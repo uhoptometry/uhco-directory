@@ -146,6 +146,16 @@ component extends="dir.dao.BaseDAO" output="false" singleton {
         if ( !structKeyExists(data, "MaidenName") ) {
             data.MaidenName = "";
         }
+        if ( !structKeyExists(data, "Prefix") ) { data.Prefix = ""; }
+        if ( !structKeyExists(data, "Suffix") ) { data.Suffix = ""; }
+        if ( !structKeyExists(data, "Degrees") ) { data.Degrees = ""; }
+        if ( !structKeyExists(data, "Campus") ) { data.Campus = ""; }
+        if ( !structKeyExists(data, "Division") ) { data.Division = ""; }
+        if ( !structKeyExists(data, "DivisionName") ) { data.DivisionName = ""; }
+        if ( !structKeyExists(data, "Department") ) { data.Department = ""; }
+        if ( !structKeyExists(data, "DepartmentName") ) { data.DepartmentName = ""; }
+        if ( !structKeyExists(data, "Office_Mailing_Address") ) { data.Office_Mailing_Address = ""; }
+        if ( !structKeyExists(data, "Mailcode") ) { data.Mailcode = ""; }
         // Map Title fields to parameter names (ColdFusion SQL parser doesn't like numeric placeholders)
         data.TitleOneParam = data.Title1;
         data.TitleTwoParam = data.Title2;
@@ -159,7 +169,10 @@ component extends="dir.dao.BaseDAO" output="false" singleton {
                 EmailPrimary, EmailSecondary,
                 Phone, UH_API_ID,
                 Title1, Title2, Title3,
-                Room, Building
+                Room, Building,
+                Prefix, Suffix, Degrees,
+                Campus, Division, DivisionName, Department, DepartmentName,
+                Office_Mailing_Address, Mailcode
             )
             VALUES (
                 :FirstName, :MiddleName, :LastName, :MaidenName,
@@ -167,7 +180,10 @@ component extends="dir.dao.BaseDAO" output="false" singleton {
                 :EmailPrimary, :EmailSecondary,
                 :Phone, :UH_API_ID,
                 :TitleOneParam, :TitleTwoParam, :TitleThreeParam,
-                :Room, :Building
+                :Room, :Building,
+                :Prefix, :Suffix, :Degrees,
+                :Campus, :Division, :DivisionName, :Department, :DepartmentName,
+                :Office_Mailing_Address, :Mailcode
 
             );
             SELECT SCOPE_IDENTITY() AS newID;
@@ -197,6 +213,16 @@ component extends="dir.dao.BaseDAO" output="false" singleton {
         if ( !structKeyExists(data, "MaidenName") ) {
             data.MaidenName = "";
         }
+        if ( !structKeyExists(data, "Prefix") ) { data.Prefix = ""; }
+        if ( !structKeyExists(data, "Suffix") ) { data.Suffix = ""; }
+        if ( !structKeyExists(data, "Degrees") ) { data.Degrees = ""; }
+        if ( !structKeyExists(data, "Campus") ) { data.Campus = ""; }
+        if ( !structKeyExists(data, "Division") ) { data.Division = ""; }
+        if ( !structKeyExists(data, "DivisionName") ) { data.DivisionName = ""; }
+        if ( !structKeyExists(data, "Department") ) { data.Department = ""; }
+        if ( !structKeyExists(data, "DepartmentName") ) { data.DepartmentName = ""; }
+        if ( !structKeyExists(data, "Office_Mailing_Address") ) { data.Office_Mailing_Address = ""; }
+        if ( !structKeyExists(data, "Mailcode") ) { data.Mailcode = ""; }
         data.TitleOneParam = data.Title1;
         data.TitleTwoParam = data.Title2;
         data.TitleThreeParam = data.Title3;
@@ -220,6 +246,16 @@ component extends="dir.dao.BaseDAO" output="false" singleton {
                 Title2 = :TitleTwoParam,
                 Title3 = :TitleThreeParam,
                 UH_API_ID = :UH_API_ID,
+                Prefix = :Prefix,
+                Suffix = :Suffix,
+                Degrees = :Degrees,
+                Campus = :Campus,
+                Division = :Division,
+                DivisionName = :DivisionName,
+                Department = :Department,
+                DepartmentName = :DepartmentName,
+                Office_Mailing_Address = :Office_Mailing_Address,
+                Mailcode = :Mailcode,
                 UpdatedAt = GETDATE()
             WHERE UserID = :id
             ",

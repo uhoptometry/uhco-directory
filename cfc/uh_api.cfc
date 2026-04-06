@@ -265,11 +265,18 @@
 
     <!--- GET: Person (restricted requires auth) --->
     <cffunction name="getPerson" access="public" returntype="struct">
-        <cfargument name="personId" type="string" required="true">
+        <cfargument name="personId"   type="string"  required="true">
+        <cfargument name="department" type="string"  required="false" default="">
+        <cfargument name="division"   type="string"  required="false" default="">
+        <cfargument name="campus"     type="string"  required="false" default="">
         <cfargument name="returnJson" type="boolean" default="false">
+        <cfset var params = { id = arguments.personId }>
+        <cfif len(trim(arguments.department))><cfset params.department = trim(arguments.department)></cfif>
+        <cfif len(trim(arguments.division))><cfset params.division = trim(arguments.division)></cfif>
+        <cfif len(trim(arguments.campus))><cfset params.campus = trim(arguments.campus)></cfif>
         <cfset var response = apiRequest(
             "person",
-            { id = arguments.personId },
+            params,
             arguments.returnJson,
             true
         )>

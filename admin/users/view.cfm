@@ -5,18 +5,44 @@
 <cfparam name="form.matchedApiId" default="">
 
 <!--- Assign variables outside the content string --->
+<cfset prefix      = profile.user.PREFIX       ?: "">
+<cfset suffix      = profile.user.SUFFIX       ?: "">
+<cfset degrees     = profile.user.DEGREES      ?: "">
+<cfset pronouns    = profile.user.PRONOUNS     ?: "">
+<cfset maidenName  = profile.user.MAIDENNAME   ?: "">
+<cfset preferredName = profile.user.PREFERREDNAME ?: "">
 <cfset emailPrimary = profile.user.EMAILPRIMARY ?: "">
 <cfset emailSecondary = profile.user.EMAILSECONDARY ?: "">
-<cfset phone = profile.user.PHONE ?: "">
-<cfset room = profile.user.ROOM ?: "">
-<cfset building = profile.user.BUILDING ?: "">
-<cfset cougarnetid = profile.user.COUGARNETID ?: "">
-<cfset title1 = profile.user.TITLE1 ?: "">
-<cfset title2 = profile.user.TITLE2 ?: "">
-<cfset title3 = profile.user.TITLE3 ?: "">
-<cfset uhApiId = trim(profile.user.UH_API_ID ?: "")>
-<cfset showAcademicInfo = false>
+<cfset phone       = profile.user.PHONE        ?: "">
+<cfset room        = profile.user.ROOM         ?: "">
+<cfset building    = profile.user.BUILDING     ?: "">
+<cfset campus      = profile.user.CAMPUS       ?: "">
+<cfset division       = profile.user.DIVISION      ?: "">
+<cfset divisionName   = profile.user.DIVISIONNAME  ?: "">
+<cfset department     = profile.user.DEPARTMENT    ?: "">
+<cfset departmentName = profile.user.DEPARTMENTNAME ?: "">
+<cfset officeMailAddr = profile.user.OFFICE_MAILING_ADDRESS ?: "">
+<cfset mailcode    = profile.user.MAILCODE     ?: "">
+<cfset cougarnetid = profile.user.COUGARNETID  ?: "">
+<cfset title1      = profile.user.TITLE1       ?: "">
+<cfset title2      = profile.user.TITLE2       ?: "">
+<cfset title3      = profile.user.TITLE3       ?: "">
+<cfset uhApiId     = trim(profile.user.UH_API_ID ?: "")>
+<cfset showAcademicInfo   = false>
+<cfset showStudentProfile = false>
 <cfset quickMatchAttempted = (cgi.request_method EQ "POST" AND form.quickApiMatch EQ "1")>
+<cfset hasAddress =
+    len(room) ||
+    len(building) ||
+    len(campus) ||
+    len(division) ||
+    len(divisionName) ||
+    len(department) ||
+    len(departmentName) ||
+    len(officeMailAddr) ||
+    len(mailcode)
+>
+
 <cfset quickMatchFound = false>
 <cfset quickMatchApiId = "">
 <cfset quickMatchApiFirstName = "">
@@ -29,9 +55,26 @@
         <cfset flagName = trim(profile.flags[f].FLAGNAME ?: "")>
         <cfif compareNoCase(flagName, "Current Student") eq 0 OR compareNoCase(flagName, "Alumni") eq 0>
             <cfset showAcademicInfo = true>
-            <cfbreak>
+        </cfif>
+        <cfif compareNoCase(flagName, "Current Student") eq 0>
+            <cfset showStudentProfile = true>
         </cfif>
     </cfloop>
+</cfif>
+
+<!--- Load student profile data if applicable --->
+<cfif showStudentProfile>
+    <cfset studentProfileSvc = createObject("component", "dir.cfc.studentProfile_service").init()>
+    <cfset spProfile   = studentProfileSvc.getProfile(url.userID).data>
+    <cfset spAwards    = studentProfileSvc.getAwards(url.userID).data>
+    <cfset spHometown  = structIsEmpty(spProfile) ? "" : (spProfile.HOMETOWN         ?: "")>
+    <cfset spFirstExt  = structIsEmpty(spProfile) ? "" : (spProfile.FIRSTEXTERNSHIP  ?: "")>
+    <cfset spSecondExt = structIsEmpty(spProfile) ? "" : (spProfile.SECONDEXTERNSHIP ?: "")>
+<cfelse>
+    <cfset spAwards    = []>
+    <cfset spHometown  = "">
+    <cfset spFirstExt  = "">
+    <cfset spSecondExt = "">
 </cfif>
 
 <cfif quickMatchAttempted>
@@ -174,26 +217,47 @@
 <cfset quickMatchHtml &= "</div>">
 
 <cfset content = "
-<h1>#profile.user.FIRSTNAME# #profile.user.LASTNAME#</h1>
+<h1>#(len(prefix) ? prefix & ' ' : '')##profile.user.FIRSTNAME# #profile.user.LASTNAME##(len(suffix) ? ', ' & suffix : '')#</h1>
+<p class='text-muted fs-5'>#(len(degrees) ? degrees : '')#</p>
 
 #quickMatchHtml#
 
 <div class='row mt-4'>
-    <div class='col-md-4'>
-        <h4>Profile Info</h4>
-        " & (emailPrimary != "" ? "<p><strong>Email (@uh):</strong> #emailPrimary#</p>" : "") & "
-        " & (emailSecondary != "" ? "<p><strong>Email (@central/@cougarnet):</strong> #emailSecondary#</p>" : "") & "
-        " & (phone != "" ? "<p><strong>Phone:</strong> #phone#</p>" : "") & "
-        " & (cougarnetid != "" ? "<p><strong>CougarNetID:</strong> #cougarnetid#</p>" : "") & "
-        " & (title1 != "" ? "<p><strong>Title 1:</strong> #title1#</p>" : "") & "
-        " & (title2 != "" ? "<p><strong>Title 2:</strong> #title2#</p>" : "") & "
-        " & (title3 != "" ? "<p><strong>Title 3:</strong> #title3#</p>" : "") & "
-        " & (room != "" ? "<p><strong>Room:</strong> #room#</p>" : "") & "
-        " & (building != "" ? "<p><strong>Building:</strong> #building#</p>" : "") & "
+    <div class='col-md-6'>
+        <div class='card mb-3'>
+            <div class='card-header fw-semibold'>General Information</div>
+            <div class='card-body'>
+                #(len(preferredName) ? '<p><strong>Preferred Name:</strong> ' & EncodeForHTML(preferredName) & '</p>' : '')#
+                #(len(maidenName)    ? '<p><strong>Maiden Name:</strong> '    & EncodeForHTML(maidenName)    & '</p>' : '')#
+                #(len(pronouns)      ? '<p><strong>Pronouns:</strong> '        & EncodeForHTML(pronouns)      & '</p>' : '')#
+                #(len(emailPrimary)  ? '<p><strong>Email (@uh):</strong> '      & EncodeForHTML(emailPrimary)  & '</p>' : '')#
+                #(len(emailSecondary)? '<p><strong>Email (@central/@cougarnet):</strong> ' & EncodeForHTML(emailSecondary) & '</p>' : '')#
+                #(len(phone)         ? '<p><strong>Phone:</strong> '            & EncodeForHTML(phone)         & '</p>' : '')#
+                #(len(cougarnetid)   ? '<p><strong>CougarNet ID:</strong> '     & EncodeForHTML(cougarnetid)   & '</p>' : '')#
+                #(len(title1)        ? '<p><strong>Title 1:</strong> '          & EncodeForHTML(title1)        & '</p>' : '')#
+                #(len(title2)        ? '<p><strong>Title 2:</strong> '          & EncodeForHTML(title2)        & '</p>' : '')#
+                #(len(title3)        ? '<p><strong>Title 3:</strong> '          & EncodeForHTML(title3)        & '</p>' : '')#
+            </div>
+        </div>
+        #( hasAddress ? "
+        <div class='card mb-3'>
+            <div class='card-header fw-semibold'>Address</div>
+            <div class='card-body'>
+                #(len(room)          ? '<p><strong>Room:</strong> '                  & EncodeForHTML(room)          & '</p>' : '')#
+                #(len(building)      ? '<p><strong>Building:</strong> '              & EncodeForHTML(building)      & '</p>' : '')#
+                #(len(campus)        ? '<p><strong>Campus:</strong> '               & EncodeForHTML(campus)        & '</p>' : '')#
+                #(len(division)       ? '<p><strong>Division:</strong> '      & EncodeForHTML(division)       & (len(divisionName)   ? ' <span class="text-muted">(' & EncodeForHTML(divisionName)   & ')</span>' : '') & '</p>' : '')#
+                #(len(department)     ? '<p><strong>Department:</strong> '    & EncodeForHTML(department)     & (len(departmentName) ? ' <span class="text-muted">(' & EncodeForHTML(departmentName) & ')</span>' : '') & '</p>' : '')#
+                #(len(officeMailAddr)? '<p><strong>Office Mailing Address:</strong> '& EncodeForHTML(officeMailAddr)& '</p>' : '')#
+                #(len(mailcode)      ? '<p><strong>Mailcode:</strong> '             & EncodeForHTML(mailcode)      & '</p>' : '')#
+            </div>
+        </div>" : "" )#
     </div>
 
-    <div class='col-md-4'>
-        <h4>Flags</h4>
+    <div class='col-md-3'>
+        <div class='card mb-3'>
+            <div class='card-header fw-semibold'>Flags</div>
+            <div class='card-body'>
 " />
 
 <cfif arrayLen(profile.flags) gt 0>
@@ -206,24 +270,34 @@
 </cfif>
 
 <cfset content &= "
+            </div>
+        </div>
     </div>
 
-    <div class='col-md-4'>
-        <h4>Organizations</h4>
-        <ul>
+    <div class='col-md-3'>
+        <div class='card mb-3'>
+            <div class='card-header fw-semibold'>Organizations</div>
+            <div class='card-body'>
+                <ul class='list-unstyled mb-0'>
 " />
 
 <cfif arrayLen(profile.organizations) gt 0>
     <cfloop from="1" to="#arrayLen(profile.organizations)#" index="o">
         <cfset org = profile.organizations[o]>
-        <cfset content &= "<li>#org.ORGNAME# (#org.ROLETITLE#)</li>">
+        <cfset orgLine = EncodeForHTML(org.ORGNAME)>
+        <cfif len(trim(org.ROLETITLE ?: ""))>
+            <cfset orgLine &= " <span class='text-muted small'>(&nbsp;" & EncodeForHTML(org.ROLETITLE) & "&nbsp;)</span>">
+        </cfif>
+        <cfset content &= "<li>#orgLine#</li>">
     </cfloop>
 <cfelse>
     <cfset content &= "<li class='text-muted'>No organizations assigned</li>">
 </cfif>
 
 <cfset content &= "
-        </ul>
+                </ul>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -252,37 +326,52 @@
 
 <cfset content &= "
 </div>
-
-<hr>
-
 " />
 
 <cfif showAcademicInfo>
-    <cfset content &= "
-<h3>Academic Info</h3>
-<div>
-" />
+    <cfset content &= "<hr><h3>Academic Info</h3><div>">
 
     <cfif structCount(profile.academic) gt 0>
         <cfset ac = profile.academic>
-        <cfset content &= "
-    <p><strong>Degree:</strong> #ac.DEGREE#</p>
-    <p><strong>Graduation Year:</strong> #ac.ORIGINALGRADYEAR#</p>
-    ">
+        <cfif isNumeric(ac.CURRENTGRADYEAR ?: "") AND val(ac.CURRENTGRADYEAR) GT 0>
+            <cfset content &= "<p><strong>Current Grad Year:</strong> #val(ac.CURRENTGRADYEAR)#</p>">
+        </cfif>
+        <cfif isNumeric(ac.ORIGINALGRADYEAR ?: "") AND val(ac.ORIGINALGRADYEAR) GT 0>
+            <cfset content &= "<p><strong>Original Grad Year:</strong> #val(ac.ORIGINALGRADYEAR)#</p>">
+        </cfif>
     <cfelse>
         <cfset content &= "<p class='text-muted'>No academic information</p>">
     </cfif>
 
-    <cfset content &= "
-</div>
+    <cfset content &= "</div>">
+</cfif>
 
-<hr>
-">
+<cfif showStudentProfile>
+    <cfset content &= "<hr><h3>Student Profile</h3><div class='row'>">
+    <cfset content &= "<div class='col-md-6'>">
+    <cfif len(spHometown)>  <cfset content &= "<p><strong>Hometown:</strong> "       & EncodeForHTML(spHometown)  & "</p>"> </cfif>
+    <cfif len(spFirstExt)>  <cfset content &= "<p><strong>First Externship:</strong> " & EncodeForHTML(spFirstExt)  & "</p>"> </cfif>
+    <cfif len(spSecondExt)> <cfset content &= "<p><strong>Second Externship:</strong> "& EncodeForHTML(spSecondExt) & "</p>"> </cfif>
+    <cfset content &= "</div>">
+    <cfif arrayLen(spAwards) GT 0>
+        <cfset content &= "<div class='col-md-6'><h5>Awards</h5><ul class='list-group list-group-flush'>">
+        <cfloop from="1" to="#arrayLen(spAwards)#" index="aw">
+            <cfset award = spAwards[aw]>
+            <cfset awardLine = "<li class='list-group-item px-0'>" & EncodeForHTML(award.AWARDNAME)>
+            <cfif len(trim(award.AWARDTYPE ?: ""))>
+                <cfset awardLine &= " <span class='badge bg-secondary ms-1'>" & EncodeForHTML(award.AWARDTYPE) & "</span>">
+            </cfif>
+            <cfset awardLine &= "</li>">
+            <cfset content &= awardLine>
+        </cfloop>
+        <cfset content &= "</ul></div>">
+    </cfif>
+    <cfset content &= "</div>">
 </cfif>
 
 <cfset content &= "
 <div class='mt-4'>
-    " & (uhApiId != "" ? "<a href='/dir/admin/users/uh_person.cfm?uhApiId=#urlEncodedFormat(uhApiId)#&sourceUserID=#urlEncodedFormat(profile.user.USERID)#' class='btn btn-info me-2'>UH API Details</a>" : "") & "
+    " & (uhApiId != "" ? "<a href='/dir/admin/users/uh_sync.cfm?uhApiId=#urlEncodedFormat(uhApiId)#&sourceUserID=#urlEncodedFormat(profile.user.USERID)#' class='btn btn-info me-2'>UH Sync</a>" : "") & "
     <a href='/dir/admin/users/edit.cfm?userID=#profile.user.USERID#' class='btn btn-primary'>Edit</a>
     <a href='/dir/admin/users/index.cfm' class='btn btn-secondary'>Back to Users</a>
 </div>

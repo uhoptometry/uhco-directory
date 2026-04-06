@@ -18,6 +18,17 @@
 <cfset userData.Title2 = structKeyExists(form, "TITLE2") ? form.TITLE2 : "">
 <cfset userData.Title3 = structKeyExists(form, "TITLE3") ? form.TITLE3 : "">
 <cfset userData.UH_API_ID = structKeyExists(form, "UH_API_ID") ? form.UH_API_ID : "">
+<cfset userData.MaidenName = structKeyExists(form, "MAIDENNAME") ? form.MAIDENNAME : "">
+<cfset userData.Prefix = structKeyExists(form, "PREFIX") ? form.PREFIX : "">
+<cfset userData.Suffix = structKeyExists(form, "SUFFIX") ? form.SUFFIX : "">
+<cfset userData.Degrees = structKeyExists(form, "DEGREES") ? form.DEGREES : "">
+<cfset userData.Campus = structKeyExists(form, "CAMPUS") ? form.CAMPUS : "">
+<cfset userData.Division = structKeyExists(form, "DIVISION") ? form.DIVISION : "">
+<cfset userData.DivisionName = structKeyExists(form, "DIVISIONNAME") ? form.DIVISIONNAME : "">
+<cfset userData.Department = structKeyExists(form, "DEPARTMENT") ? form.DEPARTMENT : "">
+<cfset userData.DepartmentName = structKeyExists(form, "DEPARTMENTNAME") ? form.DEPARTMENTNAME : "">
+<cfset userData.Office_Mailing_Address = structKeyExists(form, "OFFICE_MAILING_ADDRESS") ? form.OFFICE_MAILING_ADDRESS : "">
+<cfset userData.Mailcode = structKeyExists(form, "MAILCODE") ? form.MAILCODE : "">
 
 <cfif structKeyExists(form, "UserID")>
     <!--- Update user --->
@@ -142,7 +153,29 @@
         )>
     </cfif>
     
-    <cflocation url="/dir/admin/users/index.cfm" addtoken="false">
+    <!--- Handle student profile (current students) --->
+    <cfif structKeyExists(form, "processStudentProfile")>
+        <cfset studentProfileSvc = createObject("component", "dir.cfc.studentProfile_service").init()>
+        <cfset studentProfileSvc.saveProfile(
+            userID,
+            structKeyExists(form, "sp_hometown")          ? trim(form.sp_hometown)          : "",
+            structKeyExists(form, "sp_first_externship")  ? trim(form.sp_first_externship)  : "",
+            structKeyExists(form, "sp_second_externship") ? trim(form.sp_second_externship) : ""
+        )>
+        <cfset spAwardsToSave = []>
+        <cfset spCount = (structKeyExists(form, "award_count") AND isNumeric(form.award_count)) ? val(form.award_count) : 0>
+        <cfloop from="0" to="#spCount - 1#" index="ai">
+            <cfset aName = structKeyExists(form, "award_name_#ai#") ? trim(form["award_name_#ai#"]) : "">
+            <cfset aType = structKeyExists(form, "award_type_#ai#") ? trim(form["award_type_#ai#"]) : "">
+            <cfif len(aName)>
+                <cfset arrayAppend(spAwardsToSave, { name=aName, type=aType })>
+            </cfif>
+        </cfloop>
+        <cfset studentProfileSvc.replaceAwards(userID, spAwardsToSave)>
+    </cfif>
+
+    <cfset redirectTo = (structKeyExists(form, "returnTo") AND len(trim(form.returnTo))) ? trim(form.returnTo) : "/dir/admin/users/index.cfm">
+    <cflocation url="#redirectTo#" addtoken="false">
 <cfelse>
     <cfoutput><h2>Error: #result.message#</h2></cfoutput>
 </cfif>

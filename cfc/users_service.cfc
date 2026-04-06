@@ -34,6 +34,16 @@ component output="false" singleton {
         data.Title3 = trim( data.Title3 ?: "" );
         data.Room = trim( data.Room ?: "" );
         data.Building = trim( data.Building ?: "" );
+        data.Prefix = trim( data.Prefix ?: "" );
+        data.Suffix = trim( data.Suffix ?: "" );
+        data.Degrees = trim( data.Degrees ?: "" );
+        data.Campus = trim( data.Campus ?: "" );
+        data.Division = trim( data.Division ?: "" );
+        data.DivisionName = trim( data.DivisionName ?: "" );
+        data.Department = trim( data.Department ?: "" );
+        data.DepartmentName = trim( data.DepartmentName ?: "" );
+        data.Office_Mailing_Address = trim( data.Office_Mailing_Address ?: "" );
+        data.Mailcode = trim( data.Mailcode ?: "" );
 
         // Validate
         if ( !len( data.FirstName ) OR !len( data.LastName ) ) {
@@ -63,6 +73,16 @@ component output="false" singleton {
         data.Title3 = trim( data.Title3 ?: "" );
         data.Room = trim( data.Room ?: "" );
         data.Building = trim( data.Building ?: "" );
+        data.Prefix = trim( data.Prefix ?: "" );
+        data.Suffix = trim( data.Suffix ?: "" );
+        data.Degrees = trim( data.Degrees ?: "" );
+        data.Campus = trim( data.Campus ?: "" );
+        data.Division = trim( data.Division ?: "" );
+        data.DivisionName = trim( data.DivisionName ?: "" );
+        data.Department = trim( data.Department ?: "" );
+        data.DepartmentName = trim( data.DepartmentName ?: "" );
+        data.Office_Mailing_Address = trim( data.Office_Mailing_Address ?: "" );
+        data.Mailcode = trim( data.Mailcode ?: "" );
 
         if ( len( data.EmailPrimary ?: "" ) && !isValid( "email", data.EmailPrimary ) ) {
             return { success=false, message="Invalid primary email." };

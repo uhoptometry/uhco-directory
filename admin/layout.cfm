@@ -15,6 +15,7 @@
         
         .sidebar {
             width: 260px;
+            flex-shrink: 0;
             background: #212529;
             color: #fff;
             min-height: 100vh;
@@ -211,7 +212,7 @@
                    onclick="toggleAPI(event)">
                     <span class="d-flex align-items-center gap-3">
                         <i class="bi bi-braces sidebar-icon"></i>
-                        <span class="sidebar-label">API</span>
+                        <span class="sidebar-label">UHCO API</span>
                     </span>
                     <i class="bi bi-chevron-down sidebar-label" id="apiChevron" style="font-size:12px;transition:transform 0.2s;"></i>
                 </a>
@@ -306,7 +307,7 @@
     </nav>
 
     <!-- Main Content -->
-    <main class="flex-fill p-4">
+    <main class="flex-fill p-4" style="min-width:0; overflow-x:hidden;">
         <cfoutput>#content#</cfoutput>
     </main>
 </div>

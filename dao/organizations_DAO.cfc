@@ -82,33 +82,35 @@ component extends="dir.dao.BaseDAO" output="false" singleton {
         return arrayLen( rows ) ? rows[1] : {};
     }
 
-    public numeric function createOrg( required string orgName, string orgType="", any parentOrgID="", numeric additionalRoles=0 ) {
+    public numeric function createOrg( required string orgName, string orgType="", any parentOrgID="", numeric additionalRoles=0, string orgDescription="" ) {
         var q = executeQueryWithRetry(
             "
-            INSERT INTO Organizations (OrgName, OrgType, ParentOrgID, AdditionalRoles)
-            VALUES (:orgName, :orgType, :parentOrgID, :additionalRoles);
+            INSERT INTO Organizations (OrgName, OrgType, ParentOrgID, AdditionalRoles, OrgDescription)
+            VALUES (:orgName, :orgType, :parentOrgID, :additionalRoles, :orgDescription);
             SELECT SCOPE_IDENTITY() AS newID;
             ",
             {
                 orgName={ value=trim(orgName), cfsqltype="cf_sql_varchar" },
                 orgType={ value=trim(orgType), cfsqltype="cf_sql_varchar" },
                 parentOrgID={ value=isNumeric(arguments.parentOrgID) ? val(arguments.parentOrgID) : 0, "null"=NOT isNumeric(arguments.parentOrgID), cfsqltype="cf_sql_integer" },
-                additionalRoles={ value=arguments.additionalRoles ? 1 : 0, cfsqltype="cf_sql_integer" }
+                additionalRoles={ value=arguments.additionalRoles ? 1 : 0, cfsqltype="cf_sql_integer" },
+                orgDescription={ value=trim(arguments.orgDescription), cfsqltype="cf_sql_varchar" }
             },
             { datasource=variables.datasource, timeout=30 }
         );
         return q.newID;
     }
 
-    public void function updateOrg( required numeric orgID, required string orgName, string orgType="", any parentOrgID="", numeric additionalRoles=0 ) {
+    public void function updateOrg( required numeric orgID, required string orgName, string orgType="", any parentOrgID="", numeric additionalRoles=0, string orgDescription="" ) {
         executeQueryWithRetry(
-            "UPDATE Organizations SET OrgName = :orgName, OrgType = :orgType, ParentOrgID = :parentOrgID, AdditionalRoles = :additionalRoles WHERE OrgID = :id",
+            "UPDATE Organizations SET OrgName = :orgName, OrgType = :orgType, ParentOrgID = :parentOrgID, AdditionalRoles = :additionalRoles, OrgDescription = :orgDescription WHERE OrgID = :id",
             {
                 id={ value=orgID, cfsqltype="cf_sql_integer" },
                 orgName={ value=trim(orgName), cfsqltype="cf_sql_varchar" },
                 orgType={ value=trim(orgType), cfsqltype="cf_sql_varchar" },
                 parentOrgID={ value=isNumeric(arguments.parentOrgID) ? val(arguments.parentOrgID) : 0, "null"=NOT isNumeric(arguments.parentOrgID), cfsqltype="cf_sql_integer" },
-                additionalRoles={ value=arguments.additionalRoles ? 1 : 0, cfsqltype="cf_sql_integer" }
+                additionalRoles={ value=arguments.additionalRoles ? 1 : 0, cfsqltype="cf_sql_integer" },
+                orgDescription={ value=trim(arguments.orgDescription), cfsqltype="cf_sql_varchar" }
             },
             { datasource=variables.datasource, timeout=30 }
         );

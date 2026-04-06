@@ -30,8 +30,8 @@
         <cfset uhApiSecret = trim(server.system.environment["UH_API_SECRET"])>
     </cfif>
 </cfif>
-<cfif uhApiToken  EQ ""><cfset uhApiToken  = "my5Tu[{[VH%,dT{wR3SEigeWc%2w,ZyFT6=5!2Rv$f0g,_z!UpDduLxhgjSm$P6"></cfif>
-<cfif uhApiSecret EQ ""><cfset uhApiSecret = "degxqhYPX2Vk@LFevunxX}:kTkX3fBXR"></cfif>
+<cfif uhApiToken  EQ ""><cfabort showerror="UH_API_TOKEN environment variable is not set."></cfif>
+<cfif uhApiSecret EQ ""><cfabort showerror="UH_API_SECRET environment variable is not set."></cfif>
 
 <!--- ── Helper: extract a field from a query row by trying multiple candidate column names ── --->
 <cffunction name="getQueryVal" access="private" returntype="string" output="false">

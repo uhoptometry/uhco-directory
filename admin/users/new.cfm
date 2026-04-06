@@ -64,6 +64,7 @@
     <cfset var checked = false>
     <cfset var childKey = "">
     <cfset var parentAttr = "">
+    <cfset var childDesc = "">
 
     <cfif NOT structKeyExists(orgChildrenByParent, arguments.parentKey)>
         <cfreturn "">
@@ -87,6 +88,13 @@
                 </div>
             </li>
         ">
+        <!--- Description for root/parent orgs only (depth 0) --->
+        <cfif arguments.depth EQ 0>
+            <cfset childDesc = trim(child.ORGDESCRIPTION ?: '')>
+            <cfif len(childDesc)>
+                <cfset html &= "<p class='text-muted small mb-0 ms-4 fst-italic'>#EncodeForHTML(childDesc)#</p>">
+            </cfif>
+        </cfif>
         <cfset html &= renderOrgCheckboxTree(childKey, arguments.depth + 1, arguments.selectedOrgIDs)>
     </cfloop>
 
@@ -101,6 +109,20 @@
     <input type='hidden' name='processOrganizations' value='1'>
     <input type='hidden' name='processExternalIDs' value='1'>
     <input type='hidden' name='processAcademicInfo' value='1'>
+    <div class='row mb-3'>
+        <div class='col-md-4'>
+            <label class='form-label'>Prefix</label>
+            <input class='form-control' name='Prefix'>
+        </div>
+        <div class='col-md-4'>
+            <label class='form-label'>Suffix</label>
+            <input class='form-control' name='Suffix'>
+        </div>
+        <div class='col-md-4'>
+            <label class='form-label'>Pronouns</label>
+            <input class='form-control' name='Pronouns'>
+        </div>
+    </div>
     <div class='row mb-3'>
         <div class='col-md-4'>
             <label class='form-label'>First Name</label>
@@ -119,22 +141,31 @@
     <div class='row mb-3'>
         <div class='col-md-6'>
             <label class='form-label'>Maiden Name</label>
-            <input class='form-control' name='MaidenName' required>
+            <input class='form-control' name='MaidenName'>
         </div>
         <div class='col-md-6'>
             <label class='form-label'>Preferred Name</label>
-            <input class='form-control' name='PreferredName' required>
+            <input class='form-control' name='PreferredName'>
+        </div>
+    </div>
+
+    <div class='row mb-3'>
+        <div class='col-md-6'>
+            <label class='form-label'>Degrees</label>
+            <input class='form-control' name='Degrees'>
         </div>
     </div>
 
     <div class='row mb-3'>
         <div class='col-md-6'>
             <label class='form-label'>Email (@uh)</label>
-            <input class='form-control' name='EmailPrimary' type='email'>
+            <input class='form-control' id='emailPrimary' name='EmailPrimary' type='email'>
+            <div class='invalid-feedback' id='emailPrimaryErr'></div>
         </div>
         <div class='col-md-6'>
             <label class='form-label'>Email (@central/@cougarnet)</label>
-            <input class='form-control' name='EmailSecondary' type='email'>
+            <input class='form-control' id='emailSecondary' name='EmailSecondary' type='email'>
+            <div class='invalid-feedback' id='emailSecondaryErr'></div>
         </div>
     </div>
 
@@ -164,14 +195,50 @@
         </div>
     </div>
     
+    <h5 class='mt-4 mb-3'>Address</h5>
     <div class='row mb-3'>
-        <div class='col-md-6'>
+        <div class='col-md-4'>
             <label class='form-label'>Room</label>
             <input class='form-control' name='Room'>
         </div>
-        <div class='col-md-6'>
+        <div class='col-md-4'>
             <label class='form-label'>Building</label>
             <input class='form-control' name='Building'>
+        </div>
+    </div>
+    <div class='row mb-3'>
+        <div class='col-md-4'>
+            <label class='form-label'>Campus</label>
+            <input class='form-control' name='Campus'>
+        </div>
+        <div class='col-md-4'>
+            <label class='form-label'>Division</label>
+            <input class='form-control' name='Division'>
+        </div>
+        <div class='col-md-4'>
+            <label class='form-label'>Division Name</label>
+            <input class='form-control' name='DivisionName'>
+        </div>
+    </div>
+    <div class='row mb-3'>
+        <div class='col-md-4'>
+            <label class='form-label'>Department</label>
+            <input class='form-control' name='Department'>
+        </div>
+        <div class='col-md-4'>
+            <label class='form-label'>Department Name</label>
+            <input class='form-control' name='DepartmentName'>
+        </div>
+        <div class='col-md-4'></div>
+    </div>
+    <div class='row mb-3'>
+        <div class='col-md-8'>
+            <label class='form-label'>Office Mailing Address</label>
+            <input class='form-control' name='Office_Mailing_Address'>
+        </div>
+        <div class='col-md-4'>
+            <label class='form-label'>Mailcode</label>
+            <input class='form-control' name='Mailcode'>
         </div>
     </div>
 
@@ -336,6 +403,44 @@
             var cb = document.querySelector('input[name=""Flags""][value=""' + id + '""]');
             if (cb) cb.addEventListener('change', syncRowVisibility);
         });
+    })();
+    </script>
+
+    <script>
+    (function () {
+        var epEl  = document.getElementById('emailPrimary');
+        var esEl  = document.getElementById('emailSecondary');
+        var epErr = document.getElementById('emailPrimaryErr');
+        var esErr = document.getElementById('emailSecondaryErr');
+        function showError(el, errEl, msg) { el.classList.add('is-invalid'); errEl.textContent = msg; }
+        function clearError(el, errEl)     { el.classList.remove('is-invalid'); errEl.textContent = ''; }
+        function validatePrimary() {
+            var val = (epEl ? epEl.value : '').trim().toLowerCase();
+            if (val && !val.endsWith('@uh.edu')) {
+                showError(epEl, epErr, 'Must be a @uh.edu address (e.g. jsmith@uh.edu).');
+                return false;
+            }
+            if (epEl) clearError(epEl, epErr);
+            return true;
+        }
+        function validateSecondary() {
+            var val = (esEl ? esEl.value : '').trim().toLowerCase();
+            if (val && !val.endsWith('@cougarnet.uh.edu') && !val.endsWith('@central.uh.edu')) {
+                showError(esEl, esErr, 'Must be a @cougarnet.uh.edu or @central.uh.edu address.');
+                return false;
+            }
+            if (esEl) clearError(esEl, esErr);
+            return true;
+        }
+        if (epEl) epEl.addEventListener('blur', validatePrimary);
+        if (esEl) esEl.addEventListener('blur', validateSecondary);
+        var form = epEl ? epEl.closest('form') : null;
+        if (form) {
+            form.addEventListener('submit', function (e) {
+                var ok = validatePrimary() & validateSecondary();
+                if (!ok) { e.preventDefault(); var inv = document.querySelector('.is-invalid'); if (inv) inv.focus(); }
+            });
+        }
     })();
     </script>
 

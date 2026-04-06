@@ -182,6 +182,10 @@
                 <div class='form-text'>Allow role title &amp; order when assigning users.</div>
             </div>
             <div class='col-12'>
+                <label class='form-label'>Description</label>
+                <textarea class='form-control' name='OrgDescription' rows='2' placeholder='Optional description shown on user edit/new pages for parent organizations.'></textarea>
+            </div>
+            <div class='col-12'>
                 <button class='btn btn-success'>Add Organization</button>
             </div>
         </form>

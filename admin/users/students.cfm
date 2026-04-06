@@ -81,15 +81,12 @@
 </cfif>
 
 <!--- Apply search filter --->
+<cfinclude template="/dir/admin/users/_search_helper.cfm">
 <cfif searchTerm != "">
     <cfset searchedStudents = []>
     <cfloop from="1" to="#arrayLen(filteredStudents)#" index="i">
-        <cfset u = filteredStudents[i]>
-        <cfif findNoCase(searchTerm, u.FIRSTNAME) ||
-              findNoCase(searchTerm, u.LASTNAME)  ||
-              findNoCase(searchTerm, u.EMAILPRIMARY) ||
-              findNoCase(searchTerm, u.EMAILSECONDARY)>
-            <cfset arrayAppend(searchedStudents, u)>
+        <cfif userMatchesSearch(filteredStudents[i], searchTerm)>
+            <cfset arrayAppend(searchedStudents, filteredStudents[i])>
         </cfif>
     </cfloop>
     <cfset filteredStudents = searchedStudents>
@@ -165,7 +162,7 @@
             <input type='hidden' name='sortCol' value='#sortColumn#'>
             <input type='hidden' name='sortDir' value='#sortDirection#'>
             <div style='min-width:220px; flex:1;'>
-                <input type='text' name='search' class='form-control' placeholder='Search by name or email...' value='#searchTerm#'>
+                <input type='text' name='search' class='form-control' placeholder='Search name/email or use field:value (e.g. lastname:Doe &amp;&amp; firstname:Jane)' value='#searchTerm#'>
             </div>
             <label for='flagFilter' class='mb-0'>Flag:</label>
             <select name='filterFlag' id='flagFilter' class='form-select' style='width:auto;'>
@@ -199,6 +196,7 @@
                 <option value='9999'>All</option>
             </select>
             <button type='submit' class='btn btn-sm btn-secondary'>Apply</button>
+            <button type='button' class='btn btn-sm btn-outline-secondary' data-bs-toggle='modal' data-bs-target='##searchHelpModal' title='Search help'><i class='bi bi-question-circle'></i></button>
             " & ((selectedFlagFilter != "" OR selectedGradYear != "" OR searchTerm != "") ? "<a href='?sortCol=" & sortColumn & "&sortDir=" & sortDirection & "' class='btn btn-sm btn-warning'>Clear</a>" : "") & "
         </form>
     </div>

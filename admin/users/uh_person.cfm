@@ -165,6 +165,11 @@
                     Title1 = currentUser.TITLE1 ?: "",
                     Title2 = currentUser.TITLE2 ?: "",
                     Title3 = currentUser.TITLE3 ?: "",
+                    Division = currentUser.DIVISION ?: "",
+                    Campus = currentUser.CAMPUS ?: "",
+                    Department = currentUser.DEPARTMENT ?: "",
+                    Office_Mailing_Address = currentUser.OFFICE_MAILING_ADDRESS ?: "",
+                    Mailcode = currentUser.MAILCODE ?: "",
                     UH_API_ID = currentUser.UH_API_ID ?: ""
                 }>
 
@@ -234,28 +239,24 @@
                     <cfset apiRoom = trim(syncAllGetApiValue(syncApiPerson, "room"))>
                     <cfset apiBuilding = trim(syncAllGetApiValue(syncApiPerson, "building"))>
                     <cfset apiTitle = trim(syncAllGetApiValue(syncApiPerson, "title"))>
+                    <cfset apiDivision = trim(syncAllGetApiValue(syncApiPerson, "division"))>
+                    <cfset apiCampus = trim(syncAllGetApiValue(syncApiPerson, "campus"))>
+                    <cfset apiDepartment = trim(syncAllGetApiValue(syncApiPerson, "department"))>
+                    <cfset apiOfficeAddr = trim(syncAllGetApiValue(syncApiPerson, "office_mailing_address,officeMailingAddress,mailing_address"))>
+                    <cfset apiMailcode = trim(syncAllGetApiValue(syncApiPerson, "mailcode,mail_code"))>
 
-                    <cfif len(apiFirstName)>
-                        <cfset userData.FirstName = apiFirstName>
-                    </cfif>
-                    <cfif len(apiLastName)>
-                        <cfset userData.LastName = apiLastName>
-                    </cfif>
-                    <cfif len(apiEmail)>
-                        <cfset userData.EmailPrimary = lCase(apiEmail)>
-                    </cfif>
-                    <cfif len(apiPhone)>
-                        <cfset userData.Phone = apiPhone>
-                    </cfif>
-                    <cfif len(apiRoom)>
-                        <cfset userData.Room = apiRoom>
-                    </cfif>
-                    <cfif len(apiBuilding)>
-                        <cfset userData.Building = apiBuilding>
-                    </cfif>
-                    <cfif len(apiTitle)>
-                        <cfset userData.Title1 = apiTitle>
-                    </cfif>
+                    <cfif len(apiFirstName)>  <cfset userData.FirstName = apiFirstName>                    </cfif>
+                    <cfif len(apiLastName)>   <cfset userData.LastName  = apiLastName>                    </cfif>
+                    <cfif len(apiEmail)>      <cfset userData.EmailPrimary = lCase(apiEmail)>             </cfif>
+                    <cfif len(apiPhone)>      <cfset userData.Phone = apiPhone>                          </cfif>
+                    <cfif len(apiRoom)>       <cfset userData.Room = apiRoom>                            </cfif>
+                    <cfif len(apiBuilding)>   <cfset userData.Building = apiBuilding>                    </cfif>
+                    <cfif len(apiTitle)>      <cfset userData.Title1 = apiTitle>                         </cfif>
+                    <cfif len(apiDivision)>   <cfset userData.Division = apiDivision>                    </cfif>
+                    <cfif len(apiCampus)>     <cfset userData.Campus = apiCampus>                        </cfif>
+                    <cfif len(apiDepartment)> <cfset userData.Department = apiDepartment>                </cfif>
+                    <cfif len(apiOfficeAddr)> <cfset userData.Office_Mailing_Address = apiOfficeAddr>    </cfif>
+                    <cfif len(apiMailcode)>   <cfset userData.Mailcode = apiMailcode>                    </cfif>
                 </cfif>
 
                 <cfset updateResult = usersService.updateUser(applyUserID, userData)>
@@ -430,6 +431,11 @@
                 Title1 = currentUser.TITLE1 ?: "",
                 Title2 = currentUser.TITLE2 ?: "",
                 Title3 = currentUser.TITLE3 ?: "",
+                Division = currentUser.DIVISION ?: "",
+                Campus = currentUser.CAMPUS ?: "",
+                Department = currentUser.DEPARTMENT ?: "",
+                Office_Mailing_Address = currentUser.OFFICE_MAILING_ADDRESS ?: "",
+                Mailcode = currentUser.MAILCODE ?: "",
                 UH_API_ID = currentUser.UH_API_ID ?: ""
             }>
 
@@ -447,6 +453,16 @@
                 <cfset userData.Building = applyValue>
             <cfelseif applyField EQ "TITLE1">
                 <cfset userData.Title1 = applyValue>
+            <cfelseif applyField EQ "DIVISION">
+                <cfset userData.Division = applyValue>
+            <cfelseif applyField EQ "CAMPUS">
+                <cfset userData.Campus = applyValue>
+            <cfelseif applyField EQ "DEPARTMENT">
+                <cfset userData.Department = applyValue>
+            <cfelseif applyField EQ "OFFICE_MAILING_ADDRESS">
+                <cfset userData.Office_Mailing_Address = applyValue>
+            <cfelseif applyField EQ "MAILCODE">
+                <cfset userData.Mailcode = applyValue>
             <cfelse>
                 <cfset saveMessage = "This field is not currently updatable from this page.">
                 <cfset saveMessageClass = "alert-warning">
@@ -763,16 +779,17 @@
             { label="Phone", dbKey="PHONE", apiKeys="phone,phoneNumber", canUpdate=true },
             { label="Room", dbKey="ROOM", apiKeys="room", canUpdate=true },
             { label="Building", dbKey="BUILDING", apiKeys="building", canUpdate=true },
-            { label="Title (DB: Title1)", dbKey="TITLE1", apiKeys="title", canUpdate=true }
+            { label="Title (DB: Title1)", dbKey="TITLE1", apiKeys="title", canUpdate=true },
+            { label="Division", dbKey="DIVISION", apiKeys="division", canUpdate=true },
+            { label="Campus", dbKey="CAMPUS", apiKeys="campus", canUpdate=true },
+            { label="Department", dbKey="DEPARTMENT", apiKeys="department", canUpdate=true },
+            { label="Office Mailing Address", dbKey="OFFICE_MAILING_ADDRESS", apiKeys="office_mailing_address,officeMailingAddress,mailing_address", canUpdate=true },
+            { label="Mailcode", dbKey="MAILCODE", apiKeys="mailcode,mail_code", canUpdate=true }
         ]>
 
         <cfset apiOnlyRows = [
-            { label="Division", apiKeys="division" },
             { label="Division Name", apiKeys="division_name,divisionName" },
-            { label="Campus", apiKeys="campus" },
-            { label="Mail Code", apiKeys="mailcode,mailCode" },
-            { label="Office Mailing Address", apiKeys="office-mailing_address,office_mailing_address,officeMailingAddress,mailing_address" },
-            { label="Mailcode", apiKeys="mailcode,mail_code" }
+            { label="Department Name", apiKeys="department_name,departmentName" }
         ]>
 
         <cfset flagCompareRows = [

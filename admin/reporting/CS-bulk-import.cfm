@@ -48,6 +48,36 @@
 <cfset errorCount      = 0>
 <cfset globalError     = "">
 
+<!--- ── Handle single manual staging (AJAX) ── --->
+<cfif cgi.request_method EQ "POST" AND structKeyExists(form, "action") AND form.action EQ "stage_one">
+    <cftry>
+        <cfset ssFN = len(trim(form.firstName ?: "")) ? trim(form.firstName) : "">
+        <cfset ssLN = len(trim(form.lastName  ?: "")) ? trim(form.lastName)  : "">
+        <cfset ssGY = len(trim(form.gradYear  ?: "")) ? trim(form.gradYear)  : "">
+        <cfif len(ssFN) AND len(ssLN)>
+            <cfset ssStagingID = "NOTFOUND_" & ssGY & "_" & createUUID()>
+            <cfset queryExecute(
+                "MERGE INTO UHApiPeopleStaging AS tgt
+                 USING (SELECT :uhid AS UHApiID) AS src ON tgt.UHApiID = src.UHApiID
+                 WHEN NOT MATCHED THEN
+                 INSERT (UHApiID, FirstName, LastName, Reason)
+                 VALUES (:uhid, :fn, :ln, :reason);",
+                {
+                    uhid   = { value=ssStagingID, cfsqltype="cf_sql_varchar" },
+                    fn     = { value=ssFN,         cfsqltype="cf_sql_varchar" },
+                    ln     = { value=ssLN,         cfsqltype="cf_sql_varchar" },
+                    reason = { value="User Not Found in API for Year " & ssGY, cfsqltype="cf_sql_varchar" }
+                },
+                { datasource="UHCO_Directory", timeout=30 }
+            )>
+        </cfif>
+    <cfcatch>
+        <cfheader statuscode="500">
+    </cfcatch>
+    </cftry>
+    <cfabort>
+</cfif>
+
 <!--- ── Helper function ── --->
 <cffunction name="getColVal" access="private" returntype="string" output="false">
     <cfargument name="row"        type="struct" required="true">
@@ -255,42 +285,15 @@
             </cfif>
 
             <cfif structIsEmpty(biFoundPerson)>
-                <!--- ── Not found in API: insert into staging ── --->
-                <cftry>
-                    <cfset biStagingID = "NOTFOUND_" & selectedYear & "_" & createUUID()>
-                    <cfset queryExecute(
-                        "MERGE INTO UHApiPeopleStaging AS tgt
-                         USING (SELECT :uhid AS UHApiID) AS src ON tgt.UHApiID = src.UHApiID
-                         WHEN NOT MATCHED THEN
-                         INSERT (UHApiID, FirstName, LastName, Reason)
-                         VALUES (:uhid, :fn, :ln, :reason);",
-                        {
-                            uhid   = { value=biStagingID,                                                          cfsqltype="cf_sql_varchar" },
-                            fn     = { value=biFirst,                                                              cfsqltype="cf_sql_varchar" },
-                            ln     = { value=biLast,                                                               cfsqltype="cf_sql_varchar" },
-                            reason = { value="User Not Found in API for Year " & selectedYear, cfsqltype="cf_sql_varchar" }
-                        },
-                        { datasource="UHCO_Directory", timeout=30 }
-                    )>
-                    <cfset arrayAppend(processResults, {
-                        status    = "staged",
-                        firstName = biFirst,
-                        lastName  = biLast,
-                        gradYear  = biGradYr,
-                        message   = "Not found in API — added to staging"
-                    })>
-                    <cfset stagedCount++>
-                <cfcatch>
-                    <cfset arrayAppend(processResults, {
-                        status    = "error",
-                        firstName = biFirst,
-                        lastName  = biLast,
-                        gradYear  = biGradYr,
-                        message   = "Staging insert failed: " & cfcatch.message
-                    })>
-                    <cfset errorCount++>
-                </cfcatch>
-                </cftry>
+                <!--- ── Not found in API: collect for manual staging ── --->
+                <cfset arrayAppend(processResults, {
+                    status    = "notfound",
+                    firstName = biFirst,
+                    lastName  = biLast,
+                    gradYear  = biGradYr,
+                    message   = "Not found in API"
+                })>
+                <cfset stagedCount++>
                 <cfcontinue>
             </cfif>
 
@@ -437,8 +440,7 @@
     <cfelse>
         <div class="d-flex gap-3 mb-3 flex-wrap">
             <span class="badge bg-success fs-6 px-3 py-2"><i class="bi bi-person-plus-fill me-1"></i> #insertedCount# Inserted</span>
-            <span class="badge bg-secondary fs-6 px-3 py-2"><i class="bi bi-skip-forward-fill me-1"></i> #skippedCount# Skipped (existing)</span>
-            <span class="badge bg-warning text-dark fs-6 px-3 py-2"><i class="bi bi-hourglass-split me-1"></i> #stagedCount# Staged (not in API)</span>
+            <span class="badge bg-warning text-dark fs-6 px-3 py-2"><i class="bi bi-hourglass-split me-1"></i> #stagedCount# Not in API</span>
             <span class="badge bg-danger fs-6 px-3 py-2"><i class="bi bi-exclamation-triangle-fill me-1"></i> #errorCount# Errors</span>
         </div>
 
@@ -458,6 +460,7 @@
                 <tbody>
                 <cfloop from="1" to="#arrayLen(processResults)#" index="bir">
                     <cfset biRow = processResults[bir]>
+                    <cfif biRow.status EQ "skipped"><cfcontinue></cfif>
                     <cfif biRow.status EQ "inserted">
                         <tr>
                             <td>#bir#</td>
@@ -494,23 +497,21 @@
                                 <a href="/dir/admin/users/edit.cfm?userID=#biRow.userID#" class="btn btn-outline-success ms-1" style="font-size:0.75rem;padding:1px 6px;">Edit</a>
                             </td>
                         </tr>
-                    <cfelseif biRow.status EQ "skipped">
-                        <tr>
-                            <td>#bir#</td>
-                            <td><span class="badge bg-secondary">Skipped</span></td>
-                            <td>#encodeForHTML(biRow.gradYear ?: "")#</td>
-                            <td>#encodeForHTML(biRow.firstName)#</td>
-                            <td>#encodeForHTML(biRow.lastName)#</td>
-                            <td><small class="text-muted">#encodeForHTML(biRow.message)#</small></td>
-                        </tr>
-                    <cfelseif biRow.status EQ "staged">
+                    <cfelseif biRow.status EQ "notfound">
                         <tr class="table-warning">
                             <td>#bir#</td>
-                            <td><span class="badge bg-warning text-dark">Staged</span></td>
+                            <td><span class="badge bg-warning text-dark">Not in API</span></td>
                             <td>#encodeForHTML(biRow.gradYear ?: "")#</td>
                             <td>#encodeForHTML(biRow.firstName)#</td>
                             <td>#encodeForHTML(biRow.lastName)#</td>
-                            <td><small class="text-muted">#encodeForHTML(biRow.message)#</small></td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-warning stage-btn"
+                                        data-fn="#encodeForHTMLAttribute(biRow.firstName)#"
+                                        data-ln="#encodeForHTMLAttribute(biRow.lastName)#"
+                                        data-gy="#encodeForHTMLAttribute(biRow.gradYear ?: '')#">
+                                    Add to Staging
+                                </button>
+                            </td>
                         </tr>
                     <cfelse>
                         <tr class="table-danger">
@@ -531,6 +532,38 @@
         </cfif>
     </cfif>
 </cfif>
+
+<script>
+document.querySelectorAll('.stage-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        var self = this;
+        var fd = new FormData();
+        fd.append('action',    'stage_one');
+        fd.append('firstName', self.dataset.fn);
+        fd.append('lastName',  self.dataset.ln);
+        fd.append('gradYear',  self.dataset.gy);
+        self.disabled = true;
+        self.textContent = 'Staging\u2026';
+        fetch(window.location.pathname, { method: 'POST', body: fd })
+            .then(function(r) {
+                if (r.ok) {
+                    self.textContent = 'Staged';
+                    self.classList.remove('btn-warning');
+                    self.classList.add('btn-secondary');
+                } else {
+                    self.disabled = false;
+                    self.textContent = 'Add to Staging';
+                    alert('Staging failed. Please try again.');
+                }
+            })
+            .catch(function() {
+                self.disabled = false;
+                self.textContent = 'Add to Staging';
+                alert('Staging failed. Please try again.');
+            });
+    });
+});
+</script>
 </cfoutput></cfsavecontent>
 
 <cfinclude template="/dir/admin/layout.cfm">

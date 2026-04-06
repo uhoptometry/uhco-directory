@@ -5,6 +5,10 @@
 <cfparam name="form.viewStaging" default="1">
 <cfparam name="form.deleteFromStaging" default="0">
 <cfparam name="form.deleteUHApiID" default="">
+<cfparam name="url.msg" default="">
+<cfparam name="url.err" default="">
+<cfparam name="url.importedName" default="">
+<cfparam name="url.newUserID" default="">
 
 <cfset datasource = "UHCO_Directory">
 <cfset uhApiToken = structKeyExists(application, "uhApiToken") ? trim(application.uhApiToken ?: "") : "">
@@ -37,7 +41,13 @@
     <cfset uhApiSecret = "degxqhYPX2Vk@LFevunxX}:kTkX3fBXR">
 </cfif>
 
-<cfset content = "
+<cfset content = "">
+<cfif url.msg EQ "imported">
+    <cfset content &= "<div class='alert alert-success'><i class='bi bi-check-circle-fill'></i> <strong>#EncodeForHTML(url.importedName)#</strong> imported successfully as <a href='/dir/admin/users/edit.cfm?userID=#EncodeForHTMLAttribute(url.newUserID)#'>User ##&thinsp;#EncodeForHTML(url.newUserID)#</a>.</div>">
+<cfelseif len(url.err)>
+    <cfset content &= "<div class='alert alert-danger'><strong>Import failed:</strong> #EncodeForHTML(url.err)#</div>">
+</cfif>
+<cfset content &= "
 <h1>UH People Import</h1>
 <p class='text-muted'>Pull people from the UH API, compare by first and last name against local users, and stage missing people for review.</p>
 <div class='mb-3'>
@@ -118,12 +128,16 @@
                         <td>#EncodeForHTML(stagingRecords.uhApiId)#</td>
                         <td>#EncodeForHTML(stagingRecords.reason ?: "")#</td>
                         <td>#dateformat(stagingRecords.createdAt, 'yyyy-mm-dd')# #timeformat(stagingRecords.createdAt, 'HH:mm')#</td>
-                        <td>
+                        <td class='text-nowrap'>
                             <a href='/dir/admin/users/uh_person.cfm?uhApiId=#urlEncodedFormat(stagingRecords.uhApiId)#' class='btn btn-sm btn-outline-primary'>Review</a>
+                            <cfif (stagingRecords.reason ?: "") EQ reasonApiOnly>
+                                <a href='/dir/admin/users/quick_import_person.cfm?uhApiId=#urlEncodedFormat(stagingRecords.uhApiId)#&returnTo=#urlEncodedFormat(cgi.SCRIPT_NAME)#'
+                                   class='btn btn-sm btn-success ms-1'>Quick Import</a>
+                            </cfif>
                             <form method='post' style='display:inline;'>
                                 <input type='hidden' name='deleteFromStaging' value='1'>
                                 <input type='hidden' name='deleteUHApiID' value='#stagingRecords.uhApiId#'>
-                                <button type='submit' class='btn btn-sm btn-outline-danger' onclick='return confirm(""Remove from staging?"");'>Delete</button>
+                                <button type='submit' class='btn btn-sm btn-outline-danger ms-1' onclick='return confirm(&quot;Remove from staging?&quot;);'>Delete</button>
                             </form>
                         </td>
                     </tr>
@@ -280,15 +294,17 @@
                         <td>#EncodeForHTML(row.uhApiId)#</td>
                         <td>#EncodeForHTML(row.action)#</td>
                         <td>#EncodeForHTML(row.reason)#</td>
-                        <td>
+                        <td class='text-nowrap'>
                             <a href='/dir/admin/users/uh_person.cfm?uhApiId=#urlEncodedFormat(row.uhApiId)#' class='btn btn-sm btn-outline-primary'>Review</a>
             ">
             <cfif row.action EQ "Inserted">
                 <cfset content &= "
+                                <a href='/dir/admin/users/quick_import_person.cfm?uhApiId=#urlEncodedFormat(row.uhApiId)#&returnTo=#urlEncodedFormat(cgi.SCRIPT_NAME)#'
+                                   class='btn btn-sm btn-success ms-1'>Quick Import</a>
                                 <form method='post' style='display:inline;'>
                                     <input type='hidden' name='deleteFromStaging' value='1'>
                                     <input type='hidden' name='deleteUHApiID' value='#row.uhApiId#'>
-                                    <button type='submit' class='btn btn-sm btn-outline-danger' onclick='return confirm(""Remove from staging?"");'>Delete</button>
+                                    <button type='submit' class='btn btn-sm btn-outline-danger ms-1' onclick='return confirm(&quot;Remove from staging?&quot;);'>Delete</button>
                                 </form>
                 ">
             </cfif>

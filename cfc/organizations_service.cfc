@@ -62,13 +62,13 @@ component output="false" singleton {
         return { success=true, data=org };
     }
 
-    public struct function createOrg( required string orgName, string orgType="", any parentOrgID="", numeric additionalRoles=0 ) {
-        var newID = variables.OrganizationsDAO.createOrg( orgName, orgType, parentOrgID, arguments.additionalRoles );
+    public struct function createOrg( required string orgName, string orgType="", any parentOrgID="", numeric additionalRoles=0, string orgDescription="" ) {
+        var newID = variables.OrganizationsDAO.createOrg( orgName, orgType, parentOrgID, arguments.additionalRoles, arguments.orgDescription );
         return { success=true, message="Organization created.", orgID=newID };
     }
 
-    public struct function updateOrg( required numeric orgID, required string orgName, string orgType="", any parentOrgID="", numeric additionalRoles=0 ) {
-        variables.OrganizationsDAO.updateOrg( orgID, orgName, orgType, parentOrgID, arguments.additionalRoles );
+    public struct function updateOrg( required numeric orgID, required string orgName, string orgType="", any parentOrgID="", numeric additionalRoles=0, string orgDescription="" ) {
+        variables.OrganizationsDAO.updateOrg( orgID, orgName, orgType, parentOrgID, arguments.additionalRoles, arguments.orgDescription );
         return { success=true, message="Organization updated." };
     }
 

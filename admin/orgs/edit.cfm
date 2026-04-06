@@ -15,6 +15,7 @@
 
 <cfset orgName    = EncodeForHTML(org.ORGNAME)>
 <cfset orgType    = EncodeForHTML(len(trim(org.ORGTYPE ?: '')) ? org.ORGTYPE : '')>
+<cfset orgDesc    = EncodeForHTML(len(trim(org.ORGDESCRIPTION ?: '')) ? org.ORGDESCRIPTION : '')>
 <cfset orgParentID = isNumeric(org.PARENTORGID ?: '') ? val(org.PARENTORGID) : ''>
 <cfset orgAdditionalRoles = (isNumeric(org.ADDITIONALROLES ?: '') AND val(org.ADDITIONALROLES) EQ 1) ? 1 : 0>
 
@@ -33,6 +34,11 @@
     <div class='mb-3'>
         <label class='form-label'>Organization Type</label>
         <input class='form-control' name='OrgType' value='#orgType#'>
+    </div>
+
+    <div class='mb-3'>
+        <label class='form-label'>Description</label>
+        <textarea class='form-control' name='OrgDescription' rows='3' placeholder='Optional description shown on user edit/new pages for parent organizations.'>#orgDesc#</textarea>
     </div>
 
     <div class='mb-3'>

@@ -10,12 +10,17 @@
         <cfset uhApiSecret = trim(server.system.environment["UH_API_SECRET"])>
     </cfif>
 </cfif>
+<!--- ── Search parameters from form ── --->
+<cfset paramQ          = structKeyExists(url, "q")          ? trim(url.q)          : "">
+<cfset paramDepartment = structKeyExists(url, "department") ? trim(url.department) : "H0113">
+<cfif NOT len(paramDepartment)><cfset paramDepartment = "H0113"></cfif>
+
 <!--- ── Init API — capture verbose debug output from uh_api.cfc ── --->
 <cfsavecontent variable="apiDebugOutput">
     <cftry>
         <cfset uhApi = createObject("component", "dir.cfc.uh_api").init(apiToken=uhApiToken, apiSecret=uhApiSecret)>
         <cfset authStatus = uhApi.getAuthStatus()>
-        <cfset peopleResp = uhApi.getPeople(student=true, staff=false, faculty=false, department="H0113")>
+        <cfset peopleResp = uhApi.getPeople(student=true, staff=false, faculty=false, department=paramDepartment, q=paramQ)>
         <cfcatch>
             <cfset apiError = cfcatch.message & " — " & cfcatch.detail>
         </cfcatch>
@@ -119,10 +124,30 @@
 
 <cfset content = "
 <h1>UH API — Student Pull</h1>
+
+<div class='card mb-4'>
+    <div class='card-body'>
+        <form method='get' class='row g-2 align-items-end'>
+            <div class='col-auto'>
+                <label for='deptInput' class='form-label mb-1'>Department</label>
+                <input type='text' id='deptInput' name='department' class='form-control' value='#EncodeForHTML(paramDepartment)#' placeholder='e.g. H0113'>
+            </div>
+            <div class='col-auto'>
+                <label for='qInput' class='form-label mb-1'>Search (q)</label>
+                <input type='text' id='qInput' name='q' class='form-control' value='#EncodeForHTML(paramQ)#' placeholder='Name, ID, email...'>
+            </div>
+            <div class='col-auto'>
+                <button type='submit' class='btn btn-primary'>Search</button>
+                #(len(paramQ) OR paramDepartment NEQ 'H0113' ? "<a href='?department=H0113' class='btn btn-outline-secondary ms-1'>Reset</a>" : "")#
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class='mb-3 d-flex align-items-center flex-wrap gap-2'>
     #authBadge#
     <span class='badge bg-secondary fs-6'>#arrayLen(apiPeople)# student(s) returned</span>
-    <small class='text-muted ms-2'>student=true, staff=false, faculty=false</small>
+    <small class='text-muted ms-2'>department=#EncodeForHTML(paramDepartment)##(len(paramQ) ? ', q=' & EncodeForHTML(paramQ) : '')#</small>
 </div>
 
 <div class='card mb-3 border-primary'>

@@ -38,21 +38,26 @@
 <cfset allUserFlagMap = flagsService.getAllUserFlagMap()>
 <cfset allUserOrgMap  = orgsService.getAllUserOrgMap()>
 
-<!--- Pre-filter: exclude students, faculty, and staff (they have dedicated pages) --->
-<cfset excludeFlagNames = "Current-Student,Alumni,Faculty-Fulltime,Faculty-Adjunct,Staff">
+<!--- Pre-filter: only users with no flags OR who have "Admin - Check" or "No UH" flag --->
+<cfset includeByFlagNames = "Admin - Check,No UH">
 <cfset otherUsers = []>
 <cfloop from="1" to="#arrayLen(allUsers)#" index="i">
     <cfset u = allUsers[i]>
     <cfset uFlags = structKeyExists(allUserFlagMap, toString(u.USERID)) ? allUserFlagMap[toString(u.USERID)] : []>
-    <cfset isExcluded = false>
-    <cfloop from="1" to="#arrayLen(uFlags)#" index="f">
-        <cfif listFindNoCase(excludeFlagNames, uFlags[f].FLAGNAME)>
-            <cfset isExcluded = true>
-            <cfbreak>
-        </cfif>
-    </cfloop>
-    <cfif NOT isExcluded>
+    <cfif arrayLen(uFlags) EQ 0>
+        <!--- No flags at all — include --->
         <cfset arrayAppend(otherUsers, u)>
+    <cfelse>
+        <cfset hasIncludeFlag = false>
+        <cfloop from="1" to="#arrayLen(uFlags)#" index="f">
+            <cfif listFindNoCase(includeByFlagNames, uFlags[f].FLAGNAME)>
+                <cfset hasIncludeFlag = true>
+                <cfbreak>
+            </cfif>
+        </cfloop>
+        <cfif hasIncludeFlag>
+            <cfset arrayAppend(otherUsers, u)>
+        </cfif>
     </cfif>
 </cfloop>
 <cfset allUsers = otherUsers>
@@ -85,16 +90,12 @@
 </cfif>
 
 <!--- Apply search filter --->
+<cfinclude template="/dir/admin/users/_search_helper.cfm">
 <cfif searchTerm != "">
-    <cfset searchLower = lcase(searchTerm)>
     <cfset searchedUsers = []>
     <cfloop from="1" to="#arrayLen(filteredUsers)#" index="i">
-        <cfset u = filteredUsers[i]>
-        <cfif findNoCase(searchTerm, u.FIRSTNAME) || 
-              findNoCase(searchTerm, u.LASTNAME) || 
-              findNoCase(searchTerm, u.EMAILPRIMARY) || 
-              findNoCase(searchTerm, u.EMAILSECONDARY)>
-            <cfset arrayAppend(searchedUsers, u)>
+        <cfif userMatchesSearch(filteredUsers[i], searchTerm)>
+            <cfset arrayAppend(searchedUsers, filteredUsers[i])>
         </cfif>
     </cfloop>
     <cfset filteredUsers = searchedUsers>
@@ -150,18 +151,19 @@
 <div class='d-flex justify-content-between mb-4'>
     <h1>All Users</h1>
     <div class='d-flex gap-2'>
-        <a href='/dir/admin/users/new.cfm' class='btn btn-primary'>New User</a>
+        <a href='/dir/admin/users/new.cfm' class='btn btn-primary'>Records with Issues</a>
     </div>
 </div>
 
 <!--- Filter Form --->
 <div class='card mb-4'>
     <div class='card-body'>
-        <form method='get' class='d-flex flex-wrap align-items-center gap-2'>
+        <form method='get' class='d-flex flex-wrap align-items-center gap-2 my-0'>
             <input type='hidden' name='sortCol' value='#sortColumn#'>
             <input type='hidden' name='sortDir' value='#sortDirection#'>
-            <div style='min-width:220px; flex:1;'>
-                <input type='text' name='search' id='searchInput' class='form-control' placeholder='Search by name or email...' value='#searchTerm#'>
+            <div class='input-group' style='min-width:220px; flex:1;'>
+                <button type='button' class='btn btn-sm btn-outline-secondary' data-bs-toggle='modal' data-bs-target='##searchHelpModal' title='Search help'><i class='bi bi-question-circle'></i></button>
+                <input type='text' name='search' class='form-control' placeholder='Search name/email or use field:value (e.g. lastname:Doe &amp;&amp; firstname:Jane)' value='#searchTerm#'>
             </div>
             <label for='flagFilter' class='mb-0'>Flag:</label>
             <select name='filterFlag' id='flagFilter' class='form-select' style='width:auto;'>
@@ -206,7 +208,7 @@
 
 " & orgTabsHTML & "
 
-<table class='table table-striped table-hover'>
+<table id='usersTable' class='table table-striped table-hover'>
     <thead class='table-dark'>
         <tr>
             <th><a href='#getSortLink("FIRSTNAME", sortColumn, sortDirection)#' style='color: ##fff; text-decoration: none;'>First Name #(sortColumn == "FIRSTNAME" ? (sortDirection == "ASC" ? "↑" : "↓") : "")#</a></th>
@@ -265,7 +267,7 @@
     var sel = document.getElementById('pageSizeSelect');
     var pageSize = sel ? (parseInt(sel.value) || 25) : 25;
     var currentPage = 1;
-    function allRows() { return Array.from(document.querySelectorAll('tbody tr')); }
+    function allRows() { return Array.from(document.querySelectorAll('##usersTable tbody tr')); }
     function visibleRows() { return allRows().filter(function(r) { return r.dataset.pagehidden !== '1'; }); }
     function applyPagination() {
         var rows = visibleRows();
