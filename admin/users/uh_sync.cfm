@@ -17,7 +17,7 @@
     <cfset sourceUserID = trim(form.applySourceUserID)>
 </cfif>
 
-<!--- returnTo: only allow relative paths under /dir/admin/ to prevent open redirect --->
+<!--- returnTo: only allow relative paths under /admin/ to prevent open redirect --->
 <cfset returnTo = "">
 <cfif len(trim(url.returnTo))>
     <cfset candidateReturn = trim(url.returnTo)>
@@ -33,20 +33,20 @@
 
 <!--- Require a valid numeric userID --->
 <cfif NOT (isNumeric(sourceUserID) AND val(sourceUserID) GT 0)>
-    <cfset content = "<h1>UH API Sync</h1><div class='alert alert-danger'>No valid user ID provided. Pass <code>userID</code> in the URL.</div><a href='/dir/admin/users/index.cfm' class='btn btn-secondary'>Back to Users</a>">
-    <cfinclude template="/dir/admin/layout.cfm">
+    <cfset content = "<h1>UH API Sync</h1><div class='alert alert-danger'>No valid user ID provided. Pass <code>userID</code> in the URL.</div><a href='/admin/users/index.cfm' class='btn btn-secondary'>Back to Users</a>">
+    <cfinclude template="/admin/layout.cfm">
     <cfabort>
 </cfif>
 
 <!--- Load the user record --->
-<cfset directoryService = createObject("component", "dir.cfc.directory_service").init()>
+<cfset directoryService = createObject("component", "cfc.directory_service").init()>
 <cfset profile = directoryService.getFullProfile(val(sourceUserID))>
 
 <cfif structKeyExists(profile, "user") AND structCount(profile.user) GT 0>
     <cfset dbUser = profile.user>
 <cfelse>
-    <cfset content = "<h1>UH API Sync</h1><div class='alert alert-danger'>User #EncodeForHTML(sourceUserID)# was not found.</div><a href='/dir/admin/users/index.cfm' class='btn btn-secondary'>Back to Users</a>">
-    <cfinclude template="/dir/admin/layout.cfm">
+    <cfset content = "<h1>UH API Sync</h1><div class='alert alert-danger'>User #EncodeForHTML(sourceUserID)# was not found.</div><a href='/admin/users/index.cfm' class='btn btn-secondary'>Back to Users</a>">
+    <cfinclude template="/admin/layout.cfm">
     <cfabort>
 </cfif>
 
@@ -56,8 +56,8 @@
 
 <cfset uhApiId = trim(dbUser.UH_API_ID ?: "")>
 <cfif uhApiId EQ "">
-    <cfset content = "<h1>UH API Sync</h1><div class='alert alert-warning'>This user does not have a UH API ID assigned. UH API sync is not available.</div><a href='/dir/admin/users/view.cfm?userID=#urlEncodedFormat(sourceUserID)#' class='btn btn-primary me-2'>Back to User</a><a href='/dir/admin/users/index.cfm' class='btn btn-outline-secondary'>Back to Users</a>">
-    <cfinclude template="/dir/admin/layout.cfm">
+    <cfset content = "<h1>UH API Sync</h1><div class='alert alert-warning'>This user does not have a UH API ID assigned. UH API sync is not available.</div><a href='/admin/users/view.cfm?userID=#urlEncodedFormat(sourceUserID)#' class='btn btn-primary me-2'>Back to User</a><a href='/admin/users/index.cfm' class='btn btn-outline-secondary'>Back to Users</a>">
+    <cfinclude template="/admin/layout.cfm">
     <cfabort>
 </cfif>
 
@@ -83,7 +83,7 @@
 <!--- POST handling --->
 <cfif cgi.request_method EQ "POST" AND isNumeric(form.applySourceUserID) AND val(form.applySourceUserID) GT 0>
     <cfset applyUserID = val(form.applySourceUserID)>
-    <cfset usersService = createObject("component", "dir.cfc.users_service").init()>
+    <cfset usersService = createObject("component", "cfc.users_service").init()>
 
     <!--- SYNC ALL --->
     <cfif form.syncAll EQ "1">
@@ -91,7 +91,7 @@
         <cfset syncStatusCode = "Unknown">
 
         <cfsilent>
-            <cfset syncUhApi = createObject("component", "dir.cfc.uh_api").init(apiToken=uhApiToken, apiSecret=uhApiSecret)>
+            <cfset syncUhApi = createObject("component", "cfc.uh_api").init(apiToken=uhApiToken, apiSecret=uhApiSecret)>
             <cfset syncPersonResponse = syncUhApi.getPerson(
                 uhApiId,
                 trim(dbUser.DEPARTMENT ?: ""),
@@ -133,10 +133,8 @@
                     FirstName              = currentUser.FIRSTNAME ?: "",
                     MiddleName             = currentUser.MIDDLENAME ?: "",
                     LastName               = currentUser.LASTNAME ?: "",
-                    PreferredName          = currentUser.PREFERREDNAME ?: "",
                     Pronouns               = currentUser.PRONOUNS ?: "",
                     EmailPrimary           = currentUser.EMAILPRIMARY ?: "",
-                    EmailSecondary         = currentUser.EMAILSECONDARY ?: "",
                     Phone                  = currentUser.PHONE ?: "",
                     Room                   = currentUser.ROOM ?: "",
                     Building               = currentUser.BUILDING ?: "",
@@ -153,7 +151,6 @@
                     Mailcode               = currentUser.MAILCODE ?: "",
                     UH_API_ID              = currentUser.UH_API_ID ?: "",
                     Degrees                = currentUser.DEGREES ?: "",
-                    MaidenName             = currentUser.MAIDENNAME ?: "",
                     Prefix                 = currentUser.PREFIX ?: "",
                     Suffix                 = currentUser.SUFFIX ?: ""
                 }>
@@ -238,7 +235,7 @@
                     <cfset saveMessage = "Sync All failed while updating user fields: " & (updateResult.message ?: "Unknown error")>
                     <cfset saveMessageClass = "alert-danger">
                 <cfelse>
-                    <cfset flagsService = createObject("component", "dir.cfc.flags_service").init()>
+                    <cfset flagsService = createObject("component", "cfc.flags_service").init()>
                     <cfset allFlagsResult = flagsService.getAllFlags()>
                     <cfset syncFlagsUpdated = 0>
 
@@ -313,7 +310,7 @@
 
     <!--- SYNC SINGLE FLAG --->
     <cfelseif len(trim(form.applyFlagName))>
-        <cfset flagsService = createObject("component", "dir.cfc.flags_service").init()>
+        <cfset flagsService = createObject("component", "cfc.flags_service").init()>
         <cfset requestedFlagName = trim(form.applyFlagName)>
         <cfset requestedApiValue = lCase(trim(form.applyFlagApiValue ?: ""))>
         <cfset targetHasFlag = "">
@@ -399,7 +396,6 @@
                 PreferredName          = currentUser.PREFERREDNAME ?: "",
                 Pronouns               = currentUser.PRONOUNS ?: "",
                 EmailPrimary           = currentUser.EMAILPRIMARY ?: "",
-                EmailSecondary         = currentUser.EMAILSECONDARY ?: "",
                 Phone                  = currentUser.PHONE ?: "",
                 Room                   = currentUser.ROOM ?: "",
                 Building               = currentUser.BUILDING ?: "",
@@ -482,8 +478,8 @@
 <cfif len(returnTo)>
     <cfset content &= "<a href='#EncodeForHTMLAttribute(returnTo)#' class='btn btn-sm btn-outline-primary mb-3 me-2'>&##8592; Back to Report</a>">
 </cfif>
-<cfset content &= "<a href='/dir/admin/users/view.cfm?userID=#urlEncodedFormat(sourceUserID)#' class='btn btn-sm btn-outline-secondary mb-3 me-2'>Back to User</a>">
-<cfset content &= "<a href='/dir/admin/users/index.cfm' class='btn btn-sm btn-outline-secondary mb-3'>Back to All Users</a>">
+<cfset content &= "<a href='/admin/users/view.cfm?userID=#urlEncodedFormat(sourceUserID)#' class='btn btn-sm btn-outline-secondary mb-3 me-2'>Back to User</a>">
+<cfset content &= "<a href='/admin/users/index.cfm' class='btn btn-sm btn-outline-secondary mb-3'>Back to All Users</a>">
 <cfif saveMessage NEQ "">
     <cfset content &= "<div class='alert #saveMessageClass# mt-3'>#EncodeForHTML(saveMessage)#</div>">
 </cfif>
@@ -495,7 +491,7 @@
     <cfset apiPerson = {}>
 
     <cfsilent>
-        <cfset uhApi = createObject("component", "dir.cfc.uh_api").init(apiToken=uhApiToken, apiSecret=uhApiSecret)>
+        <cfset uhApi = createObject("component", "cfc.uh_api").init(apiToken=uhApiToken, apiSecret=uhApiSecret)>
         <cfset personResponse = uhApi.getPerson(
             uhApiId,
             trim(dbUser.DEPARTMENT ?: ""),
@@ -775,9 +771,9 @@
 
 <cfset content &= "
 <div class='mt-4'>
-    <a href='/dir/admin/users/view.cfm?userID=#urlEncodedFormat(sourceUserID)#' class='btn btn-primary'>Back to Profile</a>
-    <a href='/dir/admin/users/index.cfm' class='btn btn-secondary ms-2'>Back to Users</a>
+    <a href='/admin/users/view.cfm?userID=#urlEncodedFormat(sourceUserID)#' class='btn btn-primary'>Back to Profile</a>
+    <a href='/admin/users/index.cfm' class='btn btn-secondary ms-2'>Back to Users</a>
 </div>
 ">
 
-<cfinclude template="/dir/admin/layout.cfm">
+<cfinclude template="/admin/layout.cfm">

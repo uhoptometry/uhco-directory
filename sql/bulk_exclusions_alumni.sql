@@ -48,7 +48,6 @@ CROSS JOIN (
     VALUES
         ('missing_uh_api_id'),
         ('missing_email_primary'),
-        ('missing_email_secondary'),
         ('missing_room'),
         ('missing_building'),
         ('missing_phone'),

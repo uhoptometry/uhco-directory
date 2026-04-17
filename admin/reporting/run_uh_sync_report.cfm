@@ -55,7 +55,7 @@
 <cftry>
 
     <!--- ── Initialise DAOs ── --->
-    <cfset uhSyncDAO = createObject("component", "dir.dao.uhSync_DAO").init()>
+    <cfset uhSyncDAO = createObject("component", "dao.uhSync_DAO").init()>
 
     <!--- ── Create the run record first ── --->
     <cfset runID = uhSyncDAO.createRun(triggeredBy)>
@@ -90,7 +90,7 @@
           )
         ",
         {},
-        { datasource="UHCO_Directory", timeout=60 }
+        { datasource="#request.datasource#", timeout=60 }
     )>
 
     <!--- Build lookup maps of local users --->
@@ -106,7 +106,7 @@
     </cfloop>
 
     <!--- ── Call UH API — get all staff and faculty ── --->
-    <cfset uhApi       = createObject("component", "dir.cfc.uh_api").init(apiToken=uhApiToken, apiSecret=uhApiSecret)>
+    <cfset uhApi       = createObject("component", "cfc.uh_api").init(apiToken=uhApiToken, apiSecret=uhApiSecret)>
     <cfset apiResponse = uhApi.getPeople(staff=true, faculty=true)>
 
     <cfif left(apiResponse.statusCode, 3) NEQ "200">
@@ -356,7 +356,7 @@
 </cfif>
 
 <cfif success>
-    <cflocation url="/dir/admin/reporting/uh_sync_report.cfm?msg=ran&runID=#runID#" addtoken="false">
+    <cflocation url="#request.webRoot#/admin/reporting/uh_sync_report.cfm?msg=ran&runID=#runID#" addtoken="false">
 <cfelse>
-    <cflocation url="/dir/admin/reporting/uh_sync_report.cfm?msg=error&err=#urlEncodedFormat(errorMsg)#" addtoken="false">
+    <cflocation url="#request.webRoot#/admin/reporting/uh_sync_report.cfm?msg=error&err=#urlEncodedFormat(errorMsg)#" addtoken="false">
 </cfif>

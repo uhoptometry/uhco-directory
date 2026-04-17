@@ -30,7 +30,7 @@
 
 <cfif cgi.request_method EQ "POST" AND (isNumeric(form.applySourceUserID) OR len(trim(form.uhApiId)))>
     <cfset applyUserID = isNumeric(form.applySourceUserID) ? val(form.applySourceUserID) : 0>
-    <cfset usersService = createObject("component", "dir.cfc.users_service").init()>
+    <cfset usersService = createObject("component", "cfc.users_service").init()>
 
     <cfif applyUserID LTE 0 AND len(trim(form.uhApiId))>
         <cfset existingUsers = usersService.listUsers()>
@@ -48,10 +48,8 @@
             FirstName = trim(form.createFirstName),
             MiddleName = "",
             LastName = trim(form.createLastName),
-            PreferredName = "",
             Pronouns = "",
             EmailPrimary = "",
-            EmailSecondary = "",
             Phone = "",
             Room = "",
             Building = "",
@@ -74,7 +72,7 @@
                     {
                         uhApiID = { value = trim(form.uhApiId), cfsqltype = "cf_sql_varchar" }
                     },
-                    { datasource = "UHCO_Directory", timeout = 30 }
+                    { datasource = request.datasource, timeout = 30 }
                 )>
             </cfsilent>
         <cfelse>
@@ -116,7 +114,7 @@
             <cfset saveMessageClass = "alert-danger">
         <cfelse>
             <cfsilent>
-                <cfset syncUhApi = createObject("component", "dir.cfc.uh_api").init(apiToken=syncUhApiToken, apiSecret=syncUhApiSecret)>
+                <cfset syncUhApi = createObject("component", "cfc.uh_api").init(apiToken=syncUhApiToken, apiSecret=syncUhApiSecret)>
                 <cfset syncPersonResponse = syncUhApi.getPerson(syncUhApiId)>
             </cfsilent>
 
@@ -154,10 +152,8 @@
                     FirstName = currentUser.FIRSTNAME ?: "",
                     MiddleName = currentUser.MIDDLENAME ?: "",
                     LastName = currentUser.LASTNAME ?: "",
-                    PreferredName = currentUser.PREFERREDNAME ?: "",
                     Pronouns = currentUser.PRONOUNS ?: "",
                     EmailPrimary = currentUser.EMAILPRIMARY ?: "",
-                    EmailSecondary = currentUser.EMAILSECONDARY ?: "",
                     Phone = currentUser.PHONE ?: "",
                     Room = currentUser.ROOM ?: "",
                     Building = currentUser.BUILDING ?: "",
@@ -264,7 +260,7 @@
                     <cfset saveMessage = "Sync All failed while updating user fields: " & (updateResult.message ?: "Unknown error")>
                     <cfset saveMessageClass = "alert-danger">
                 <cfelse>
-                    <cfset flagsService = createObject("component", "dir.cfc.flags_service").init()>
+                    <cfset flagsService = createObject("component", "cfc.flags_service").init()>
                     <cfset allFlagsResult = flagsService.getAllFlags()>
                     <cfset syncFlagsUpdated = 0>
 
@@ -337,7 +333,7 @@
             </cfif>
         </cfif>
     <cfelseif applyUserID GT 0 AND len(trim(form.applyFlagName))>
-        <cfset flagsService = createObject("component", "dir.cfc.flags_service").init()>
+        <cfset flagsService = createObject("component", "cfc.flags_service").init()>
         <cfset requestedFlagName = trim(form.applyFlagName)>
         <cfset requestedApiValue = lCase(trim(form.applyFlagApiValue ?: ""))>
         <cfset targetHasFlag = "">
@@ -423,7 +419,6 @@
                 PreferredName = currentUser.PREFERREDNAME ?: "",
                 Pronouns = currentUser.PRONOUNS ?: "",
                 EmailPrimary = currentUser.EMAILPRIMARY ?: "",
-                EmailSecondary = currentUser.EMAILSECONDARY ?: "",
                 Phone = currentUser.PHONE ?: "",
                 Room = currentUser.ROOM ?: "",
                 Building = currentUser.BUILDING ?: "",
@@ -483,7 +478,7 @@
 </cfif>
 
 <cfif isNumeric(sourceUserID) AND val(sourceUserID) GT 0>
-    <cfset directoryService = createObject("component", "dir.cfc.directory_service").init()>
+    <cfset directoryService = createObject("component", "cfc.directory_service").init()>
     <cfset profile = directoryService.getFullProfile(val(sourceUserID))>
     <cfif structKeyExists(profile, "user") AND structCount(profile.user) GT 0>
         <cfset dbUser = profile.user>
@@ -494,7 +489,7 @@
         <cfset dbFlagsLoaded = true>
     </cfif>
 <cfelseif uhApiId NEQ "">
-    <cfset usersService = createObject("component", "dir.cfc.users_service").init()>
+    <cfset usersService = createObject("component", "cfc.users_service").init()>
     <cfset allUsers = usersService.listUsers()>
     <cfloop from="1" to="#arrayLen(allUsers)#" index="u">
         <cfif compare(trim(allUsers[u].UH_API_ID ?: ""), uhApiId) EQ 0>
@@ -507,7 +502,7 @@
 </cfif>
 
 <cfif dbUserFound AND NOT dbFlagsLoaded AND isNumeric(sourceUserID) AND val(sourceUserID) GT 0>
-    <cfset directoryService = createObject("component", "dir.cfc.directory_service").init()>
+    <cfset directoryService = createObject("component", "cfc.directory_service").init()>
     <cfset profile = directoryService.getFullProfile(val(sourceUserID))>
     <cfif structKeyExists(profile, "flags") AND isArray(profile.flags)>
         <cfset dbFlags = profile.flags>
@@ -536,9 +531,9 @@
 " />
 
 <cfif sourceUserID NEQ "">
-    <cfset content &= "<a href='/dir/admin/users/view.cfm?userID=#urlEncodedFormat(sourceUserID)#' class='btn btn-sm btn-outline-secondary mb-3 me-2'>Back to User Details</a>">
+    <cfset content &= "<a href='/admin/users/view.cfm?userID=#urlEncodedFormat(sourceUserID)#' class='btn btn-sm btn-outline-secondary mb-3 me-2'>Back to User Details</a>">
 </cfif>
-<cfset content &= "<a href='/dir/admin/users/index.cfm' class='btn btn-sm btn-outline-secondary mb-3'>Back to All Users</a>">
+<cfset content &= "<a href='/admin/users/index.cfm' class='btn btn-sm btn-outline-secondary mb-3'>Back to All Users</a>">
 <cfif saveMessage NEQ "">
     <cfset content &= "<div class='alert #saveMessageClass# mt-3'>#EncodeForHTML(saveMessage)#</div>">
 </cfif>
@@ -558,7 +553,7 @@
 
     <!-- Capture verbose output from the API CFC so it does not break the page layout. -->
     <cfsilent>
-        <cfset uhApi = createObject("component", "dir.cfc.uh_api").init(apiToken=uhApiToken, apiSecret=uhApiSecret)>
+        <cfset uhApi = createObject("component", "cfc.uh_api").init(apiToken=uhApiToken, apiSecret=uhApiSecret)>
         <cfset personResponse = uhApi.getPerson(uhApiId)>
     </cfsilent>
 
@@ -924,10 +919,10 @@
 
 <cfset content &= "
 <div class='mt-4'>
-    " & (sourceUserID != "" ? "<a href='/dir/admin/users/view.cfm?userID=#urlEncodedFormat(sourceUserID)#' class='btn btn-primary'>Back to Profile</a>" : "") & "
-    <a href='/dir/admin/users/index.cfm' class='btn btn-secondary'>Back to Users</a>
-    <a href='/dir/admin/users/uh_people_import.cfm' class='btn btn-secondary'>Back to UH Import</a>
+    " & (sourceUserID != "" ? "<a href='/admin/users/view.cfm?userID=#urlEncodedFormat(sourceUserID)#' class='btn btn-primary'>Back to Profile</a>" : "") & "
+    <a href='/admin/users/index.cfm' class='btn btn-secondary'>Back to Users</a>
+    <a href='/admin/users/uh_people_import.cfm' class='btn btn-secondary'>Back to UH Import</a>
 </div>
 " />
 
-<cfinclude template="/dir/admin/layout.cfm">
+<cfinclude template="/admin/layout.cfm">

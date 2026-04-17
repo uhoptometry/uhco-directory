@@ -15,10 +15,10 @@
 <cfparam name="url.uhApiId"  default="">
 <cfparam name="url.returnTo" default="">
 
-<cfset datasource = "UHCO_Directory">
+<cfset datasource = request.datasource>
 
 <!--- Validate returnTo: root-relative only, no open-redirect --->
-<cfset returnTo = "/dir/admin/users/uh_people_import.cfm">
+<cfset returnTo = "/admin/users/uh_people_import.cfm">
 <cfif len(trim(url.returnTo))>
     <cfset candidate = trim(url.returnTo)>
     <cfif left(candidate, 1) EQ "/" AND NOT find("//", candidate) AND NOT findNoCase("javascript:", candidate)>
@@ -65,7 +65,7 @@
 </cfif>
 
 <!--- Fetch person from UH API --->
-<cfset uhApi = createObject("component", "dir.cfc.uh_api").init(apiToken=uhApiToken, apiSecret=uhApiSecret)>
+<cfset uhApi = createObject("component", "cfc.uh_api").init(apiToken=uhApiToken, apiSecret=uhApiSecret)>
 <cfsilent>
     <cfset personResponse = uhApi.getPerson(uhApiId)>
 </cfsilent>
@@ -161,15 +161,13 @@
 </cfif>
 
 <!--- Step 3: Create the local user row --->
-<cfset usersService = createObject("component", "dir.cfc.users_service").init()>
+<cfset usersService = createObject("component", "cfc.users_service").init()>
 <cfset createResult = usersService.createUser({
     FirstName              = apiFirstName,
     MiddleName             = "",
     LastName               = apiLastName,
-    PreferredName          = "",
     Pronouns               = "",
     EmailPrimary           = (len(apiEmail)      ? lCase(apiEmail)    : ""),
-    EmailSecondary         = "",
     Phone                  = (len(apiPhone)       ? apiPhone           : ""),
     Room                   = (len(apiRoom)        ? apiRoom            : ""),
     Building               = (len(apiBuilding)    ? apiBuilding        : ""),
@@ -185,7 +183,6 @@
     Office_Mailing_Address = (len(apiOfficeAddr)  ? apiOfficeAddr      : ""),
     Mailcode               = (len(apiMailcode)    ? apiMailcode        : ""),
     Degrees                = "",
-    MaidenName             = "",
     Prefix                 = "",
     Suffix                 = "",
     UH_API_ID              = uhApiId
@@ -199,7 +196,7 @@
 <cfset newUserID = val(createResult.userID ?: 0)>
 
 <!--- Step 5: Assign flags --->
-<cfset flagsService   = createObject("component", "dir.cfc.flags_service").init()>
+<cfset flagsService   = createObject("component", "cfc.flags_service").init()>
 <cfset allFlagsResult = flagsService.getAllFlags()>
 <cfset flagsAssigned  = 0>
 

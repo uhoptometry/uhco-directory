@@ -1,7 +1,7 @@
 <!--- GET /dir/api/v1/people  — list users with optional filtering --->
 <cfset auth.requireAuth("read")>
 
-<cfset dirService = createObject("component", "dir.cfc.directory_service").init()>
+<cfset dirService = createObject("component", "cfc.directory_service").init()>
 
 <!--- Query params --->
 <cfset search      = trim(url.search ?: "")>

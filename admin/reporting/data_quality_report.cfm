@@ -55,7 +55,7 @@
 <cfset viewRunID   = structKeyExists(url, "runID")  AND isNumeric(url.runID) ? val(url.runID) : 0>
 
 <!--- ── Load data ── --->
-<cfset dqDAO      = createObject("component", "dir.dao.dataQuality_DAO").init()>
+<cfset dqDAO      = createObject("component", "dao.dataQuality_DAO").init()>
 <cfset recentRuns = []>
 <cfset summary    = []>
 <cfset userDetail = []>
@@ -96,7 +96,7 @@
 <!--- ── Schedule helper — build the runner URL ── --->
 <cfset schedulerUrl = "http://" & cgi.SERVER_NAME
     & (cgi.SERVER_PORT NEQ "80" AND cgi.SERVER_PORT NEQ "" ? ":" & cgi.SERVER_PORT : "")
-    & "/dir/admin/reporting/run_data_quality_report.cfm?triggeredBy=scheduled&format=json">
+    & "/admin/reporting/run_data_quality_report.cfm?triggeredBy=scheduled&format=json">
 
 <!--- ── Handle schedule form submission ── --->
 <cfset scheduleMsg = "">
@@ -150,7 +150,7 @@
 <!--- ── Action bar ── --->
 <cfset content &= "
 <div class='d-flex flex-wrap align-items-center gap-2 mb-4 mt-2'>
-    <a href='/dir/admin/reporting/run_data_quality_report.cfm' class='btn btn-primary'>
+    <a href='/admin/reporting/run_data_quality_report.cfm' class='btn btn-primary'>
         <i class='bi bi-play-fill'></i> Run Now
     </a>
     <button class='btn btn-outline-secondary btn-sm' type='button'
@@ -225,7 +225,7 @@
             <p class='text-muted'>Click <strong>Run Now</strong> to generate the first report.</p>
         </div>
     </div>">
-    <cfinclude template="/dir/admin/layout.cfm">
+    <cfinclude template="/admin/layout.cfm">
     <cfabort>
 </cfif>
 
@@ -342,11 +342,11 @@
         <cfset uhApiIdVal = trim(row.UH_API_ID ?: "")>
         <cfset syncBtnHtml = "">
         <cfif len(uhApiIdVal)>
-            <cfset syncBtnHtml = "<a href='/dir/admin/users/uh_sync.cfm?userID=#row.USERID#&returnTo=#urlEncodedFormat(returnToUrl)#' class='btn btn-sm btn-secondary py-0 ms-1'>UH Sync</a>">
+            <cfset syncBtnHtml = "<a href='/admin/users/uh_sync.cfm?userID=#row.USERID#&returnTo=#urlEncodedFormat(returnToUrl)#' class='btn btn-sm btn-secondary py-0 ms-1'>UH Sync</a>">
             <cfloop list="#row.ISSUECODES#" index="qsc">
                 <cfset qsc = trim(qsc)>
                 <cfif structKeyExists(quickSyncLabels, qsc)>
-                    <cfset syncBtnHtml &= "<a href='/dir/admin/users/quick_sync_field.cfm?userID=#row.USERID#&issueCode=#urlEncodedFormat(qsc)#&returnTo=#urlEncodedFormat(returnToUrl)#' class='btn btn-sm btn-outline-success py-0 ms-1'>#EncodeForHTML(quickSyncLabels[qsc])#</a>">
+                    <cfset syncBtnHtml &= "<a href='/admin/users/quick_sync_field.cfm?userID=#row.USERID#&issueCode=#urlEncodedFormat(qsc)#&returnTo=#urlEncodedFormat(returnToUrl)#' class='btn btn-sm btn-outline-success py-0 ms-1'>#EncodeForHTML(quickSyncLabels[qsc])#</a>">
                 </cfif>
             </cfloop>
         </cfif>
@@ -357,7 +357,7 @@
             <td>#EncodeForHTML(row.EMAILPRIMARY)#</td>
             <td>#badgesHtml#</td>
             <td class='text-nowrap'>
-                <a href='/dir/admin/users/edit.cfm?userID=#row.USERID#' class='btn btn-sm btn-info py-0'>Edit</a>#syncBtnHtml#
+                <a href='/admin/users/edit.cfm?userID=#row.USERID#' class='btn btn-sm btn-info py-0'>Edit</a>#syncBtnHtml#
             </td>
         </tr>
         ">
@@ -384,4 +384,4 @@
 </script>
 ">
 
-<cfinclude template="/dir/admin/layout.cfm">
+<cfinclude template="/admin/layout.cfm">

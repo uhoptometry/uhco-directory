@@ -46,7 +46,6 @@ CROSS JOIN (
     -- Issue codes to exclude these users from
     VALUES
         ('missing_email_primary'),
-        ('missing_email_secondary'),
         ('missing_title1'),
         ('missing_room'),
         ('missing_building'),

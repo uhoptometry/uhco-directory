@@ -30,12 +30,12 @@
 
 <!--- Only allow POST --->
 <cfif cgi.REQUEST_METHOD NEQ "POST">
-    <cflocation url="/dir/admin/reporting/uh_sync_report.cfm" addtoken="false">
+    <cflocation url="#request.webRoot#/admin/reporting/uh_sync_report.cfm" addtoken="false">
     <cfabort>
 </cfif>
 
 <!--- Validate returnTo: root-relative only, no open-redirect --->
-<cfset returnTo = "/dir/admin/reporting/uh_sync_report.cfm">
+<cfset returnTo = "/admin/reporting/uh_sync_report.cfm">
 <cfif len(trim(form.returnTo))>
     <cfset candidate = trim(form.returnTo)>
     <cfif left(candidate, 1) EQ "/" AND NOT find("//", candidate) AND NOT findNoCase("javascript:", candidate)>
@@ -45,7 +45,7 @@
 <cfset sep = find("?", returnTo) ? "&" : "?">
 
 <cfset resolution = lCase(trim(form.resolution))>
-<cfset uhSyncDAO  = createObject("component", "dir.dao.uhSync_DAO").init()>
+<cfset uhSyncDAO  = createObject("component", "dao.uhSync_DAO").init()>
 
 <!--- ══════════════════════════════════════════════════════════════════ --->
 <!--- ── FIELD DIFF ─────────────────────────────────────────────────── --->
@@ -74,7 +74,7 @@
 
     <cfif resolution EQ "synced">
         <!--- Apply the API value to the local user field --->
-        <cfset usersService    = createObject("component", "dir.cfc.users_service").init()>
+        <cfset usersService    = createObject("component", "cfc.users_service").init()>
         <cfset currentUserResult = usersService.getUser(val(diffRow.USERID))>
 
         <cfif NOT (structKeyExists(currentUserResult, "success") AND currentUserResult.success)>
@@ -87,10 +87,8 @@
             FirstName              = cu.FIRSTNAME              ?: "",
             MiddleName             = cu.MIDDLENAME             ?: "",
             LastName               = cu.LASTNAME               ?: "",
-            PreferredName          = cu.PREFERREDNAME          ?: "",
             Pronouns               = cu.PRONOUNS               ?: "",
             EmailPrimary           = cu.EMAILPRIMARY           ?: "",
-            EmailSecondary         = cu.EMAILSECONDARY         ?: "",
             Phone                  = cu.PHONE                  ?: "",
             Room                   = cu.ROOM                   ?: "",
             Building               = cu.BUILDING               ?: "",
@@ -106,7 +104,6 @@
             Mailcode               = cu.MAILCODE               ?: "",
             UH_API_ID              = cu.UH_API_ID              ?: "",
             Degrees                = cu.DEGREES                ?: "",
-            MaidenName             = cu.MAIDENNAME             ?: "",
             Prefix                 = cu.PREFIX                 ?: "",
             Suffix                 = cu.SUFFIX                 ?: ""
         }>
@@ -183,7 +180,7 @@
         <!--- Delete user from local DB using userID from form (double-check matches gone record) --->
         <cfset targetUserID = isNumeric(form.userID) ? val(form.userID) : val(goneRow.USERID)>
         <cfif targetUserID GT 0>
-            <cfset usersService  = createObject("component", "dir.cfc.users_service").init()>
+            <cfset usersService  = createObject("component", "cfc.users_service").init()>
             <cfset deleteResult  = usersService.deleteUser(targetUserID)>
             <cfif NOT (structKeyExists(deleteResult, "success") AND deleteResult.success)>
                 <cflocation url="#returnTo##sep#err=#urlEncodedFormat('Could not delete user: ' & (deleteResult.message ?: 'Unknown error.'))#" addtoken="false">
@@ -247,7 +244,7 @@
         <cfset existingCheck = queryExecute(
             "SELECT TOP 1 UserID FROM Users WHERE UH_API_ID = :id",
             { id = { value=uhApiId, cfsqltype="cf_sql_nvarchar" } },
-            { datasource="UHCO_Directory", timeout=30 }
+            { datasource="#request.datasource#", timeout=30 }
         )>
         <cfif existingCheck.recordCount GT 0>
             <!--- Already exists — just mark resolved and continue --->
@@ -266,7 +263,7 @@
         <cfif uhApiToken  EQ ""><cfset uhApiToken  = "my5Tu[{[VH%,dT{wR3SEigeWc%2w,ZyFT6=5!2Rv$f0g,_z!UpDduLxhgjSm$P6"></cfif>
         <cfif uhApiSecret EQ ""><cfset uhApiSecret = "degxqhYPX2Vk@LFevunxX}:kTkX3fBXR"></cfif>
 
-        <cfset uhApi = createObject("component", "dir.cfc.uh_api").init(apiToken=uhApiToken, apiSecret=uhApiSecret)>
+        <cfset uhApi = createObject("component", "cfc.uh_api").init(apiToken=uhApiToken, apiSecret=uhApiSecret)>
         <cfsilent>
             <cfset personResponse = uhApi.getPerson(uhApiId)>
         </cfsilent>
@@ -366,15 +363,13 @@
         </cfif>
 
         <!--- Create local user --->
-        <cfset usersService = createObject("component", "dir.cfc.users_service").init()>
+        <cfset usersService = createObject("component", "cfc.users_service").init()>
         <cfset createResult = usersService.createUser({
             FirstName              = apiFirstName,
             MiddleName             = "",
             LastName               = apiLastName,
-            PreferredName          = "",
             Pronouns               = "",
             EmailPrimary           = (len(apiEmail)       ? lCase(apiEmail)    : ""),
-            EmailSecondary         = "",
             Phone                  = (len(apiPhone)       ? apiPhone           : ""),
             Room                   = (len(apiRoom)        ? apiRoom            : ""),
             Building               = (len(apiBuilding)    ? apiBuilding        : ""),
@@ -389,7 +384,6 @@
             Office_Mailing_Address = (len(apiOfficeAddr)  ? apiOfficeAddr      : ""),
             Mailcode               = (len(apiMailcode)    ? apiMailcode        : ""),
             Degrees                = "",
-            MaidenName             = "",
             Prefix                 = "",
             Suffix                 = "",
             UH_API_ID              = uhApiId
@@ -403,7 +397,7 @@
         <cfset newUserID = val(createResult.userID ?: 0)>
 
         <!--- Assign flags from API booleans --->
-        <cfset flagsService     = createObject("component", "dir.cfc.flags_service").init()>
+        <cfset flagsService     = createObject("component", "cfc.flags_service").init()>
         <cfset allFlagsResult   = flagsService.getAllFlags()>
         <cfif structKeyExists(allFlagsResult, "success") AND allFlagsResult.success>
             <cfloop from="1" to="#arrayLen(allFlagsResult.data)#" index="f">
@@ -438,5 +432,5 @@
 
 <cfelse>
     <!--- No valid operation supplied --->
-    <cflocation url="/dir/admin/reporting/uh_sync_report.cfm?err=#urlEncodedFormat('No valid action supplied.')#" addtoken="false">
+    <cflocation url="#request.webRoot#/admin/reporting/uh_sync_report.cfm?err=#urlEncodedFormat('No valid action supplied.')#" addtoken="false">
 </cfif>

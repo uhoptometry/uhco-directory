@@ -1,6 +1,6 @@
 <cfoutput>
 <cftry>
-    <cfset dao = createObject("component", "dir.dao.users_DAO").init()>
+    <cfset dao = createObject("component", "dao.users_DAO").init()>
     <cfset users = dao.getAllUsers()>
     
     <h2>Diagnostic Output</h2>

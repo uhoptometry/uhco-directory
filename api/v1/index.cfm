@@ -1,14 +1,14 @@
 <!---
     API v1 Dispatcher
-    Routed here via IIS URL rewrite from /dir/api/v1/*
+    Routed here via IIS URL rewrite from /api/v1/*
 
-    URL structure:  /dir/api/v1/{resource}/{id?}/{sub?}
-    e.g.  GET /dir/api/v1/people
-          GET /dir/api/v1/people/42
-          GET /dir/api/v1/people/42/flags
-          GET /dir/api/v1/organizations
+    URL structure:  /api/v1/{resource}/{id?}/{sub?}
+    e.g.  GET /api/v1/people
+          GET /api/v1/people/42
+          GET /api/v1/people/42/flags
+          GET /api/v1/organizations
 --->
-<cfset auth  = createObject("component", "dir.api.v1.api_auth")>
+<cfset auth  = createObject("component", "api.v1.api_auth")>
 
 <!--- Parse path: passed by URL rewrite as _path=/people/42/flags → ["people","42","flags"] --->
 <cfset pathInfo    = trim(url._path ?: "")>
@@ -32,6 +32,11 @@
             <cfif !isNumeric(resourceID)>
                 <cfset auth.sendError(400, "Invalid user ID")>
             </cfif>
+            <!--- Guard: inactive records are treated as not found for all person endpoints --->
+            <cfset _activeChk = createObject("component", "cfc.users_service").init().getUser(val(resourceID))>
+            <cfif structIsEmpty(_activeChk.data) OR NOT val(_activeChk.data.ACTIVE ?: 1)>
+                <cfset auth.sendError(404, "User not found")>
+            </cfif>
             <cfswitch expression="#subResource#">
                 <cfcase value="">       <cfinclude template="handlers/person.cfm"></cfcase>
                 <cfcase value="flags">  <cfinclude template="handlers/person_flags.cfm"></cfcase>
@@ -39,6 +44,12 @@
                 <cfcase value="academic">      <cfinclude template="handlers/person_academic.cfm"></cfcase>
                 <cfcase value="addresses">     <cfinclude template="handlers/person_addresses.cfm"></cfcase>
                 <cfcase value="externalids">   <cfinclude template="handlers/person_externalids.cfm"></cfcase>
+                <cfcase value="images">        <cfinclude template="handlers/person_images.cfm"></cfcase>
+                <cfcase value="emails">        <cfinclude template="handlers/person_emails.cfm"></cfcase>
+                <cfcase value="degrees">       <cfinclude template="handlers/person_degrees.cfm"></cfcase>
+                <cfcase value="studentprofile"><cfinclude template="handlers/person_studentprofile.cfm"></cfcase>
+                <cfcase value="awards">        <cfinclude template="handlers/person_awards.cfm"></cfcase>
+                <cfcase value="bio">           <cfinclude template="handlers/person_bio.cfm"></cfcase>
                 <cfdefaultcase> <cfset auth.sendError(404, "Unknown sub-resource")> </cfdefaultcase>
             </cfswitch>
         <cfelse>
@@ -61,22 +72,39 @@
         <cfinclude template="handlers/flags.cfm">
     </cfcase>
 
+    <cfcase value="quickpulls">
+        <cfif NOT len(resourceID)>
+            <cfset auth.sendError(400, "Quickpull type is required (e.g. /quickpulls/attending)")>
+        </cfif>
+        <cfinclude template="handlers/quickpulls.cfm">
+    </cfcase>
+
     <cfcase value="">
         <cfset auth.sendJSON({
             api     : "UHCO Directory API",
             version : "1.0",
-            docs    : "/dir/api/docs.html",
+            docs    : "/api/docs.html",
             endpoints : [
-                "GET /dir/api/v1/people",
-                "GET /dir/api/v1/people/{id}",
-                "GET /dir/api/v1/people/{id}/flags",
-                "GET /dir/api/v1/people/{id}/organizations",
-                "GET /dir/api/v1/people/{id}/academic",
-                "GET /dir/api/v1/people/{id}/addresses",
-                "GET /dir/api/v1/people/{id}/externalids",
-                "GET /dir/api/v1/organizations",
-                "GET /dir/api/v1/organizations/{id}",
-                "GET /dir/api/v1/flags"
+                "GET /api/v1/people",
+                "GET /api/v1/people/{id}",
+                "GET /api/v1/people/{id}/flags",
+                "GET /api/v1/people/{id}/organizations",
+                "GET /api/v1/people/{id}/academic",
+                "GET /api/v1/people/{id}/addresses",
+                "GET /api/v1/people/{id}/externalids",
+                "GET /api/v1/people/{id}/images",
+                "GET /api/v1/people/{id}/emails",
+                "GET /api/v1/people/{id}/degrees",
+                "GET /api/v1/people/{id}/studentprofile",
+                "GET /api/v1/people/{id}/awards",
+                "GET /api/v1/people/{id}/bio",
+                "GET /api/v1/organizations",
+                "GET /api/v1/organizations/{id}",
+                "GET /api/v1/flags",
+                "GET /api/v1/quickpulls/attending",
+                "GET /api/v1/quickpulls/gradclass?year={year}",
+                "GET /api/v1/quickpulls/graduate?id={userID}",
+                "GET /api/v1/quickpulls/deans"
             ]
         })>
         <cfabort>

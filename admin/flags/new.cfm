@@ -9,9 +9,9 @@
 
     <div class='mb-3'>
         <button type='submit' class='btn btn-success'>Create Flag</button>
-        <a href='/dir/admin/flags/index.cfm' class='btn btn-secondary'>Cancel</a>
+        <a href='/admin/flags/index.cfm' class='btn btn-secondary'>Cancel</a>
     </div>
 </form>
 " />
 
-<cfinclude template="/dir/admin/layout.cfm">
+<cfinclude template="/admin/layout.cfm">

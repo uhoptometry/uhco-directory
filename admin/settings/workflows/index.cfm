@@ -1,0 +1,35 @@
+<!---
+    Workflows Hub — placeholder.
+    SUPER_ADMIN only.
+--->
+
+<cfif NOT request.hasRole("SUPER_ADMIN")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
+<cfset content = "">
+<cfsavecontent variable="content">
+<cfoutput>
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/admin/settings/">Settings</a></li>
+        <li class="breadcrumb-item active">Workflows</li>
+    </ol>
+</nav>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+<h1 class="mb-1"><i class="bi bi-diagram-3-fill me-2"></i>Workflows</h1>
+<p class="text-muted">Manage automated workflows and processing pipelines.</p>
+</div>
+<span class='badge bg-warning text-dark float-end'>Currently in: Alpha</span>
+</div>
+<div class="alert alert-info mt-3">
+    <i class="bi bi-info-circle me-1"></i>
+    Workflow configuration is coming soon. This section will allow you to create, schedule, and monitor automated data processing workflows.
+</div>
+
+</cfoutput>
+</cfsavecontent>
+
+<cfinclude template="/admin/layout.cfm">

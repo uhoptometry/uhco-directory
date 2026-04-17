@@ -4,7 +4,7 @@
     Expects POST: UserID, returnTo, dqInclude (multi-value checkbox list)
 --->
 <cfparam name="form.UserID"      type="integer">
-<cfparam name="form.returnTo"    default="/dir/admin/users/index.cfm">
+<cfparam name="form.returnTo"    default="/admin/users/index.cfm">
 <cfparam name="form.dqInclude"   default="">
 
 <cfset allCodes = [
@@ -43,7 +43,7 @@
     </cfif>
 </cfloop>
 
-<cfset dqDAO = createObject("component", "dir.dao.dataQuality_DAO").init()>
+<cfset dqDAO = createObject("component", "dao.dataQuality_DAO").init()>
 <cfset dqDAO.saveExclusionsForUser(form.UserID, exclusionCodes)>
 
 <cflocation url="#form.returnTo#" addtoken="false">

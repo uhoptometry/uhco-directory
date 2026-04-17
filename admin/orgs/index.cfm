@@ -1,4 +1,4 @@
-<cfset orgsService = createObject("component", "dir.cfc.organizations_service").init()>
+<cfset orgsService = createObject("component", "cfc.organizations_service").init()>
 <cfset orgsResult = orgsService.getAllOrgs()>
 <cfset allOrgs = orgsResult.data />
 
@@ -54,10 +54,10 @@
 </cffunction>
 
 <!--- ── Render ── --->
-<cfset content = "<h1>Organizations</h1>">
+<cfset content = "<h1>Organizational Units</h1>">
 
 <cfif arrayLen(allOrgs) EQ 0>
-    <cfset content &= "<p class='text-muted mt-3'>No organizations found.</p>">
+    <cfset content &= "<p class='text-muted mt-3'>No organizational units found.</p>">
 <cfelse>
     <cfset content &= "<div class='accordion mt-4' id='orgAccordion'>">
 
@@ -86,8 +86,8 @@
                     #EncodeForHTML(ro.ORGNAME)##typeHtml##countBadge#
                 </button>
                 <div class='d-flex gap-1 flex-shrink-0'>
-                    <a href='/dir/admin/orgs/edit.cfm?orgID=#ro.ORGID#'   class='btn btn-sm btn-outline-primary'>Edit</a>
-                    <a href='/dir/admin/orgs/delete.cfm?orgID=#ro.ORGID#' class='btn btn-sm btn-outline-danger'>Delete</a>
+                    <a href='/admin/orgs/edit.cfm?orgID=#ro.ORGID#'   class='btn btn-sm btn-outline-primary'>Edit</a>
+                    <a href='/admin/orgs/delete.cfm?orgID=#ro.ORGID#' class='btn btn-sm btn-outline-danger'>Delete</a>
                 </div>
             </div>
             <div id='#collapseID#' class='accordion-collapse collapse#showClass#'>
@@ -117,8 +117,8 @@
                             <td class='ps-3'>#prefix##EncodeForHTML(desc.org.ORGNAME)#</td>
                             <td>#dType#</td>
                             <td class='text-end pe-3'>
-                                <a href='/dir/admin/orgs/edit.cfm?orgID=#desc.org.ORGID#'   class='btn btn-sm btn-outline-primary'>Edit</a>
-                                <a href='/dir/admin/orgs/delete.cfm?orgID=#desc.org.ORGID#' class='btn btn-sm btn-outline-danger'>Delete</a>
+                                <a href='/admin/orgs/edit.cfm?orgID=#desc.org.ORGID#'   class='btn btn-sm btn-outline-primary'>Edit</a>
+                                <a href='/admin/orgs/delete.cfm?orgID=#desc.org.ORGID#' class='btn btn-sm btn-outline-danger'>Delete</a>
                             </td>
                         </tr>
                 ">
@@ -129,7 +129,7 @@
                 </table>
             ">
         <cfelse>
-            <cfset content &= "<p class='text-muted small ps-3 py-2 mb-0'>No sub-organizations.</p>">
+            <cfset content &= "<p class='text-muted small ps-3 py-2 mb-0'>No sub-organizational units.</p>">
         </cfif>
 
         <cfset content &= "
@@ -143,19 +143,19 @@
 
 <cfset content &= "
 <div class='card mt-5'>
-    <div class='card-header fw-semibold'>Add New Organization</div>
+    <div class='card-header fw-semibold'>Add New Organizational Unit</div>
     <div class='card-body'>
         <form class='row g-3' method='post' action='saveOrg.cfm'>
             <div class='col-md-4'>
-                <label class='form-label'>Organization Name</label>
+                <label class='form-label'>Organizational Unit Name</label>
                 <input class='form-control' name='OrgName' required>
             </div>
             <div class='col-md-4'>
-                <label class='form-label'>Organization Type</label>
+                <label class='form-label'>Organizational Unit Type</label>
                 <input class='form-control' name='OrgType'>
             </div>
             <div class='col-md-4'>
-                <label class='form-label'>Parent Organization</label>
+                <label class='form-label'>Parent Organizational Unit</label>
                 <select class='form-select' name='ParentOrgID'>
                     <option value=''>-- None --</option>
 ">
@@ -193,4 +193,4 @@
 </div>
 " />
 
-<cfinclude template="/dir/admin/layout.cfm">
+<cfinclude template="/admin/layout.cfm">

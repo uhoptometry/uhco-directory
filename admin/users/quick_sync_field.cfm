@@ -10,14 +10,14 @@
 
 <!--- Validate userID --->
 <cfif NOT (isNumeric(url.userID) AND val(url.userID) GT 0)>
-    <cfset content = "<h1>Quick Sync</h1><div class='alert alert-danger'>Invalid user ID.</div><a href='/dir/admin/users/index.cfm' class='btn btn-secondary'>Back to Users</a>">
-    <cfinclude template="/dir/admin/layout.cfm">
+    <cfset content = "<h1>Quick Sync</h1><div class='alert alert-danger'>Invalid user ID.</div><a href='/admin/users/index.cfm' class='btn btn-secondary'>Back to Users</a>">
+    <cfinclude template="/admin/layout.cfm">
     <cfabort>
 </cfif>
 <cfset targetUserID = val(url.userID)>
 
 <!--- Validate returnTo: only allow root-relative paths to prevent open redirect --->
-<cfset returnTo = "/dir/admin/users/view.cfm?userID=#targetUserID#">
+<cfset returnTo = "/admin/users/view.cfm?userID=#targetUserID#">
 <cfif len(trim(url.returnTo))>
     <cfset candidateReturn = trim(url.returnTo)>
     <cfif left(candidateReturn, 1) EQ "/" AND NOT find("//", candidateReturn) AND NOT findNoCase("javascript:", candidateReturn)>
@@ -45,7 +45,7 @@
 <cfset issueMap = syncableIssues[issueCode]>
 
 <!--- Load user profile --->
-<cfset directoryService = createObject("component", "dir.cfc.directory_service").init()>
+<cfset directoryService = createObject("component", "cfc.directory_service").init()>
 <cfset profile = directoryService.getFullProfile(targetUserID)>
 <cfif NOT (structKeyExists(profile, "user") AND structCount(profile.user) GT 0)>
     <cfset sep = find("?", returnTo) ? "&" : "?">
@@ -79,7 +79,7 @@
 </cfif>
 
 <!--- Fetch person from UH API --->
-<cfset uhApi = createObject("component", "dir.cfc.uh_api").init(apiToken=uhApiToken, apiSecret=uhApiSecret)>
+<cfset uhApi = createObject("component", "cfc.uh_api").init(apiToken=uhApiToken, apiSecret=uhApiSecret)>
 <cfset personResponse = uhApi.getPerson(
     uhApiId,
     trim(dbUser.DEPARTMENT ?: ""),
@@ -163,7 +163,7 @@
 </cfif>
 
 <!--- Load full user record and build userData struct for update --->
-<cfset usersService       = createObject("component", "dir.cfc.users_service").init()>
+<cfset usersService       = createObject("component", "cfc.users_service").init()>
 <cfset currentUserResult  = usersService.getUser(targetUserID)>
 <cfif NOT (structKeyExists(currentUserResult, "success") AND currentUserResult.success)>
     <cfset sep = find("?", returnTo) ? "&" : "?">
@@ -175,10 +175,8 @@
     FirstName              = cu.FIRSTNAME              ?: "",
     MiddleName             = cu.MIDDLENAME             ?: "",
     LastName               = cu.LASTNAME               ?: "",
-    PreferredName          = cu.PREFERREDNAME          ?: "",
     Pronouns               = cu.PRONOUNS               ?: "",
     EmailPrimary           = cu.EMAILPRIMARY           ?: "",
-    EmailSecondary         = cu.EMAILSECONDARY         ?: "",
     Phone                  = cu.PHONE                  ?: "",
     Room                   = cu.ROOM                   ?: "",
     Building               = cu.BUILDING               ?: "",
@@ -195,7 +193,6 @@
     Mailcode               = cu.MAILCODE               ?: "",
     UH_API_ID              = cu.UH_API_ID              ?: "",
     Degrees                = cu.DEGREES                ?: "",
-    MaidenName             = cu.MAIDENNAME             ?: "",
     Prefix                 = cu.PREFIX                 ?: "",
     Suffix                 = cu.SUFFIX                 ?: ""
 }>

@@ -2,7 +2,7 @@
 <cfset dqLastRun  = {}>
 <cfset dqDbOk     = true>
 <cftry>
-    <cfset dqDAO    = createObject("component", "dir.dao.dataQuality_DAO").init()>
+    <cfset dqDAO    = createObject("component", "dao.dataQuality_DAO").init()>
     <cfset dqRuns   = dqDAO.getRecentRuns(1)>
     <cfset dqLastRun = arrayLen(dqRuns) ? dqRuns[1] : {}>
 <cfcatch>
@@ -14,7 +14,7 @@
 <cfset uhSyncLastRun = {}>
 <cfset uhSyncDbOk    = true>
 <cftry>
-    <cfset uhSyncDAO_dash  = createObject("component", "dir.dao.uhSync_DAO").init()>
+    <cfset uhSyncDAO_dash  = createObject("component", "dao.uhSync_DAO").init()>
     <cfset uhSyncLastRun   = uhSyncDAO_dash.getLatestRun()>
 <cfcatch>
     <cfset uhSyncDbOk = false>
@@ -45,82 +45,133 @@
 </cfif>
 
 <cfset content = "
-<h1 class='mb-4'>Directory Admin Dashboard</h1>
+<h1 class='mb-4'>UHCO_<em>Ident</em> Admin Dashboard</h1>
 
-<div class='row g-4'>
-    <div class='col-md-4'>
-        <div class='card shadow-sm'>
-            <div class='card-body'>
-                <h5 class='card-title'>Users</h5>
-                <p class='card-text'>Manage UHCO faculty, staff, residents, alumni, and students.</p>
-                <a href='/dir/admin/users/index.cfm' class='btn btn-primary'>Manage Users</a>
-            </div>
-        </div>
-    </div>
-
-    <div class='col-md-4'>
-        <div class='card shadow-sm'>
-            <div class='card-body'>
-                <h5 class='card-title'>Flags</h5>
-                <p class='card-text'>Assign Display Flags such as Faculty, Staff, Resident, Alumni.</p>
-                <a href='/dir/admin/flags/index.cfm' class='btn btn-primary'>Manage Flags</a>
-            </div>
-        </div>
-    </div>
-
-    <div class='col-md-4'>
-        <div class='card shadow-sm'>
-            <div class='card-body'>
-                <h5 class='card-title'>Organizations</h5>
-                <p class='card-text'>Manage departments, divisions, and faculty groups.</p>
-                <a href='/dir/admin/orgs/index.cfm' class='btn btn-primary'>Manage Orgs</a>
-            </div>
-        </div>
-    </div>
-</div>
-<div class='row g-4 mt-1'>
-    <div class='col-md-4'>
-        <div class='card shadow-sm'>
-            <div class='card-body'>
-                <h5 class='card-title'>External IDs</h5>
-                <p class='card-text'>Manage External IDs for users.</p>
-                <a href='/dir/admin/external/index.cfm' class='btn btn-primary'>Manage IDs</a>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class='row g-4 mt-2'>
-    <div class='col-12'>
-        <div class='card shadow-sm " & (dqIssues GT 0 ? "border-danger" : (dqIssues EQ 0 ? "border-success" : "")) & "'>
-            <div class='card-body d-flex flex-wrap align-items-center justify-content-between gap-3'>
-                <div>
-                    <h5 class='card-title mb-1'>
-                        <i class='bi bi-clipboard-data me-2'></i>Data Quality Report
-                    </h5>
-                    <small class='text-muted'>#dqSubtitle#</small>
-                </div>
-                <div class='d-flex align-items-center gap-2'>
-                    <span class='badge #dqBadgeCls# fs-6'>#dqBadgeTxt#</span>
-                    <a href='/dir/admin/reporting/data_quality_report.cfm' class='btn btn-sm btn-primary'>View Report</a>
-                    <a href='/dir/admin/reporting/run_data_quality_report.cfm' class='btn btn-sm btn-outline-secondary'>Run Now</a>
+<div class='row'>
+    <div class='col-md-8'>
+        <div class='row g-4'>
+            <div class='col-md-6'>
+                <div class='card shadow-sm'>
+                    <div class='card-body d-flex flex-wrap align-items-center justify-content-between gap-3'>
+                        <div>
+                            <h5 class='card-title mb-1'><i class='bi bi-people-fill sidebar-icon me-2'></i>Users</h5>
+                            <p class='card-text'>Manage UHCO User Records</p>
+                        </div>
+                        <div class='d-flex align-items-center gap-2'>
+                            <div class='dropdown'>
+                                <button class='btn btn-primary btn-sm dropdown-toggle' type='button' data-bs-toggle='dropdown' aria-expanded='false'>
+                                    <i class='bi bi-gear-fill sidebar-icon me-2'></i>Manage Users
+                                </button>
+                                <ul class='dropdown-menu'>
+                                    <li><a class='dropdown-item' href='/admin/users/index.cfm'><i class='bi bi-exclamation-triangle sidebar-icon me-2'></i>Problem Records</a></li>
+                                    <li><a class='dropdown-item' href='/admin/users/index.cfm?list=faculty'><i class='bi bi-people-fill sidebar-icon me-2'></i>Faculty</a></li>
+                                    <li><a class='dropdown-item' href='/admin/users/index.cfm?list=staff'><i class='bi bi-people-fill sidebar-icon me-2'></i>Staff</a></li>
+                                    <li><a class='dropdown-item' href='/admin/users/index.cfm?list=current-students'><i class='bi bi-people-fill sidebar-icon me-2'></i>Current Students</a></li>
+                                    <li><a class='dropdown-item' href='/admin/users/index.cfm?list=alumni'><i class='bi bi-mortarboard sidebar-icon me-2'></i>Alumni</a></li>
+                                    <li><a class='dropdown-item' href='/admin/users/index.cfm?list=inactive-users'><i class='bi bi-person-dash sidebar-icon me-2'></i>Inactive Users</a></li>
+                                    <li><a class='dropdown-item' href='/admin/users/index.cfm?list=all'><i class='bi bi-list sidebar-icon me-2'></i>All Records</a></li>
+                                    <li><a class='dropdown-item' href='/admin/users/search-uh-api.cfm'><i class='bi bi-search sidebar-icon me-2'></i>Search UH API</a></li>
+                                </ul>
+                                </div>
+                        </div>
+                    </div>
                 </div>
             </div>
+
+            <div class='col-md-6'>
+                <div class='card shadow-sm'>
+                    <div class='card-body d-flex flex-wrap align-items-center justify-content-between gap-3'>
+                        <div>
+                            <h5 class='card-title mb-1'><i class='bi bi-flag-fill sidebar-icon me-2'></i>Flags</h5>
+                            <p class='card-text'>Assign Display Flags</p>
+                        </div>
+                        <div class='d-flex align-items-center gap-2'>
+                            <a href='/admin/flags/index.cfm' class='btn btn-sm btn-primary stretched-link'><i class='bi bi-gear-fill sidebar-icon me-2'></i>Manage Flags</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class='col-md-6'>
+                <div class='card shadow-sm'>
+                    <div class='card-body d-flex flex-wrap align-items-center justify-content-between gap-3'>
+                        <div>
+                            <h5 class='card-title mb-1'><i class='bi bi-building-fill sidebar-icon me-2'></i>Organizations</h5>
+                            <p class='card-text'>Manage Organizational groups.</p>
+                        </div>
+                        <div class='d-flex align-items-center gap-2'>
+                            <a href='/admin/orgs/index.cfm' class='btn btn-sm btn-primary stretched-link'><i class='bi bi-gear-fill sidebar-icon me-2'></i>Manage Orgs</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class='col-md-6'>
+                <div class='card shadow-sm'>
+                    <div class='card-body d-flex flex-wrap align-items-center justify-content-between gap-3'>
+                        <div>
+                            <h5 class='card-title mb-1'><i class='bi bi-person-bounding-box sidebar-icon me-2'></i>External IDs</h5>
+                            <p class='card-text'>Manage External IDs for users.</p>
+                        </div>
+                        <div class='d-flex align-items-center gap-2'>
+                            <a href='/admin/external/index.cfm' class='btn btn-sm btn-primary stretched-link'><i class='bi bi-gear-fill sidebar-icon me-2'></i>Manage IDs</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
-    <div class='col-12'>
-        <div class='card shadow-sm #uhSyncBorderCls#'>
-            <div class='card-body d-flex flex-wrap align-items-center justify-content-between gap-3'>
-                <div>
-                    <h5 class='card-title mb-1'>
-                        <i class='bi bi-arrow-left-right me-2'></i>UH API Sync Report
-                    </h5>
-                    <small class='text-muted'>#uhSyncSubtitle#</small>
+    <div class='col-md-4'>
+        <div class='row g-4'>
+            <div class='col-md-12'>
+                <div class='card shadow-sm'>
+                    <div class='card-body d-flex flex-wrap align-items-center justify-content-between gap-3'>
+                        <div>
+                            <h5 class='card-title mb-1'><i class='bi bi-braces sidebar-icon me-2'></i>UHCO API</h5>
+                            <p class='card-text'>Manage UHCO API settings and integrations.</p>
+                        </div>
+                        <div class='d-flex align-items-center gap-2'>
+                            <a href='/admin/tokens/index.cfm' class='btn btn-sm btn-primary'><i class='bi bi-key-fill sidebar-icon me-2'></i>Manage Tokens</a>
+                            <a href='/admin/tokens/index.cfm' class='btn btn-sm btn-primary'><i class='bi bi-shield-lock-fill sidebar-icon me-2'></i>Manage Secrets</a>
+                            <a href='/api/docs.html' class='btn btn-sm btn-primary'><i class='bi bi-book-fill me-2'></i>Documentation</a>
+                        </div>
+                    </div>
                 </div>
-                <div class='d-flex align-items-center gap-2'>
-                    <span class='badge #uhSyncBadgeCls# fs-6'>#uhSyncBadgeTxt#</span>
-                    <a href='/dir/admin/reporting/uh_sync_report.cfm' class='btn btn-sm btn-primary'>View Report</a>
-                    <a href='/dir/admin/reporting/run_uh_sync_report.cfm' class='btn btn-sm btn-outline-secondary'>Run Now</a>
+            </div>
+            <div class='col-12'>
+                <div class='card shadow-sm " & (dqIssues GT 0 ? "border-danger" : (dqIssues EQ 0 ? "border-success" : "")) & "'>
+                    <div class='card-body d-flex flex-wrap align-items-center justify-content-between gap-3'>
+                        <div>
+                            <h5 class='card-title mb-1'>
+                                <i class='bi bi-clipboard-data me-2'></i>Data Quality Report
+                                <span class='badge #dqBadgeCls# fs-6'>#dqBadgeTxt#</span>
+                            </h5>
+                            <small class='text-muted'>#dqSubtitle#</small>
+                        </div>
+                        <div class='d-flex align-items-center gap-2'>
+                            
+                            <a href='/admin/reporting/data_quality_report.cfm' class='btn btn-sm btn-primary'><i class='bi bi-file-earmark-text-fill me-2'></i>View Report</a>
+                            <a href='/admin/reporting/run_data_quality_report.cfm' class='btn btn-sm btn-outline-secondary'><i class='bi bi-play-fill me-2'></i>Run Now</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class='col-12'>
+                <div class='card shadow-sm #uhSyncBorderCls#''>
+                    <div class='card-body d-flex flex-wrap align-items-center justify-content-between gap-3'>
+                        <div>
+                            <h5 class='card-title mb-1'>
+                                <i class='bi bi-arrow-left-right me-2'></i>UH API Sync Report
+                                <span class='badge #uhSyncBadgeCls# fs-6'>#uhSyncBadgeTxt#</span>
+                            </h5>
+                            <small class='text-muted'>#uhSyncSubtitle#</small>
+                        </div>
+                        <div class='d-flex align-items-center gap-2'>
+                            
+                            <a href='/admin/reporting/uh_sync_report.cfm' class='btn btn-sm btn-primary'><i class='bi bi-file-earmark-text-fill me-2'></i>View Report</a>
+                            <a href='/admin/reporting/run_uh_sync_report.cfm' class='btn btn-sm btn-outline-secondary'><i class='bi bi-play-fill me-2'></i>Run Now</a>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -128,4 +179,4 @@
 </div>
 " />
 
-<cfinclude template="/dir/admin/layout.cfm">
+<cfinclude template="/admin/layout.cfm">

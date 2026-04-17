@@ -107,14 +107,14 @@ X-API-Secret: uhcs_sec_your_secret_here</pre>
                     <div class="col-md-8">
                         <label class="form-label fw-semibold">Endpoint</label>
                         <select id="inp-endpoint" class="form-select font-monospace">
-                            <option value="/dir/api/v1/people">/dir/api/v1/people</option>
-                            <option value="/dir/api/v1/people?flag=Staff">/dir/api/v1/people?flag=Staff</option>
-                            <option value="/dir/api/v1/people?flag=Faculty-Fulltime">/dir/api/v1/people?flag=Faculty-Fulltime</option>
-                            <option value="/dir/api/v1/people?flag=Current-Student">/dir/api/v1/people?flag=Current-Student  ⚠ requires secret</option>
-                            <option value="/dir/api/v1/people?flag=Alumni">/dir/api/v1/people?flag=Alumni  ⚠ requires secret</option>
-                            <option value="/dir/api/v1/people?org=OD+Program">/dir/api/v1/people?org=OD Program  ⚠ requires secret</option>
-                            <option value="/dir/api/v1/organizations">/dir/api/v1/organizations</option>
-                            <option value="/dir/api/v1/flags">/dir/api/v1/flags</option>
+                            <option value="/api/v1/people">/api/v1/people</option>
+                            <option value="/api/v1/people?flag=Staff">/api/v1/people?flag=Staff</option>
+                            <option value="/api/v1/people?flag=Faculty-Fulltime">/api/v1/people?flag=Faculty-Fulltime</option>
+                            <option value="/api/v1/people?flag=Current-Student">/api/v1/people?flag=Current-Student  ⚠ requires secret</option>
+                            <option value="/api/v1/people?flag=Alumni">/api/v1/people?flag=Alumni  ⚠ requires secret</option>
+                            <option value="/api/v1/people?org=OD+Program">/api/v1/people?org=OD Program  ⚠ requires secret</option>
+                            <option value="/api/v1/organizations">/api/v1/organizations</option>
+                            <option value="/api/v1/flags">/api/v1/flags</option>
                         </select>
                     </div>
                     <div class="col-md-4 d-flex align-items-end">
@@ -148,7 +148,7 @@ X-API-Secret: uhcs_sec_your_secret_here</pre>
         <p class="mb-1 small text-muted">Basic request:</p>
         <div class="position-relative">
             <pre class="code" id="code-curl-basic">curl -H "Authorization: Bearer uhcs_your_token" \
-     "http://127.0.0.1/dir/api/v1/people?limit=5"</pre>
+     "http://127.0.0.1/api/v1/people?limit=5"</pre>
             <button class="btn btn-sm btn-outline-secondary copy-btn" onclick="copyCode('code-curl-basic')"><i class="bi bi-clipboard"></i></button>
         </div>
 
@@ -156,14 +156,14 @@ X-API-Secret: uhcs_sec_your_secret_here</pre>
         <div class="position-relative">
             <pre class="code" id="code-curl-secret">curl -H "Authorization: Bearer uhcs_your_token" \
      -H "X-API-Secret: uhcs_sec_your_secret" \
-     "http://127.0.0.1/dir/api/v1/people?flag=Current-Student&amp;limit=10"</pre>
+     "http://127.0.0.1/api/v1/people?flag=Current-Student&amp;limit=10"</pre>
             <button class="btn btn-sm btn-outline-secondary copy-btn" onclick="copyCode('code-curl-secret')"><i class="bi bi-clipboard"></i></button>
         </div>
 
         <p class="mt-3 mb-1 small text-muted">Pretty-print JSON output (requires <code>python3</code>):</p>
         <div class="position-relative">
             <pre class="code" id="code-curl-pretty">curl -s -H "Authorization: Bearer uhcs_your_token" \
-     "http://127.0.0.1/dir/api/v1/people?limit=5" | python3 -m json.tool</pre>
+     "http://127.0.0.1/api/v1/people?limit=5" | python3 -m json.tool</pre>
             <button class="btn btn-sm btn-outline-secondary copy-btn" onclick="copyCode('code-curl-pretty')"><i class="bi bi-clipboard"></i></button>
         </div>
     </section>
@@ -182,7 +182,7 @@ X-API-Secret: uhcs_sec_your_secret_here</pre>
         <div class="position-relative">
             <pre class="code" id="code-js-basic">const token = 'uhcs_your_token';
 
-const response = await fetch('/dir/api/v1/people?limit=10', {
+const response = await fetch('/api/v1/people?limit=10', {
   headers: {
     'Authorization': `Bearer ${token}`
   }
@@ -209,7 +209,7 @@ const params = new URLSearchParams({
   limit: 25
 });
 
-const response = await fetch(`/dir/api/v1/people?${params}`, {
+const response = await fetch(`/api/v1/people?${params}`, {
   headers: {
     'Authorization': `Bearer ${token}`,
     'X-API-Secret':  secret
@@ -224,7 +224,7 @@ console.log(data);
 
         <p class="mt-3 mb-1 small text-muted">Reusable helper function:</p>
         <div class="position-relative">
-            <pre class="code" id="code-js-helper">const API_BASE   = 'http://127.0.0.1/dir/api/v1';
+            <pre class="code" id="code-js-helper">const API_BASE   = 'http://127.0.0.1/api/v1';
 const API_TOKEN  = 'uhcs_your_token';
 const API_SECRET = 'uhcs_sec_your_secret'; // omit if not needed
 
@@ -265,7 +265,7 @@ const orgs    = await apiGet('/organizations');
         <div class="position-relative">
             <pre class="code" id="code-node">// api_example.mjs  (run with: node api_example.mjs)
 
-const BASE   = 'http://127.0.0.1/dir/api/v1';
+const BASE   = 'http://127.0.0.1/api/v1';
 const TOKEN  = 'uhcs_your_token';
 const SECRET = 'uhcs_sec_your_secret';  // leave blank string if not needed
 
@@ -318,7 +318,7 @@ console.log('\nPerson:', person.USER);
 
 import requests
 
-BASE   = "http://127.0.0.1/dir/api/v1"
+BASE   = "http://127.0.0.1/api/v1"
 TOKEN  = "uhcs_your_token"
 SECRET = "uhcs_sec_your_secret"  # omit or set to "" if not needed
 
@@ -370,7 +370,7 @@ for o in orgs["DATA"]:
 
         <p class="mb-1 small text-muted">Tag syntax:</p>
         <div class="position-relative">
-            <pre class="code" id="code-cf-tag">&lt;cfset apiBase  = "http://127.0.0.1/dir/api/v1"&gt;
+            <pre class="code" id="code-cf-tag">&lt;cfset apiBase  = "http://127.0.0.1/api/v1"&gt;
 &lt;cfset apiToken = "uhcs_your_token"&gt;
 &lt;cfset apiSecret = "uhcs_sec_your_secret"&gt;&lt;!--- leave blank if not needed ---&gt;
 
@@ -407,7 +407,7 @@ for o in orgs["DATA"]:
         <div class="position-relative">
             <pre class="code" id="code-cf-script">// api_example.cfm - cfscript version
 
-variables.apiBase   = "http://127.0.0.1/dir/api/v1";
+variables.apiBase   = "http://127.0.0.1/api/v1";
 variables.apiToken  = "uhcs_your_token";
 variables.apiSecret = "uhcs_sec_your_secret";
 

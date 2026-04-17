@@ -6,7 +6,7 @@
 <cfparam name="form.stagingID" default="0">
 <cfparam name="form.userID" default="0">
 
-<cfset datasource = "UHCO_Directory">
+<cfset datasource = request.datasource>
 <cfset reasonDbOnly = "User in local Users table but not in API">
 <cfset reasonApiOnly = "User in API but not in local Users table">
 <cfset uhApiToken = structKeyExists(application, "uhApiToken") ? trim(application.uhApiToken ?: "") : "">
@@ -21,7 +21,7 @@
 <cfset pageMessage = "">
 <cfset pageMessageClass = "alert-info">
 
-<cfset usersService = createObject("component", "dir.cfc.users_service").init()>
+<cfset usersService = createObject("component", "cfc.users_service").init()>
 <cfset localUsersForActions = usersService.listUsers()>
 <cfset userByApiId = {}>
 <cfset userByName = {}>
@@ -122,7 +122,7 @@
     <cfset apiPersonExistsCache = {}>
 
     <cfsilent>
-        <cfset uhApi = createObject("component", "dir.cfc.uh_api").init(apiToken=uhApiToken, apiSecret=uhApiSecret)>
+        <cfset uhApi = createObject("component", "cfc.uh_api").init(apiToken=uhApiToken, apiSecret=uhApiSecret)>
         <cfset peopleResponse = uhApi.getPeople(student=true, staff=true, faculty=true)>
     </cfsilent>
 
@@ -425,4 +425,4 @@
     </cfif>
 </cfif>
 
-<cfinclude template="/dir/admin/layout.cfm">
+<cfinclude template="/admin/layout.cfm">

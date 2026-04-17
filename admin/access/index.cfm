@@ -1,5 +1,5 @@
-<cfset directoryService = createObject("component", "dir.cfc.directory_service").init()>
-<cfset accessService = createObject("component", "dir.cfc.access_service").init()>
+<cfset directoryService = createObject("component", "cfc.directory_service").init()>
+<cfset accessService = createObject("component", "cfc.access_service").init()>
 <cfset areasResult = accessService.getAccessAreas()>
 <cfset allAreas = areasResult.data />
 
@@ -24,8 +24,8 @@
             <tr>
                 <td>#a.ACCESSNAME#</td>
                 <td>
-                    <a href='/dir/admin/access/edit.cfm?areaID=#a.ACCESSAREAID#' class='btn btn-sm btn-info'>Edit</a>
-                    <a href='/dir/admin/access/delete.cfm?areaID=#a.ACCESSAREAID#' class='btn btn-sm btn-danger'>Delete</a>
+                    <a href='/admin/access/edit.cfm?areaID=#a.ACCESSAREAID#' class='btn btn-sm btn-info'>Edit</a>
+                    <a href='/admin/access/delete.cfm?areaID=#a.ACCESSAREAID#' class='btn btn-sm btn-danger'>Delete</a>
                 </td>
             </tr>
         ">
@@ -51,4 +51,4 @@
 </form>
 " />
 
-<cfinclude template="/dir/admin/layout.cfm">
+<cfinclude template="/admin/layout.cfm">

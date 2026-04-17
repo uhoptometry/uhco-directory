@@ -1,16 +1,47 @@
-<cfset usersService = createObject("component", "dir.cfc.users_service").init()>
-<cfset flagsService = createObject("component", "dir.cfc.flags_service").init()>
-<cfset organizationsService = createObject("component", "dir.cfc.organizations_service").init()>
+<!--- DEPRECATED: All user saves now go through saveSection.cfm via per-tab AJAX.
+     This file is kept as a redirect stub to avoid 404s from bookmarks/history. --->
+<cfset redirectTo = (structKeyExists(form, "returnTo") AND len(trim(form.returnTo))) ? trim(form.returnTo) : "/admin/users/index.cfm">
+<cflocation url="#redirectTo#" addtoken="false">
+
+<!--- Proper-case helper: "JANE DOE" / "jane doe" → "Jane Doe", handles McX / O'X / hyphens --->
+<cffunction name="toProperName" access="private" returntype="string" output="false">
+    <cfargument name="input" type="string" required="true">
+    <cfset var raw = trim(arguments.input)>
+    <cfif NOT len(raw)><cfreturn ""></cfif>
+    <cfset var words = listToArray(raw, " ")>
+    <cfset var result = []>
+    <cfloop array="#words#" index="local.w">
+        <!--- Handle hyphenated parts separately --->
+        <cfset var hParts = listToArray(local.w, "-")>
+        <cfset var hResult = []>
+        <cfloop array="#hParts#" index="local.h">
+            <cfset var part = lCase(local.h)>
+            <!--- Mc prefix: McDonald --->
+            <cfif len(part) GT 2 AND left(part, 2) EQ "mc">
+                <cfset part = "Mc" & uCase(mid(part, 3, 1)) & mid(part, 4, len(part) - 3)>
+            <!--- O' prefix: O'Brien --->
+            <cfelseif len(part) GT 2 AND left(part, 2) EQ "o'">
+                <cfset part = "O'" & uCase(mid(part, 3, 1)) & mid(part, 4, len(part) - 3)>
+            <cfelse>
+                <cfset part = uCase(left(part, 1)) & mid(part, 2, len(part) - 1)>
+            </cfif>
+            <cfset arrayAppend(hResult, part)>
+        </cfloop>
+        <cfset arrayAppend(result, arrayToList(hResult, "-"))>
+    </cfloop>
+    <cfreturn arrayToList(result, " ")>
+</cffunction>
 
 <!--- Map form data to userData with correct CamelCase naming for DAO SQL parameters --->
 <cfset userData = {}>
-<cfset userData.FirstName = form.FIRSTNAME>
-<cfset userData.MiddleName = structKeyExists(form, "MIDDLENAME") ? form.MIDDLENAME : "">
-<cfset userData.LastName = form.LASTNAME>
-<cfset userData.PreferredName = structKeyExists(form, "PREFERREDNAME") ? form.PREFERREDNAME : "">
+<cfset userData.FirstName = toProperName(form.FIRSTNAME)>
+<cfset userData.MiddleName = structKeyExists(form, "MIDDLENAME") ? toProperName(form.MIDDLENAME) : "">
+<cfif len(trim(userData.MiddleName)) EQ 1 AND reFind("^[A-Za-z]$", trim(userData.MiddleName))>
+    <cfset userData.MiddleName = trim(userData.MiddleName) & ".">
+</cfif>
+<cfset userData.LastName = toProperName(form.LASTNAME)>
 <cfset userData.Pronouns = structKeyExists(form, "PRONOUNS") ? form.PRONOUNS : "">
-<cfset userData.EmailPrimary = form.EMAILPRIMARY>
-<cfset userData.EmailSecondary = structKeyExists(form, "EMAILSECONDARY") ? form.EMAILSECONDARY : "">
+<cfset userData.EmailPrimary = structKeyExists(form, "EMAILPRIMARY") ? trim(form.EMAILPRIMARY) : "">
 <cfset userData.Phone = structKeyExists(form, "PHONE") ? form.PHONE : "">
 <cfset userData.Room = structKeyExists(form, "ROOM") ? form.ROOM : "">
 <cfset userData.Building = structKeyExists(form, "BUILDING") ? form.BUILDING : "">
@@ -18,7 +49,6 @@
 <cfset userData.Title2 = structKeyExists(form, "TITLE2") ? form.TITLE2 : "">
 <cfset userData.Title3 = structKeyExists(form, "TITLE3") ? form.TITLE3 : "">
 <cfset userData.UH_API_ID = structKeyExists(form, "UH_API_ID") ? form.UH_API_ID : "">
-<cfset userData.MaidenName = structKeyExists(form, "MAIDENNAME") ? form.MAIDENNAME : "">
 <cfset userData.Prefix = structKeyExists(form, "PREFIX") ? form.PREFIX : "">
 <cfset userData.Suffix = structKeyExists(form, "SUFFIX") ? form.SUFFIX : "">
 <cfset userData.Degrees = structKeyExists(form, "DEGREES") ? form.DEGREES : "">
@@ -29,6 +59,9 @@
 <cfset userData.DepartmentName = structKeyExists(form, "DEPARTMENTNAME") ? form.DEPARTMENTNAME : "">
 <cfset userData.Office_Mailing_Address = structKeyExists(form, "OFFICE_MAILING_ADDRESS") ? form.OFFICE_MAILING_ADDRESS : "">
 <cfset userData.Mailcode = structKeyExists(form, "MAILCODE") ? form.MAILCODE : "">
+<cfset userData.Active = structKeyExists(form, "ACTIVE") AND isNumeric(form.ACTIVE) AND listFind("0,1", form.ACTIVE) ? val(form.ACTIVE) : 1>
+<cfset userData.DOB = { value=(structKeyExists(form, "DOB") AND len(trim(form.DOB)) ? trim(form.DOB) : ""), cfsqltype="cf_sql_date", null=(NOT structKeyExists(form, "DOB") OR NOT len(trim(form.DOB))) }>
+<cfset userData.Gender = { value=(structKeyExists(form, "GENDER") AND len(trim(form.GENDER)) ? trim(form.GENDER) : ""), cfsqltype="cf_sql_nvarchar", null=(NOT structKeyExists(form, "GENDER") OR NOT len(trim(form.GENDER))) }>
 
 <cfif structKeyExists(form, "UserID")>
     <!--- Update user --->
@@ -93,26 +126,31 @@
         <cfset currentOrgsResult = organizationsService.getUserOrgs(userID)>
         <cfset currentOrgs = currentOrgsResult.data>
         <cfset currentOrgIDs = []>
+        <cfset currentOrgMap  = {}>
         <cfloop from="1" to="#arrayLen(currentOrgs)#" index="i">
             <cfset arrayAppend(currentOrgIDs, val(currentOrgs[i].ORGID))>
+            <cfset currentOrgMap[val(currentOrgs[i].ORGID)] = true>
         </cfloop>
 
         <cfset submittedOrgIDs = []>
+        <cfset submittedOrgMap  = {}>
         <cfif structKeyExists(form, "Organizations")>
             <cfif isArray(form.Organizations)>
                 <cfloop from="1" to="#arrayLen(form.Organizations)#" index="i">
                     <cfset arrayAppend(submittedOrgIDs, val(form.Organizations[i]))>
+                    <cfset submittedOrgMap[val(form.Organizations[i])] = true>
                 </cfloop>
             <cfelse>
                 <cfset orgList = listToArray(form.Organizations)>
                 <cfloop from="1" to="#arrayLen(orgList)#" index="i">
                     <cfset arrayAppend(submittedOrgIDs, val(trim(orgList[i])))>
+                    <cfset submittedOrgMap[val(trim(orgList[i]))] = true>
                 </cfloop>
             </cfif>
         </cfif>
 
         <cfloop from="1" to="#arrayLen(currentOrgIDs)#" index="i">
-            <cfif arrayFindNoCase(submittedOrgIDs, currentOrgIDs[i]) == 0>
+            <cfif NOT structKeyExists(submittedOrgMap, currentOrgIDs[i])>
                 <cfset organizationsService.removeOrg(userID, val(currentOrgIDs[i]))>
             </cfif>
         </cfloop>
@@ -121,7 +159,7 @@
             <cfset orgID     = val(submittedOrgIDs[i])>
             <cfset roleTitle = structKeyExists(form, "roleTitle_" & orgID) ? trim(form["roleTitle_" & orgID]) : "">
             <cfset roleOrder = (structKeyExists(form, "roleOrder_" & orgID) AND isNumeric(form["roleOrder_" & orgID])) ? val(form["roleOrder_" & orgID]) : 0>
-            <cfif arrayFindNoCase(currentOrgIDs, orgID) == 0>
+            <cfif NOT structKeyExists(currentOrgMap, orgID)>
                 <cfset organizationsService.assignOrg(userID, orgID, roleTitle, roleOrder)>
             <cfelse>
                 <cfset organizationsService.updateOrgAssignment(userID, orgID, roleTitle, roleOrder)>
@@ -131,7 +169,7 @@
 
     <!--- Handle external ID assignments --->
     <cfif structKeyExists(form, "processExternalIDs")>
-        <cfset externalIDService = createObject("component", "dir.cfc.externalID_service").init()>
+        <cfset externalIDService = createObject("component", "cfc.externalID_service").init()>
         <cfset allSystemsResult = externalIDService.getSystems()>
         <cfset extSystems = allSystemsResult.data>
         <cfloop from="1" to="#arrayLen(extSystems)#" index="i">
@@ -145,7 +183,7 @@
 
     <!--- Handle academic info --->
     <cfif structKeyExists(form, "processAcademicInfo")>
-        <cfset academicService = createObject("component", "dir.cfc.academic_service").init()>
+        <cfset academicService = createObject("component", "cfc.academic_service").init()>
         <cfset academicService.saveAcademicInfo(
             userID,
             structKeyExists(form, "CurrentGradYear")  ? trim(form.CurrentGradYear)  : "",
@@ -155,26 +193,49 @@
     
     <!--- Handle student profile (current students) --->
     <cfif structKeyExists(form, "processStudentProfile")>
-        <cfset studentProfileSvc = createObject("component", "dir.cfc.studentProfile_service").init()>
+        <cfset studentProfileSvc = createObject("component", "cfc.studentProfile_service").init()>
         <cfset studentProfileSvc.saveProfile(
             userID,
-            structKeyExists(form, "sp_hometown")          ? trim(form.sp_hometown)          : "",
             structKeyExists(form, "sp_first_externship")  ? trim(form.sp_first_externship)  : "",
-            structKeyExists(form, "sp_second_externship") ? trim(form.sp_second_externship) : ""
+            structKeyExists(form, "sp_second_externship") ? trim(form.sp_second_externship) : "",
+            structKeyExists(form, "sp_commencement_age")  ? trim(form.sp_commencement_age)  : ""
         )>
-        <cfset spAwardsToSave = []>
-        <cfset spCount = (structKeyExists(form, "award_count") AND isNumeric(form.award_count)) ? val(form.award_count) : 0>
-        <cfloop from="0" to="#spCount - 1#" index="ai">
-            <cfset aName = structKeyExists(form, "award_name_#ai#") ? trim(form["award_name_#ai#"]) : "">
-            <cfset aType = structKeyExists(form, "award_type_#ai#") ? trim(form["award_type_#ai#"]) : "">
-            <cfif len(aName)>
-                <cfset arrayAppend(spAwardsToSave, { name=aName, type=aType })>
-            </cfif>
-        </cfloop>
-        <cfset studentProfileSvc.replaceAwards(userID, spAwardsToSave)>
     </cfif>
 
-    <cfset redirectTo = (structKeyExists(form, "returnTo") AND len(trim(form.returnTo))) ? trim(form.returnTo) : "/dir/admin/users/index.cfm">
+    <!--- Handle bio (public-facing users) --->
+    <cfif structKeyExists(form, "processBio")>
+        <cfset bioSvc = createObject("component", "cfc.bio_service").init()>
+        <cfset bioSvc.saveBio(userID, structKeyExists(form, "bioContent") ? form.bioContent : "")>
+    </cfif>
+
+    <!--- Handle degrees (Faculty / Emeritus / Resident) --->
+    <cfif structKeyExists(form, "processDegrees")>
+        <cfset degreesSvc = createObject("component", "cfc.degrees_service").init()>
+        <!--- Collect degree rows from whichever tab prefix is present (fac, emer, or res) --->
+        <cfset degreesToSave = []>
+        <cfloop list="bio,fac,emer,res,sp" index="pfx">
+            <cfset pfxCount = (structKeyExists(form, "#pfx#_degree_count") AND isNumeric(form["#pfx#_degree_count"])) ? val(form["#pfx#_degree_count"]) : 0>
+            <cfif pfxCount GT 0>
+                <cfloop from="0" to="#pfxCount - 1#" index="di">
+                    <cfset dName = structKeyExists(form, "#pfx#_deg_name_#di#") ? trim(form["#pfx#_deg_name_#di#"]) : "">
+                    <cfset dUniv = structKeyExists(form, "#pfx#_deg_univ_#di#") ? trim(form["#pfx#_deg_univ_#di#"]) : "">
+                    <cfset dYear = structKeyExists(form, "#pfx#_deg_year_#di#") ? trim(form["#pfx#_deg_year_#di#"]) : "">
+                    <cfif len(dName)>
+                        <cfset arrayAppend(degreesToSave, { name=dName, university=dUniv, year=dYear })>
+                    </cfif>
+                </cfloop>
+                <cfbreak>
+            </cfif>
+        </cfloop>
+        <cfset degreesSvc.replaceDegrees(userID, degreesToSave)>
+        <!--- Auto-update the composite Degrees field on the Users table --->
+        <cfset compositeStr = degreesSvc.buildDegreesString(userID)>
+        <cfset usersService.updateDegreesField(userID, compositeStr)>
+    </cfif>
+
+    <!--- Emails, phones, addresses, aliases now saved via AJAX (saveSection.cfm) --->
+
+    <cfset redirectTo = (structKeyExists(form, "returnTo") AND len(trim(form.returnTo))) ? trim(form.returnTo) : "/admin/users/index.cfm">
     <cflocation url="#redirectTo#" addtoken="false">
 <cfelse>
     <cfoutput><h2>Error: #result.message#</h2></cfoutput>

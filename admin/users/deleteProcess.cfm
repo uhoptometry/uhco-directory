@@ -1,8 +1,8 @@
 <cfif !structKeyExists(form, "userID") OR !isNumeric(form.userID)>
-    <cflocation url="/dir/admin/users/index.cfm" addtoken="false">
+    <cflocation url="#request.webRoot#/admin/users/index.cfm" addtoken="false">
 </cfif>
 
-<cfset usersService = createObject("component", "dir.cfc.users_service").init()>
+<cfset usersService = createObject("component", "cfc.users_service").init()>
 
 <!--- Perform the deletion --->
 <cfset result = usersService.deleteUser( form.userID )>
@@ -15,7 +15,7 @@
         <button type='button' class='btn-close' data-bs-dismiss='alert' aria-label='Close'></button>
     </div>
 
-    <p><a href='/dir/admin/users/index.cfm' class='btn btn-primary'>Back to Users</a></p>
+    <p><a href='/admin/users/index.cfm' class='btn btn-primary'>Back to Users</a></p>
     " />
 <cfelse>
     <cfset content = "
@@ -25,8 +25,8 @@
         <button type='button' class='btn-close' data-bs-dismiss='alert' aria-label='Close'></button>
     </div>
 
-    <p><a href='/dir/admin/users/index.cfm' class='btn btn-secondary'>Back to Users</a></p>
+    <p><a href='/admin/users/index.cfm' class='btn btn-secondary'>Back to Users</a></p>
     " />
 </cfif>
 
-<cfinclude template="/dir/admin/layout.cfm">
+<cfinclude template="/admin/layout.cfm">

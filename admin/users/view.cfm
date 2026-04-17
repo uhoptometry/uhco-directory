@@ -1,4 +1,4 @@
-<cfset directoryService = createObject("component", "dir.cfc.directory_service").init()>
+<cfset directoryService = createObject("component", "cfc.directory_service").init()>
 <cfset profile = directoryService.getFullProfile(url.userID)>
 <cfparam name="form.quickApiMatch" default="0">
 <cfparam name="form.saveMatchedApiId" default="0">
@@ -12,8 +12,19 @@
 <cfset maidenName  = profile.user.MAIDENNAME   ?: "">
 <cfset preferredName = profile.user.PREFERREDNAME ?: "">
 <cfset emailPrimary = profile.user.EMAILPRIMARY ?: "">
-<cfset emailSecondary = profile.user.EMAILSECONDARY ?: "">
 <cfset phone       = profile.user.PHONE        ?: "">
+
+<!--- ── Aliases ── --->
+<cfset aliasesSvc    = createObject("component", "cfc.aliases_service").init()>
+<cfset userAliases   = aliasesSvc.getAliases(val(url.userID)).data>
+
+<!--- ── Addresses ── --->
+<cfset addressesSvc  = createObject("component", "cfc.addresses_service").init()>
+<cfset userAddresses = addressesSvc.getAddresses(val(url.userID)).data>
+
+<!--- ── DOB / Gender from Users table ── --->
+<cfset userDOB    = profile.user.DOB    ?: "">
+<cfset userGender = profile.user.GENDER ?: "">
 <cfset room        = profile.user.ROOM         ?: "">
 <cfset building    = profile.user.BUILDING     ?: "">
 <cfset campus      = profile.user.CAMPUS       ?: "">
@@ -64,17 +75,17 @@
 
 <!--- Load student profile data if applicable --->
 <cfif showStudentProfile>
-    <cfset studentProfileSvc = createObject("component", "dir.cfc.studentProfile_service").init()>
+    <cfset studentProfileSvc = createObject("component", "cfc.studentProfile_service").init()>
     <cfset spProfile   = studentProfileSvc.getProfile(url.userID).data>
     <cfset spAwards    = studentProfileSvc.getAwards(url.userID).data>
-    <cfset spHometown  = structIsEmpty(spProfile) ? "" : (spProfile.HOMETOWN         ?: "")>
-    <cfset spFirstExt  = structIsEmpty(spProfile) ? "" : (spProfile.FIRSTEXTERNSHIP  ?: "")>
-    <cfset spSecondExt = structIsEmpty(spProfile) ? "" : (spProfile.SECONDEXTERNSHIP ?: "")>
+    <cfset spFirstExt      = structIsEmpty(spProfile) ? "" : (spProfile.FIRSTEXTERNSHIP   ?: "")>
+    <cfset spSecondExt     = structIsEmpty(spProfile) ? "" : (spProfile.SECONDEXTERNSHIP  ?: "")>
+    <cfset spCommAge       = structIsEmpty(spProfile) ? "" : (spProfile.COMMENCEMENTAGE   ?: "")>
 <cfelse>
-    <cfset spAwards    = []>
-    <cfset spHometown  = "">
-    <cfset spFirstExt  = "">
-    <cfset spSecondExt = "">
+    <cfset spAwards        = []>
+    <cfset spFirstExt      = "">
+    <cfset spSecondExt     = "">
+    <cfset spCommAge       = "">
 </cfif>
 
 <cfif quickMatchAttempted>
@@ -98,7 +109,7 @@
     </cfif>
 
     <cfsilent>
-        <cfset uhApi = createObject("component", "dir.cfc.uh_api").init(apiToken=uhApiToken, apiSecret=uhApiSecret)>
+        <cfset uhApi = createObject("component", "cfc.uh_api").init(apiToken=uhApiToken, apiSecret=uhApiSecret)>
         <cfset peopleResponse = uhApi.getPeople(student=true, staff=true, faculty=true)>
     </cfsilent>
 
@@ -154,15 +165,13 @@
         <cfset quickMatchMessage = "Save failed: matched API ID is missing.">
         <cfset quickMatchMessageClass = "alert-danger">
     <cfelse>
-        <cfset usersService = createObject("component", "dir.cfc.users_service").init()>
+        <cfset usersService = createObject("component", "cfc.users_service").init()>
         <cfset userData = {
             FirstName = profile.user.FIRSTNAME ?: "",
             MiddleName = profile.user.MIDDLENAME ?: "",
             LastName = profile.user.LASTNAME ?: "",
-            PreferredName = profile.user.PREFERREDNAME ?: "",
             Pronouns = profile.user.PRONOUNS ?: "",
             EmailPrimary = profile.user.EMAILPRIMARY ?: "",
-            EmailSecondary = profile.user.EMAILSECONDARY ?: "",
             Phone = profile.user.PHONE ?: "",
             Room = profile.user.ROOM ?: "",
             Building = profile.user.BUILDING ?: "",
@@ -187,10 +196,10 @@
 </cfif>
 
 <cfset quickMatchHtml = "
-<div class='card card-body mb-3'>
+<div class='card card-body mb-3 mt-4'>
     <h5 class='mb-2'>Quick API Match</h5>
     <p class='text-muted mb-2'>Compare this user by first and last name against UH API.</p>
-    <form method='post' action='/dir/admin/users/view.cfm?userID=#urlEncodedFormat(profile.user.USERID)#' class='d-inline'>
+    <form method='post' action='/admin/users/view.cfm?userID=#urlEncodedFormat(profile.user.USERID)#' class='d-inline'>
         <input type='hidden' name='quickApiMatch' value='1'>
         <button type='submit' class='btn btn-sm btn-outline-primary'>Run Quick API Match</button>
     </form>
@@ -203,22 +212,54 @@
         <cfset quickMatchHtml &= "
         <p class='mb-2'><strong>Matched API ID:</strong> #EncodeForHTML(quickMatchApiId)#</p>
         <p class='mb-2'><strong>Matched API Name:</strong> #EncodeForHTML(quickMatchApiFirstName)# #EncodeForHTML(quickMatchApiLastName)#</p>
-        <form method='post' action='/dir/admin/users/view.cfm?userID=#urlEncodedFormat(profile.user.USERID)#' class='d-inline me-2'>
+        <form method='post' action='/admin/users/view.cfm?userID=#urlEncodedFormat(profile.user.USERID)#' class='d-inline me-2'>
             <input type='hidden' name='quickApiMatch' value='1'>
             <input type='hidden' name='saveMatchedApiId' value='1'>
             <input type='hidden' name='matchedApiId' value='#EncodeForHTMLAttribute(quickMatchApiId)#'>
             <button type='submit' class='btn btn-sm btn-outline-success'>Save API ID to User</button>
         </form>
-        <a href='/dir/admin/users/uh_person.cfm?uhApiId=#urlEncodedFormat(quickMatchApiId)#&sourceUserID=#urlEncodedFormat(profile.user.USERID)#' class='btn btn-sm btn-success'>Sync from API</a>
+        <a href='/admin/users/uh_person.cfm?uhApiId=#urlEncodedFormat(quickMatchApiId)#&sourceUserID=#urlEncodedFormat(profile.user.USERID)#' class='btn btn-sm btn-success'>Sync from API</a>
         ">
     </cfif>
 </cfif>
 
 <cfset quickMatchHtml &= "</div>">
 
+
+<cfif arrayLen(profile.images) GT 0>
+    <cfloop from="1" to="#arrayLen(profile.images)#" index="i">
+        <cfset img = profile.images[i]>
+        <cfif lCase(trim(img.IMAGEVARIANT ?: "")) EQ "web_thumb">
+            <cfset profileThumbnail = img.IMAGEURL>
+            <cfbreak>
+        </cfif>
+    </cfloop>
+<cfelse>
+    <cfset profileThumbnail = "/includes/images/uh.png">
+</cfif>
+
+<cfset SubTitle = "">
+<cfif arrayLen(profile.flags) gt 0>
+    <cfloop from="1" to="#arrayLen(profile.flags)#" index="f">
+        <cfset flag = lCase(trim(profile.flags[f].FLAGNAME ?: ""))>
+        <cfif listFindNoCase("current-student,alumni,resident", flag)>
+            <cfset SubTitle = len(title1) ? "<p class='text-muted fs-5'>#title1#</p>" : "">
+            <cfbreak>
+        <cfelseif listFindNoCase("faculty-fulltime,faculty-adjunct,professor-emeritus", flag)>
+            <cfset SubTitle = len(degrees) ? "<p class='text-muted fs-5'>#degrees#</p>" : "">
+            <cfbreak>
+        </cfif>
+    </cfloop>
+</cfif>
+<cfif SubTitle EQ "">
+    <cfset SubTitle = "<p class='text-muted fs-5'>&nbsp;</p>">
+</cfif>
+
 <cfset content = "
+<img src='#profileThumbnail#' alt='Profile Thumbnail' class='rounded float-start me-3 mb-2' style=' object-fit: cover;'>
 <h1>#(len(prefix) ? prefix & ' ' : '')##profile.user.FIRSTNAME# #profile.user.LASTNAME##(len(suffix) ? ', ' & suffix : '')#</h1>
-<p class='text-muted fs-5'>#(len(degrees) ? degrees : '')#</p>
+#SubTitle#
+
 
 #quickMatchHtml#
 
@@ -227,11 +268,11 @@
         <div class='card mb-3'>
             <div class='card-header fw-semibold'>General Information</div>
             <div class='card-body'>
-                #(len(preferredName) ? '<p><strong>Preferred Name:</strong> ' & EncodeForHTML(preferredName) & '</p>' : '')#
-                #(len(maidenName)    ? '<p><strong>Maiden Name:</strong> '    & EncodeForHTML(maidenName)    & '</p>' : '')#
+                #(len(preferredName) ? '<p><strong>Preferred Name:</strong> ' & EncodeForHTML(preferredName) & ' <span class="text-muted small">(legacy)</span></p>' : '')#
+                #(len(maidenName)    ? '<p><strong>Maiden Name:</strong> '    & EncodeForHTML(maidenName) & ' <span class="text-muted small">(legacy)</span></p>' : '')#
+' & (arrayLen(userAliases) ? '<div class="mb-2"><strong>Aliases:</strong><ul class="mb-0">' & userAliases.reduce(function(acc, al) { return acc & '<li>' & EncodeForHTML(al.DISPLAYNAME) & ' <span class="badge bg-secondary">' & EncodeForHTML(al.ALIASTYPE) & '</span>' & (val(al.ISACTIVE) NEQ 1 ? ' <span class="badge bg-light text-dark">Inactive</span>' : '') & '</li>'; }, '') & '</ul></div>' : '') & '
                 #(len(pronouns)      ? '<p><strong>Pronouns:</strong> '        & EncodeForHTML(pronouns)      & '</p>' : '')#
                 #(len(emailPrimary)  ? '<p><strong>Email (@uh):</strong> '      & EncodeForHTML(emailPrimary)  & '</p>' : '')#
-                #(len(emailSecondary)? '<p><strong>Email (@central/@cougarnet):</strong> ' & EncodeForHTML(emailSecondary) & '</p>' : '')#
                 #(len(phone)         ? '<p><strong>Phone:</strong> '            & EncodeForHTML(phone)         & '</p>' : '')#
                 #(len(cougarnetid)   ? '<p><strong>CougarNet ID:</strong> '     & EncodeForHTML(cougarnetid)   & '</p>' : '')#
                 #(len(title1)        ? '<p><strong>Title 1:</strong> '          & EncodeForHTML(title1)        & '</p>' : '')#
@@ -303,30 +344,98 @@
 
 <hr>
 
-<h3>Images</h3>
-<div class='row'>
-" />
+<h3 class='d-flex justify-content-between align-items-center'>
+    Images
+">
 
-<cfif arrayLen(profile.images) gt 0>
-    <cfloop from="1" to="#arrayLen(profile.images)#" index="i">
-        <cfset img = profile.images[i]>
-        <cfset content &= "
-        <div class='col-md-3 mb-3'>
-            <img class='img-fluid rounded shadow-sm'
-                 src='#img.IMAGEURL#'
-                 alt='#img.IMAGEDESCRIPTION#'
-                 title='#img.IMAGEDESCRIPTION#'>
-            <p class='mt-2'>#img.IMAGEDESCRIPTION#</p>
-        </div>
-        ">
-    </cfloop>
-<cfelse>
-    <cfset content &= "<p class='text-muted'>No images</p>">
+<cfif request.hasRole("USER_MEDIA_ADMIN") OR request.hasRole("SUPER_ADMIN")>
+    <cfset content &= "
+    <a href='/admin/user-media/sources.cfm?userid=#url.userID#'
+       class='btn btn-sm btn-outline-primary'>
+        <i class='bi bi-pencil-square me-1'></i> Manage Images
+    </a>
+    ">
 </cfif>
 
 <cfset content &= "
-</div>
-" />
+</h3>
+">
+
+<cfif arrayLen(profile.images) GT 0>
+    <!--- Group images by ImageVariant --->
+    <cfset variantGroups = {}>
+    <cfset variantOrder  = []>
+    <cfloop from="1" to="#arrayLen(profile.images)#" index="i">
+        <cfset img = profile.images[i]>
+        <cfset vKey = lCase(trim(img.IMAGEVARIANT ?: "unknown"))>
+        <cfif NOT structKeyExists(variantGroups, vKey)>
+            <cfset variantGroups[vKey] = []>
+            <cfset arrayAppend(variantOrder, vKey)>
+        </cfif>
+        <cfset arrayAppend(variantGroups[vKey], img)>
+    </cfloop>
+
+    <cfset content &= "<div class='accordion' id='imagesAccordion'>">
+
+    <cfloop from="1" to="#arrayLen(variantOrder)#" index="gi">
+        <cfset gKey   = variantOrder[gi]>
+        <cfset gItems = variantGroups[gKey]>
+        <cfset gLabel = encodeForHTML(uCase(gKey))>
+        <cfset gCount = arrayLen(gItems)>
+        <!--- Use the first image's dimensions as the group dimension hint --->
+        <cfset gDim = "">
+        <cfif len(gItems[1].IMAGEDIMENSIONS ?: "")>
+            <cfset gDim = encodeForHTML(gItems[1].IMAGEDIMENSIONS)>
+        </cfif>
+        <cfset collapseID = "imgGroup_#gi#">
+
+        <cfset content &= "
+        <div class='accordion-item'>
+            <h2 class='accordion-header' id='heading_#collapseID#'>
+                <button class='accordion-button #gi GT 1 ? "collapsed" : ""#' type='button'
+                        data-bs-toggle='collapse' data-bs-target='###collapseID#'
+                        aria-expanded='#gi EQ 1 ? "true" : "false"#'
+                        aria-controls='#collapseID#'>
+                    <span class='fw-semibold'>#gLabel#</span>
+                    <span class='badge bg-secondary ms-2'>#gCount#</span>
+                    #len(gDim) ? "<span class='text-muted small ms-2'>" & gDim & "</span>" : ""#
+                </button>
+            </h2>
+            <div id='#collapseID#' class='accordion-collapse collapse #gi EQ 1 ? "show" : ""#'
+                 aria-labelledby='heading_#collapseID#'
+                 data-bs-parent='##imagesAccordion'>
+                <div class='accordion-body'>
+                    <div class='row'>
+        ">
+
+        <cfloop from="1" to="#arrayLen(gItems)#" index="j">
+            <cfset img = gItems[j]>
+            <cfset content &= "
+                    <div class='col-md-3 mb-3'>
+                        <img class='img-fluid rounded shadow-sm'
+                             src='#img.IMAGEURL#'
+                             alt='#encodeForHTML(img.IMAGEDESCRIPTION ?: "")#'
+                             title='#encodeForHTML(img.IMAGEDESCRIPTION ?: "")#'>
+                        <p class='mt-2 mb-0'>#encodeForHTML(img.IMAGEDESCRIPTION ?: "")#</p>
+                        <cfif len(img.IMAGEDIMENSIONS ?: '')>
+                            <p class='text-muted small mb-0'>#encodeForHTML(img.IMAGEDIMENSIONS)#</p>
+                        </cfif>
+                    </div>
+            ">
+        </cfloop>
+
+        <cfset content &= "
+                    </div>
+                </div>
+            </div>
+        </div>
+        ">
+    </cfloop>
+
+    <cfset content &= "</div>">
+<cfelse>
+    <cfset content &= "<p class='text-muted'>No images</p>">
+</cfif>
 
 <cfif showAcademicInfo>
     <cfset content &= "<hr><h3>Academic Info</h3><div>">
@@ -346,10 +455,49 @@
     <cfset content &= "</div>">
 </cfif>
 
+<!--- ── Biographical Information card ── --->
+<cfset hasBioInfo = isDate(userDOB) OR len(userGender) OR arrayLen(userAddresses) GT 0>
+<cfif hasBioInfo>
+    <cfset content &= "<hr><h3>Biographical Information</h3>">
+    <cfset content &= "<div class='card mb-3'><div class='card-body'>">
+    <cfif isDate(userDOB)>
+        <cfset content &= "<p><strong>Date of Birth:</strong> " & dateFormat(userDOB, 'mmmm d, yyyy') & "</p>">
+    </cfif>
+    <cfif len(userGender)>
+        <cfset content &= "<p><strong>Gender:</strong> " & EncodeForHTML(userGender) & "</p>">
+    </cfif>
+    <cfset content &= "</div></div>">
+</cfif>
+<cfif arrayLen(userAddresses) GT 0>
+    <cfif NOT hasBioInfo><cfset content &= "<hr><h3>Biographical Information</h3>"></cfif>
+    <cfset content &= "<div class='card mb-3'><div class='card-header fw-semibold'>Addresses</div><div class='card-body'>">
+</cfif>
+<cfloop from="1" to="#arrayLen(userAddresses)#" index="adI">
+    <cfset addrItem = userAddresses[adI]>
+    <cfset content &= "<div class='mb-2'>">
+    <cfset content &= "<strong>" & EncodeForHTML(addrItem.ADDRESSTYPE ?: "") & "</strong>">
+    <cfif val(addrItem.ISPRIMARY ?: 0)><cfset content &= " <span class='badge bg-success'>Primary</span>"></cfif>
+    <cfset content &= "<br><small class='text-muted'>">
+    <cfif len(trim(addrItem.ADDRESS1 ?: ""))><cfset content &= EncodeForHTML(addrItem.ADDRESS1)></cfif>
+    <cfif len(trim(addrItem.ADDRESS2 ?: ""))><cfset content &= ", " & EncodeForHTML(addrItem.ADDRESS2)></cfif>
+    <cfif len(trim(addrItem.CITY ?: "")) OR len(trim(addrItem.STATE ?: "")) OR len(trim(addrItem.ZIPCODE ?: ""))>
+        <cfset content &= "<br>" & EncodeForHTML(addrItem.CITY ?: "")>
+        <cfif len(trim(addrItem.STATE ?: ""))><cfset content &= ", " & EncodeForHTML(addrItem.STATE)></cfif>
+        <cfset content &= " " & EncodeForHTML(addrItem.ZIPCODE ?: "")>
+    </cfif>
+    <cfif len(trim(addrItem.BUILDING ?: ""))><cfset content &= " | Bldg: " & EncodeForHTML(addrItem.BUILDING)></cfif>
+    <cfif len(trim(addrItem.ROOM ?: ""))><cfset content &= " Rm: " & EncodeForHTML(addrItem.ROOM)></cfif>
+    <cfif len(trim(addrItem.MAILCODE ?: ""))><cfset content &= " | MC: " & EncodeForHTML(addrItem.MAILCODE)></cfif>
+    <cfset content &= "</small></div>">
+</cfloop>
+<cfif arrayLen(userAddresses) GT 0>
+    <cfset content &= "</div></div>">
+</cfif>
+
 <cfif showStudentProfile>
     <cfset content &= "<hr><h3>Student Profile</h3><div class='row'>">
     <cfset content &= "<div class='col-md-6'>">
-    <cfif len(spHometown)>  <cfset content &= "<p><strong>Hometown:</strong> "       & EncodeForHTML(spHometown)  & "</p>"> </cfif>
+    <cfif len(spCommAge) AND isNumeric(spCommAge)> <cfset content &= "<p><strong>Commencement Age:</strong> " & int(spCommAge) & "</p>"> </cfif>
     <cfif len(spFirstExt)>  <cfset content &= "<p><strong>First Externship:</strong> " & EncodeForHTML(spFirstExt)  & "</p>"> </cfif>
     <cfif len(spSecondExt)> <cfset content &= "<p><strong>Second Externship:</strong> "& EncodeForHTML(spSecondExt) & "</p>"> </cfif>
     <cfset content &= "</div>">
@@ -371,10 +519,13 @@
 
 <cfset content &= "
 <div class='mt-4'>
-    " & (uhApiId != "" ? "<a href='/dir/admin/users/uh_sync.cfm?uhApiId=#urlEncodedFormat(uhApiId)#&sourceUserID=#urlEncodedFormat(profile.user.USERID)#' class='btn btn-info me-2'>UH Sync</a>" : "") & "
-    <a href='/dir/admin/users/edit.cfm?userID=#profile.user.USERID#' class='btn btn-primary'>Edit</a>
-    <a href='/dir/admin/users/index.cfm' class='btn btn-secondary'>Back to Users</a>
+    " & (uhApiId != "" ? "<a href='/admin/users/uh_sync.cfm?uhApiId=#urlEncodedFormat(uhApiId)#&sourceUserID=#urlEncodedFormat(profile.user.USERID)#' class='btn btn-info me-2'>UH Sync</a>" : "") & "
+    <a href='/admin/users/edit.cfm?userID=#profile.user.USERID#' class='btn btn-primary'>Edit</a>
+    <a href='/admin/users/index.cfm' class='btn btn-secondary'>Back to Users</a>
 </div>
 " />
 
-<cfinclude template="/dir/admin/layout.cfm">
+
+
+
+<cfinclude template="/admin/layout.cfm">

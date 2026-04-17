@@ -1,5 +1,5 @@
-<cfset directoryService = createObject("component", "dir.cfc.directory_service").init()>
-<cfset externalService = createObject("component", "dir.cfc.externalID_service").init()>
+<cfset directoryService = createObject("component", "cfc.directory_service").init()>
+<cfset externalService = createObject("component", "cfc.externalID_service").init()>
 <cfset systemsResult = externalService.getSystems()>
 <cfset allSystems = systemsResult.data />
 
@@ -24,8 +24,8 @@
             <tr>
                 <td>#s.SYSTEMNAME#</td>
                 <td>
-                    <a href='/dir/admin/external/edit.cfm?systemID=#s.SYSTEMID#' class='btn btn-sm btn-info'>Edit</a>
-                    <a href='/dir/admin/external/delete.cfm?systemID=#s.SYSTEMID#' class='btn btn-sm btn-danger'>Delete</a>
+                    <a href='/admin/external/edit.cfm?systemID=#s.SYSTEMID#' class='btn btn-sm btn-info'>Edit</a>
+                    <a href='/admin/external/delete.cfm?systemID=#s.SYSTEMID#' class='btn btn-sm btn-danger'>Delete</a>
                 </td>
             </tr>
         ">
@@ -51,4 +51,4 @@
 </form>
 " />
 
-<cfinclude template="/dir/admin/layout.cfm">
+<cfinclude template="/admin/layout.cfm">

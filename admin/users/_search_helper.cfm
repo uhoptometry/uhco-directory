@@ -12,8 +12,7 @@
       term1 || term2      → either condition must match (OR)
 
     Supported field names (case-insensitive):
-      firstname, lastname, email, primaryemail / emailprimary,
-      secondaryemail / emailsecondary, title
+      firstname, lastname, email, primaryemail / emailprimary, title
 --->
 <cffunction name="userMatchesSearch" returntype="boolean" output="false">
     <cfargument name="u"          type="struct" required="true">
@@ -77,17 +76,11 @@
                     <cfset condMatches = exactMatch
                         ? (lCase(arguments.u.EMAILPRIMARY ?: "") EQ lCase(fieldVal))
                         : findNoCase(fieldVal, arguments.u.EMAILPRIMARY ?: "")>
-                <cfelseif fieldName EQ "emailsecondary" OR fieldName EQ "secondaryemail">
-                    <cfset condMatches = exactMatch
-                        ? (lCase(arguments.u.EMAILSECONDARY ?: "") EQ lCase(fieldVal))
-                        : findNoCase(fieldVal, arguments.u.EMAILSECONDARY ?: "")>
                 <cfelseif fieldName EQ "email">
                     <cfif exactMatch>
-                        <cfset condMatches = (lCase(arguments.u.EMAILPRIMARY ?: "") EQ lCase(fieldVal)) OR
-                                             (lCase(arguments.u.EMAILSECONDARY ?: "") EQ lCase(fieldVal))>
+                        <cfset condMatches = (lCase(arguments.u.EMAILPRIMARY ?: "") EQ lCase(fieldVal))>
                     <cfelse>
-                        <cfset condMatches = findNoCase(fieldVal, arguments.u.EMAILPRIMARY ?: "") OR
-                                             findNoCase(fieldVal, arguments.u.EMAILSECONDARY ?: "")>
+                        <cfset condMatches = findNoCase(fieldVal, arguments.u.EMAILPRIMARY ?: "")>
                     </cfif>
                 <cfelseif fieldName EQ "title">
                     <cfset condMatches = exactMatch
@@ -97,8 +90,7 @@
                     <!--- Unknown field: fall back to any-field match on the full original token --->
                     <cfset condMatches = findNoCase(cond, arguments.u.FIRSTNAME ?: "") OR
                                          findNoCase(cond, arguments.u.LASTNAME  ?: "") OR
-                                         findNoCase(cond, arguments.u.EMAILPRIMARY ?: "") OR
-                                         findNoCase(cond, arguments.u.EMAILSECONDARY ?: "")>
+                                         findNoCase(cond, arguments.u.EMAILPRIMARY ?: "")>
                 </cfif>
 
             <cfelse>
@@ -113,13 +105,11 @@
                 <cfif exactMatch>
                     <cfset condMatches = (lCase(arguments.u.FIRSTNAME ?: "") EQ lCase(cond)) OR
                                          (lCase(arguments.u.LASTNAME  ?: "") EQ lCase(cond)) OR
-                                         (lCase(arguments.u.EMAILPRIMARY ?: "") EQ lCase(cond)) OR
-                                         (lCase(arguments.u.EMAILSECONDARY ?: "") EQ lCase(cond))>
+                                         (lCase(arguments.u.EMAILPRIMARY ?: "") EQ lCase(cond))>
                 <cfelse>
                     <cfset condMatches = findNoCase(cond, arguments.u.FIRSTNAME ?: "") OR
                                          findNoCase(cond, arguments.u.LASTNAME  ?: "") OR
-                                         findNoCase(cond, arguments.u.EMAILPRIMARY ?: "") OR
-                                         findNoCase(cond, arguments.u.EMAILSECONDARY ?: "")>
+                                         findNoCase(cond, arguments.u.EMAILPRIMARY ?: "")>
                 </cfif>
             </cfif>
 

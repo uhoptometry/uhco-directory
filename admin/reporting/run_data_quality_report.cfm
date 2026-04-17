@@ -17,7 +17,7 @@
 
 <cfset returnJson = structKeyExists(url, "format") AND trim(url.format) EQ "json">
 
-<cfset dqDAO     = createObject("component", "dir.dao.dataQuality_DAO").init()>
+<cfset dqDAO     = createObject("component", "dao.dataQuality_DAO").init()>
 <cfset runID     = 0>
 <cfset issueCount = 0>
 <cfset userCount  = 0>
@@ -49,7 +49,7 @@
 </cfif>
 
 <cfif success>
-    <cflocation url="/dir/admin/reporting/data_quality_report.cfm?msg=ran&runID=#runID#" addtoken="false">
+    <cflocation url="#request.webRoot#/admin/reporting/data_quality_report.cfm?msg=ran&runID=#runID#" addtoken="false">
 <cfelse>
-    <cflocation url="/dir/admin/reporting/data_quality_report.cfm?msg=error&err=#urlEncodedFormat(errorMsg)#" addtoken="false">
+    <cflocation url="#request.webRoot#/admin/reporting/data_quality_report.cfm?msg=error&err=#urlEncodedFormat(errorMsg)#" addtoken="false">
 </cfif>

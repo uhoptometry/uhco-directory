@@ -9,7 +9,7 @@ component output="false" {
      */
     public struct function requireAuth( required string requiredScope = "read" ) {
 
-        var tokenService = createObject("component", "dir.cfc.token_service").init();
+        var tokenService = createObject("component", "cfc.token_service").init();
 
         // Extract Bearer token from Authorization header or ?token= query param
         var authHeader = CGI.HTTP_AUTHORIZATION ?: "";
@@ -74,7 +74,7 @@ component output="false" {
         }
         if (!len(raw)) return [];
 
-        var secretService = createObject("component", "dir.cfc.secret_service").init();
+        var secretService = createObject("component", "cfc.secret_service").init();
         var result = secretService.validateSecret(
             rawSecret = raw,
             remoteIP  = CGI.REMOTE_ADDR

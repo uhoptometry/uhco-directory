@@ -10,7 +10,7 @@
 <cfparam name="url.importedName" default="">
 <cfparam name="url.newUserID" default="">
 
-<cfset datasource = "UHCO_Directory">
+<cfset datasource = request.datasource>
 <cfset uhApiToken = structKeyExists(application, "uhApiToken") ? trim(application.uhApiToken ?: "") : "">
 <cfset uhApiSecret = structKeyExists(application, "uhApiSecret") ? trim(application.uhApiSecret ?: "") : "">
 <cfset selectedStudent = form.student EQ "1">
@@ -43,7 +43,7 @@
 
 <cfset content = "">
 <cfif url.msg EQ "imported">
-    <cfset content &= "<div class='alert alert-success'><i class='bi bi-check-circle-fill'></i> <strong>#EncodeForHTML(url.importedName)#</strong> imported successfully as <a href='/dir/admin/users/edit.cfm?userID=#EncodeForHTMLAttribute(url.newUserID)#'>User ##&thinsp;#EncodeForHTML(url.newUserID)#</a>.</div>">
+    <cfset content &= "<div class='alert alert-success'><i class='bi bi-check-circle-fill'></i> <strong>#EncodeForHTML(url.importedName)#</strong> imported successfully as <a href='/admin/users/edit.cfm?userID=#EncodeForHTMLAttribute(url.newUserID)#'>User ##&thinsp;#EncodeForHTML(url.newUserID)#</a>.</div>">
 <cfelseif len(url.err)>
     <cfset content &= "<div class='alert alert-danger'><strong>Import failed:</strong> #EncodeForHTML(url.err)#</div>">
 </cfif>
@@ -51,7 +51,7 @@
 <h1>UH People Import</h1>
 <p class='text-muted'>Pull people from the UH API, compare by first and last name against local users, and stage missing people for review.</p>
 <div class='mb-3'>
-    <a href='/dir/admin/users/uh_people_db_not_in_api.cfm' class='btn btn-outline-dark btn-sm'>Open Reverse Compare</a>
+    <a href='/admin/users/uh_people_db_not_in_api.cfm' class='btn btn-outline-dark btn-sm'>Open Reverse Compare</a>
 </div>
 
 <form method='post' class='card card-body mb-4'>
@@ -129,9 +129,9 @@
                         <td>#EncodeForHTML(stagingRecords.reason ?: "")#</td>
                         <td>#dateformat(stagingRecords.createdAt, 'yyyy-mm-dd')# #timeformat(stagingRecords.createdAt, 'HH:mm')#</td>
                         <td class='text-nowrap'>
-                            <a href='/dir/admin/users/uh_person.cfm?uhApiId=#urlEncodedFormat(stagingRecords.uhApiId)#' class='btn btn-sm btn-outline-primary'>Review</a>
+                            <a href='/admin/users/uh_person.cfm?uhApiId=#urlEncodedFormat(stagingRecords.uhApiId)#' class='btn btn-sm btn-outline-primary'>Review</a>
                             <cfif (stagingRecords.reason ?: "") EQ reasonApiOnly>
-                                <a href='/dir/admin/users/quick_import_person.cfm?uhApiId=#urlEncodedFormat(stagingRecords.uhApiId)#&returnTo=#urlEncodedFormat(cgi.SCRIPT_NAME)#'
+                                <a href='/admin/users/quick_import_person.cfm?uhApiId=#urlEncodedFormat(stagingRecords.uhApiId)#&returnTo=#urlEncodedFormat(cgi.SCRIPT_NAME)#'
                                    class='btn btn-sm btn-success ms-1'>Quick Import</a>
                             </cfif>
                             <form method='post' style='display:inline;'>
@@ -159,7 +159,7 @@
         <cfset pageMessage = "Select at least one UH API filter before running the import.">
         <cfset pageMessageClass = "alert-warning">
     <cfelse>
-        <cfset usersService = createObject("component", "dir.cfc.users_service").init()>
+        <cfset usersService = createObject("component", "cfc.users_service").init()>
         <cfset localUsers = usersService.listUsers()>
         <cfset localNameIndex = {}>
 
@@ -172,7 +172,7 @@
         </cfloop>
 
         <cfsilent>
-            <cfset uhApi = createObject("component", "dir.cfc.uh_api").init(apiToken=uhApiToken, apiSecret=uhApiSecret)>
+            <cfset uhApi = createObject("component", "cfc.uh_api").init(apiToken=uhApiToken, apiSecret=uhApiSecret)>
             <cfset peopleResponse = uhApi.getPeople(student=selectedStudent, staff=selectedStaff, faculty=selectedFaculty)>
         </cfsilent>
 
@@ -295,11 +295,11 @@
                         <td>#EncodeForHTML(row.action)#</td>
                         <td>#EncodeForHTML(row.reason)#</td>
                         <td class='text-nowrap'>
-                            <a href='/dir/admin/users/uh_person.cfm?uhApiId=#urlEncodedFormat(row.uhApiId)#' class='btn btn-sm btn-outline-primary'>Review</a>
+                            <a href='/admin/users/uh_person.cfm?uhApiId=#urlEncodedFormat(row.uhApiId)#' class='btn btn-sm btn-outline-primary'>Review</a>
             ">
             <cfif row.action EQ "Inserted">
                 <cfset content &= "
-                                <a href='/dir/admin/users/quick_import_person.cfm?uhApiId=#urlEncodedFormat(row.uhApiId)#&returnTo=#urlEncodedFormat(cgi.SCRIPT_NAME)#'
+                                <a href='/admin/users/quick_import_person.cfm?uhApiId=#urlEncodedFormat(row.uhApiId)#&returnTo=#urlEncodedFormat(cgi.SCRIPT_NAME)#'
                                    class='btn btn-sm btn-success ms-1'>Quick Import</a>
                                 <form method='post' style='display:inline;'>
                                     <input type='hidden' name='deleteFromStaging' value='1'>
@@ -322,4 +322,4 @@
     </cfif>
 </cfif>
 
-<cfinclude template="/dir/admin/layout.cfm">
+<cfinclude template="/admin/layout.cfm">

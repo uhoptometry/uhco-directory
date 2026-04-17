@@ -60,6 +60,11 @@
                     <a class="nav-link py-1 ps-4 small" href="#ep-person-academic">GET /people/{id}/academic</a>
                     <a class="nav-link py-1 ps-4 small" href="#ep-person-addresses">GET /people/{id}/addresses</a>
                     <a class="nav-link py-1 ps-4 small" href="#ep-person-externalids">GET /people/{id}/externalids</a>
+                    <a class="nav-link py-1 ps-4 small" href="#ep-person-emails">GET /people/{id}/emails</a>
+                    <a class="nav-link py-1 ps-4 small" href="#ep-person-degrees">GET /people/{id}/degrees</a>
+                    <a class="nav-link py-1 ps-4 small" href="#ep-person-studentprofile">GET /people/{id}/studentprofile</a>
+                    <a class="nav-link py-1 ps-4 small" href="#ep-person-awards">GET /people/{id}/awards</a>
+                    <a class="nav-link py-1 ps-4 small" href="#ep-person-bio">GET /people/{id}/bio</a>
                     <a class="nav-link py-1" href="#ep-orgs">GET /organizations</a>
                     <a class="nav-link py-1 ps-4 small" href="#ep-org">GET /organizations/{id}</a>
                     <a class="nav-link py-1" href="#ep-flags">GET /flags</a>
@@ -76,10 +81,10 @@
             <section id="intro" class="mb-5">
                 <h2 class="h3 fw-bold mb-3">Introduction</h2>
                 <p>The <strong>UHCO Directory API</strong> provides programmatic read access to the University of Houston College of Optometry's people, organizations, and classification data. It is a JSON REST API served under:</p>
-                <pre class="example">https://&lt;host&gt;/dir/api/v1/</pre>
+                <pre class="example">https://&lt;host&gt;/api/v1/</pre>
                 <p>All responses are JSON with UTF-8 encoding. All endpoints are read-only (<code>GET</code>). Attempting any other HTTP method returns <code>405 Method Not Allowed</code>.</p>
                 <h5 class="mt-4">Base URL</h5>
-                <pre class="example">http://127.0.0.1/dir/api/v1/</pre>
+                <pre class="example">http://127.0.0.1/api/v1/</pre>
                 <h5 class="mt-4">Versioning</h5>
                 <p>The current version is <strong>v1</strong>, reflected in the URL path. Breaking changes will increment the version number.</p>
             </section>
@@ -96,7 +101,7 @@
                 <pre class="example">Authorization: Bearer uhcs_&lt;your-token&gt;</pre>
 
                 <h6 class="mt-3">Query string (for browser testing)</h6>
-                <pre class="example">GET /dir/api/v1/people?token=uhcs_&lt;your-token&gt;</pre>
+                <pre class="example">GET /api/v1/people?token=uhcs_&lt;your-token&gt;</pre>
 
                 <div class="alert alert-warning mt-3 d-flex gap-2">
                     <i class="bi bi-exclamation-triangle-fill mt-1"></i>
@@ -142,7 +147,7 @@
 X-API-Secret: uhcs_sec_&lt;your-secret&gt;</pre>
 
                 <h6 class="mt-3">Query string</h6>
-                <pre class="example">GET /dir/api/v1/people?token=uhcs_...&amp;secret=uhcs_sec_...</pre>
+                <pre class="example">GET /api/v1/people?token=uhcs_...&amp;secret=uhcs_sec_...</pre>
 
                 <div class="alert alert-info mt-3 d-flex gap-2">
                     <i class="bi bi-info-circle-fill mt-1"></i>
@@ -180,7 +185,7 @@ X-API-Secret: uhcs_sec_&lt;your-secret&gt;</pre>
             <div class="card endpoint-card shadow-sm mb-4" id="ep-people">
                 <div class="card-header bg-white">
                     <span class="badge bg-primary method-badge me-2">GET</span>
-                    <code>/dir/api/v1/people</code>
+                    <code>/api/v1/people</code>
                 </div>
                 <div class="card-body">
                     <p class="mb-3">Returns a paginated list of directory people. Supports full-text search across name and email fields.</p>
@@ -211,14 +216,14 @@ X-API-Secret: uhcs_sec_&lt;your-secret&gt;</pre>
 }</pre>
 
                     <h6 class="mt-3">Example Requests</h6>
-                    <pre class="example">GET /dir/api/v1/people?token=uhcs_...
-GET /dir/api/v1/people?search=smith&amp;limit=25&amp;offset=50&amp;token=uhcs_...
-GET /dir/api/v1/people?flag=Staff&amp;token=uhcs_...
-GET /dir/api/v1/people?org=Clinical+Operations&amp;token=uhcs_...
-GET /dir/api/v1/people?flag=Current-Student&amp;secret=uhcs_sec_...&amp;token=uhcs_...
-GET /dir/api/v1/people?flag=Alumni&amp;secret=uhcs_sec_...&amp;token=uhcs_...
-GET /dir/api/v1/people?org=OD+Program&amp;secret=uhcs_sec_...&amp;token=uhcs_...
-GET /dir/api/v1/people?return=xml&amp;token=uhcs_...</pre>
+                    <pre class="example">GET /api/v1/people?token=uhcs_...
+GET /api/v1/people?search=smith&amp;limit=25&amp;offset=50&amp;token=uhcs_...
+GET /api/v1/people?flag=Staff&amp;token=uhcs_...
+GET /api/v1/people?org=Clinical+Operations&amp;token=uhcs_...
+GET /api/v1/people?flag=Current-Student&amp;secret=uhcs_sec_...&amp;token=uhcs_...
+GET /api/v1/people?flag=Alumni&amp;secret=uhcs_sec_...&amp;token=uhcs_...
+GET /api/v1/people?org=OD+Program&amp;secret=uhcs_sec_...&amp;token=uhcs_...
+GET /api/v1/people?return=xml&amp;token=uhcs_...</pre>
                     <p class="mt-2 small text-muted">See the <a href="examples.html">Examples page</a> for working code samples in JavaScript, Python, Node.js, ColdFusion, and curl.</p>
                 </div>
             </div>
@@ -227,7 +232,7 @@ GET /dir/api/v1/people?return=xml&amp;token=uhcs_...</pre>
             <div class="card endpoint-card shadow-sm mb-4" id="ep-person">
                 <div class="card-header bg-white">
                     <span class="badge bg-primary method-badge me-2">GET</span>
-                    <code>/dir/api/v1/people/{id}</code>
+                    <code>/api/v1/people/{id}</code>
                 </div>
                 <div class="card-body">
                     <p class="mb-3">Returns the full profile for a single person, including their user record, flags, organizations, academic info, addresses, and external IDs.</p>
@@ -263,8 +268,8 @@ GET /dir/api/v1/people?return=xml&amp;token=uhcs_...</pre>
 }</pre>
 
                     <h6 class="mt-3">Example Requests</h6>
-                    <pre class="example">GET /dir/api/v1/people/42?token=uhcs_...
-GET /dir/api/v1/people/42?return=xml&amp;token=uhcs_...</pre>
+                    <pre class="example">GET /api/v1/people/42?token=uhcs_...
+GET /api/v1/people/42?return=xml&amp;token=uhcs_...</pre>
                 </div>
             </div>
 
@@ -272,7 +277,7 @@ GET /dir/api/v1/people/42?return=xml&amp;token=uhcs_...</pre>
             <div class="card endpoint-card shadow-sm mb-4" id="ep-person-flags">
                 <div class="card-header bg-white">
                     <span class="badge bg-primary method-badge me-2">GET</span>
-                    <code>/dir/api/v1/people/{id}/flags</code>
+                    <code>/api/v1/people/{id}/flags</code>
                 </div>
                 <div class="card-body">
                     <p class="mb-3">Returns all classification flags assigned to the specified person (e.g. Faculty, Student, Alumni).</p>
@@ -301,8 +306,8 @@ GET /dir/api/v1/people/42?return=xml&amp;token=uhcs_...</pre>
                     <pre class="example">{ "DATA": [ { "FLAGID": 3, "FLAGNAME": "Alumni", ... } ] }</pre>
 
                     <h6 class="mt-3">Example Requests</h6>
-                    <pre class="example">GET /dir/api/v1/people/42/flags?token=uhcs_...
-GET /dir/api/v1/people/42/flags?return=xml&amp;token=uhcs_...</pre>
+                    <pre class="example">GET /api/v1/people/42/flags?token=uhcs_...
+GET /api/v1/people/42/flags?return=xml&amp;token=uhcs_...</pre>
                 </div>
             </div>
 
@@ -310,7 +315,7 @@ GET /dir/api/v1/people/42/flags?return=xml&amp;token=uhcs_...</pre>
             <div class="card endpoint-card shadow-sm mb-4" id="ep-person-orgs">
                 <div class="card-header bg-white">
                     <span class="badge bg-primary method-badge me-2">GET</span>
-                    <code>/dir/api/v1/people/{id}/organizations</code>
+                    <code>/api/v1/people/{id}/organizations</code>
                 </div>
                 <div class="card-body">
                     <p class="mb-3">Returns all organization memberships for the specified person.</p>
@@ -339,8 +344,8 @@ GET /dir/api/v1/people/42/flags?return=xml&amp;token=uhcs_...</pre>
                     <pre class="example">{ "DATA": [ { "ORGID": 5, "ORGNAME": "Clinical Sciences", ... } ] }</pre>
 
                     <h6 class="mt-3">Example Requests</h6>
-                    <pre class="example">GET /dir/api/v1/people/42/organizations?token=uhcs_...
-GET /dir/api/v1/people/42/organizations?return=xml&amp;token=uhcs_...</pre>
+                    <pre class="example">GET /api/v1/people/42/organizations?token=uhcs_...
+GET /api/v1/people/42/organizations?return=xml&amp;token=uhcs_...</pre>
                 </div>
             </div>
 
@@ -348,7 +353,7 @@ GET /dir/api/v1/people/42/organizations?return=xml&amp;token=uhcs_...</pre>
             <div class="card endpoint-card shadow-sm mb-4" id="ep-person-academic">
                 <div class="card-header bg-white">
                     <span class="badge bg-primary method-badge me-2">GET</span>
-                    <code>/dir/api/v1/people/{id}/academic</code>
+                    <code>/api/v1/people/{id}/academic</code>
                 </div>
                 <div class="card-body">
                     <p class="mb-3">Returns academic information for the specified person, including enrollment status, graduation year, and class standing.</p>
@@ -377,8 +382,8 @@ GET /dir/api/v1/people/42/organizations?return=xml&amp;token=uhcs_...</pre>
                     <pre class="example">{ "DATA": { "GRADYEAR": 2026, "CLASSSTANDING": "4th Year", ... } }</pre>
 
                     <h6 class="mt-3">Example Requests</h6>
-                    <pre class="example">GET /dir/api/v1/people/42/academic?token=uhcs_...
-GET /dir/api/v1/people/42/academic?return=xml&amp;token=uhcs_...</pre>
+                    <pre class="example">GET /api/v1/people/42/academic?token=uhcs_...
+GET /api/v1/people/42/academic?return=xml&amp;token=uhcs_...</pre>
                 </div>
             </div>
 
@@ -386,7 +391,7 @@ GET /dir/api/v1/people/42/academic?return=xml&amp;token=uhcs_...</pre>
             <div class="card endpoint-card shadow-sm mb-4" id="ep-person-addresses">
                 <div class="card-header bg-white">
                     <span class="badge bg-primary method-badge me-2">GET</span>
-                    <code>/dir/api/v1/people/{id}/addresses</code>
+                    <code>/api/v1/people/{id}/addresses</code>
                 </div>
                 <div class="card-body">
                     <p class="mb-3">Returns all address records associated with the specified person.</p>
@@ -415,8 +420,8 @@ GET /dir/api/v1/people/42/academic?return=xml&amp;token=uhcs_...</pre>
                     <pre class="example">{ "DATA": [ { "ADDRESSID": 9, "STREET": "4901 Calhoun Rd", "CITY": "Houston", ... } ] }</pre>
 
                     <h6 class="mt-3">Example Requests</h6>
-                    <pre class="example">GET /dir/api/v1/people/42/addresses?token=uhcs_...
-GET /dir/api/v1/people/42/addresses?return=xml&amp;token=uhcs_...</pre>
+                    <pre class="example">GET /api/v1/people/42/addresses?token=uhcs_...
+GET /api/v1/people/42/addresses?return=xml&amp;token=uhcs_...</pre>
                 </div>
             </div>
 
@@ -424,7 +429,7 @@ GET /dir/api/v1/people/42/addresses?return=xml&amp;token=uhcs_...</pre>
             <div class="card endpoint-card shadow-sm mb-4" id="ep-person-externalids">
                 <div class="card-header bg-white">
                     <span class="badge bg-primary method-badge me-2">GET</span>
-                    <code>/dir/api/v1/people/{id}/externalids</code>
+                    <code>/api/v1/people/{id}/externalids</code>
                 </div>
                 <div class="card-body">
                     <p class="mb-3">Returns all external system identifiers linked to the specified person (e.g. student information system IDs, HR system IDs).</p>
@@ -453,8 +458,160 @@ GET /dir/api/v1/people/42/addresses?return=xml&amp;token=uhcs_...</pre>
                     <pre class="example">{ "DATA": [ { "SYSTEMNAME": "Cougarnet", "EXTERNALID": "jdoe2", ... } ] }</pre>
 
                     <h6 class="mt-3">Example Requests</h6>
-                    <pre class="example">GET /dir/api/v1/people/42/externalids?token=uhcs_...
-GET /dir/api/v1/people/42/externalids?return=xml&amp;token=uhcs_...</pre>
+                    <pre class="example">GET /api/v1/people/42/externalids?token=uhcs_...
+GET /api/v1/people/42/externalids?return=xml&amp;token=uhcs_...</pre>
+                </div>
+            </div>
+
+            <!-- GET /people/{id}/emails -->
+            <div class="card endpoint-card shadow-sm mb-4" id="ep-person-emails">
+                <div class="card-header bg-white">
+                    <span class="badge bg-primary method-badge me-2">GET</span>
+                    <code>/api/v1/people/{id}/emails</code>
+                </div>
+                <div class="card-body">
+                    <p class="mb-3">Returns all email addresses associated with the specified person.</p>
+
+                    <h6>Path Parameters</h6>
+                    <table class="table table-sm table-bordered param-table">
+                        <thead class="table-light">
+                            <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>id</code></td><td>integer</td><td>The numeric UserID of the person.</td></tr>
+                        </tbody>
+                    </table>
+
+                    <h6 class="mt-3">Response</h6>
+                    <pre class="example">{
+  "USERID": 42,
+  "DATA": [
+    { "EMAILADDRESS": "jdoe@uh.edu", "EMAILTYPE": "Central", "ISPRIMARY": 1, "SORTORDER": 1 },
+    { "EMAILADDRESS": "jdoe2@cougarnet.uh.edu", "EMAILTYPE": "CougarNet", "ISPRIMARY": 0, "SORTORDER": 2 }
+  ]
+}</pre>
+                </div>
+            </div>
+
+            <!-- GET /people/{id}/degrees -->
+            <div class="card endpoint-card shadow-sm mb-4" id="ep-person-degrees">
+                <div class="card-header bg-white">
+                    <span class="badge bg-primary method-badge me-2">GET</span>
+                    <code>/api/v1/people/{id}/degrees</code>
+                </div>
+                <div class="card-body">
+                    <p class="mb-3">Returns all degrees earned by the specified person.</p>
+
+                    <h6>Path Parameters</h6>
+                    <table class="table table-sm table-bordered param-table">
+                        <thead class="table-light">
+                            <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>id</code></td><td>integer</td><td>The numeric UserID of the person.</td></tr>
+                        </tbody>
+                    </table>
+
+                    <h6 class="mt-3">Response</h6>
+                    <pre class="example">{
+  "USERID": 42,
+  "DATA": [
+    { "DEGREEID": 1, "DEGREENAME": "O.D.", "UNIVERSITY": "University of Houston", "DEGREEYEAR": "2020" }
+  ]
+}</pre>
+                </div>
+            </div>
+
+            <!-- GET /people/{id}/studentprofile -->
+            <div class="card endpoint-card shadow-sm mb-4" id="ep-person-studentprofile">
+                <div class="card-header bg-white">
+                    <span class="badge bg-primary method-badge me-2">GET</span>
+                    <code>/api/v1/people/{id}/studentprofile</code>
+                </div>
+                <div class="card-body">
+                    <p class="mb-3">Returns the student profile and awards for the specified person. Returns an empty profile object if the person has no student profile.</p>
+
+                    <h6>Path Parameters</h6>
+                    <table class="table table-sm table-bordered param-table">
+                        <thead class="table-light">
+                            <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>id</code></td><td>integer</td><td>The numeric UserID of the person.</td></tr>
+                        </tbody>
+                    </table>
+
+                    <h6 class="mt-3">Response</h6>
+                    <pre class="example">{
+  "USERID": 42,
+  "PROFILE": {
+    "HOMETOWNCITY": "Houston", "HOMETOWNSTATE": "TX",
+    "FIRSTEXTERNSHIP": "...", "SECONDEXTERNSHIP": "...",
+    "DOB": "2000-01-15", "GENDER": "Female", "COMMENCEMENTAGE": 26
+  },
+  "AWARDS": [
+    { "AWARDID": 1, "AWARDNAME": "Dean's List", "AWARDTYPE": "Honor" }
+  ]
+}</pre>
+                </div>
+            </div>
+
+            <!-- GET /people/{id}/awards -->
+            <div class="card endpoint-card shadow-sm mb-4" id="ep-person-awards">
+                <div class="card-header bg-white">
+                    <span class="badge bg-primary method-badge me-2">GET</span>
+                    <code>/api/v1/people/{id}/awards</code>
+                </div>
+                <div class="card-body">
+                    <p class="mb-3">Returns all awards and honors for the specified person.</p>
+
+                    <h6>Path Parameters</h6>
+                    <table class="table table-sm table-bordered param-table">
+                        <thead class="table-light">
+                            <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>id</code></td><td>integer</td><td>The numeric UserID of the person.</td></tr>
+                        </tbody>
+                    </table>
+
+                    <h6 class="mt-3">Response</h6>
+                    <pre class="example">{
+  "USERID": 42,
+  "DATA": [
+    { "AWARDID": 1, "AWARDNAME": "Dean's List", "AWARDTYPE": "Honor" }
+  ]
+}</pre>
+                </div>
+            </div>
+
+            <!-- GET /people/{id}/bio -->
+            <div class="card endpoint-card shadow-sm mb-4" id="ep-person-bio">
+                <div class="card-header bg-white">
+                    <span class="badge bg-primary method-badge me-2">GET</span>
+                    <code>/api/v1/people/{id}/bio</code>
+                </div>
+                <div class="card-body">
+                    <p class="mb-3">Returns the bio / about-me content for the specified person. Returns an empty object if no bio exists. Content is sanitized HTML (only basic formatting tags).</p>
+
+                    <h6>Path Parameters</h6>
+                    <table class="table table-sm table-bordered param-table">
+                        <thead class="table-light">
+                            <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>id</code></td><td>integer</td><td>The numeric UserID of the person.</td></tr>
+                        </tbody>
+                    </table>
+
+                    <h6 class="mt-3">Response</h6>
+                    <pre class="example">{
+  "USERID": 42,
+  "DATA": {
+    "BIOCONTENT": "&lt;p&gt;Dr. Doe specializes in...&lt;/p&gt;",
+    "UPDATEDAT": "2026-04-15T10:30:00Z"
+  }
+}</pre>
                 </div>
             </div>
 
@@ -462,7 +619,7 @@ GET /dir/api/v1/people/42/externalids?return=xml&amp;token=uhcs_...</pre>
             <div class="card endpoint-card shadow-sm mb-4" id="ep-orgs">
                 <div class="card-header bg-white">
                     <span class="badge bg-primary method-badge me-2">GET</span>
-                    <code>/dir/api/v1/organizations</code>
+                    <code>/api/v1/organizations</code>
                 </div>
                 <div class="card-body">
                     <p class="mb-3">Returns all organizations in the directory, arranged in a hierarchical tree structure.</p>
@@ -482,8 +639,8 @@ GET /dir/api/v1/people/42/externalids?return=xml&amp;token=uhcs_...</pre>
                     <pre class="example">{ "DATA": [ { "ORGID": 1, "ORGNAME": "College of Optometry", "PARENTORGID": null, ... } ] }</pre>
 
                     <h6 class="mt-3">Example Requests</h6>
-                    <pre class="example">GET /dir/api/v1/organizations?token=uhcs_...
-GET /dir/api/v1/organizations?return=xml&amp;token=uhcs_...</pre>
+                    <pre class="example">GET /api/v1/organizations?token=uhcs_...
+GET /api/v1/organizations?return=xml&amp;token=uhcs_...</pre>
                 </div>
             </div>
 
@@ -491,7 +648,7 @@ GET /dir/api/v1/organizations?return=xml&amp;token=uhcs_...</pre>
             <div class="card endpoint-card shadow-sm mb-4" id="ep-org">
                 <div class="card-header bg-white">
                     <span class="badge bg-primary method-badge me-2">GET</span>
-                    <code>/dir/api/v1/organizations/{id}</code>
+                    <code>/api/v1/organizations/{id}</code>
                 </div>
                 <div class="card-body">
                     <p class="mb-3">Returns a single organization record by its ID.</p>
@@ -520,8 +677,8 @@ GET /dir/api/v1/organizations?return=xml&amp;token=uhcs_...</pre>
                     <pre class="example">{ "DATA": { "ORGID": 5, "ORGNAME": "Clinical Sciences", "PARENTORGID": 1, ... } }</pre>
 
                     <h6 class="mt-3">Example Requests</h6>
-                    <pre class="example">GET /dir/api/v1/organizations/5?token=uhcs_...
-GET /dir/api/v1/organizations/5?return=xml&amp;token=uhcs_...</pre>
+                    <pre class="example">GET /api/v1/organizations/5?token=uhcs_...
+GET /api/v1/organizations/5?return=xml&amp;token=uhcs_...</pre>
                 </div>
             </div>
 
@@ -529,7 +686,7 @@ GET /dir/api/v1/organizations/5?return=xml&amp;token=uhcs_...</pre>
             <div class="card endpoint-card shadow-sm mb-4" id="ep-flags">
                 <div class="card-header bg-white">
                     <span class="badge bg-primary method-badge me-2">GET</span>
-                    <code>/dir/api/v1/flags</code>
+                    <code>/api/v1/flags</code>
                 </div>
                 <div class="card-body">
                     <p class="mb-3">Returns all classification flags defined in the system (e.g. Faculty, Staff, Student, Alumni). Use these to interpret the flag assignments returned by individual person endpoints.</p>
@@ -549,8 +706,8 @@ GET /dir/api/v1/organizations/5?return=xml&amp;token=uhcs_...</pre>
                     <pre class="example">{ "DATA": [ { "FLAGID": 1, "FLAGNAME": "Faculty", "DESCRIPTION": "..." } ] }</pre>
 
                     <h6 class="mt-3">Example Requests</h6>
-                    <pre class="example">GET /dir/api/v1/flags?token=uhcs_...
-GET /dir/api/v1/flags?return=xml&amp;token=uhcs_...</pre>
+                    <pre class="example">GET /api/v1/flags?token=uhcs_...
+GET /api/v1/flags?return=xml&amp;token=uhcs_...</pre>
                 </div>
             </div>
 

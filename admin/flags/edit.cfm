@@ -1,7 +1,7 @@
-<cfset flagsDAO = createObject("component", "dir.dao.flags_DAO").init()>
+<cfset flagsDAO = createObject("component", "dao.flags_DAO").init()>
 
 <cfif !structKeyExists(url, "flagID") || !isNumeric(url.flagID)>
-    <cflocation url="/dir/admin/flags/index.cfm">
+    <cflocation url="#request.webRoot#/admin/flags/index.cfm">
 </cfif>
 
 <cfset allFlags = flagsDAO.getAllFlags()>
@@ -15,7 +15,7 @@
 </cfloop>
 
 <cfif structIsEmpty(flag)>
-    <cflocation url="/dir/admin/flags/index.cfm">
+    <cflocation url="#request.webRoot#/admin/flags/index.cfm">
 </cfif>
 
 <cfset content = "
@@ -32,9 +32,9 @@
 
     <div class='mb-3'>
         <button type='submit' class='btn btn-success'>Update Flag</button>
-        <a href='/dir/admin/flags/index.cfm' class='btn btn-secondary'>Cancel</a>
+        <a href='/admin/flags/index.cfm' class='btn btn-secondary'>Cancel</a>
     </div>
 </form>
 " />
 
-<cfinclude template="/dir/admin/layout.cfm">
+<cfinclude template="/admin/layout.cfm">

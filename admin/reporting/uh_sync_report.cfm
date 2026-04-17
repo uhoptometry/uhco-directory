@@ -31,7 +31,7 @@
 <cfset activeTab    = structKeyExists(url, "tab")    ? trim(url.tab)     : "diffs">
 
 <!--- ── Load data ── --->
-<cfset uhSyncDAO  = createObject("component", "dir.dao.uhSync_DAO").init()>
+<cfset uhSyncDAO  = createObject("component", "dao.uhSync_DAO").init()>
 <cfset recentRuns = []>
 <cfset currentRun = {}>
 <cfset diffRows   = []>
@@ -71,7 +71,7 @@
 <!--- ── Scheduler URL ── --->
 <cfset schedulerUrl = "http://" & cgi.SERVER_NAME
     & (cgi.SERVER_PORT NEQ "80" AND cgi.SERVER_PORT NEQ "" ? ":" & cgi.SERVER_PORT : "")
-    & "/dir/admin/reporting/run_uh_sync_report.cfm?triggeredBy=scheduled&format=json">
+    & "/admin/reporting/run_uh_sync_report.cfm?triggeredBy=scheduled&format=json">
 
 <!--- ── Schedule form handler ── --->
 <cfset scheduleMsg      = "">
@@ -122,7 +122,7 @@
 <!--- ── Action bar ── --->
 <cfset content &= "
 <div class='d-flex flex-wrap align-items-center gap-2 mb-4 mt-2'>
-    <a href='/dir/admin/reporting/run_uh_sync_report.cfm' class='btn btn-primary'>
+    <a href='/admin/reporting/run_uh_sync_report.cfm' class='btn btn-primary'>
         <i class='bi bi-play-fill'></i> Run Now
     </a>
     <button class='btn btn-outline-secondary btn-sm' type='button'
@@ -204,7 +204,7 @@
             <p class='text-muted'>Click <strong>Run Now</strong> to compare local records against the UH API.</p>
         </div>
     </div>">
-    <cfinclude template="/dir/admin/layout.cfm">
+    <cfinclude template="/admin/layout.cfm">
     <cfabort>
 </cfif>
 
@@ -311,12 +311,12 @@
     <cfloop from="1" to="#arrayLen(diffRows)#" index="i">
         <cfset dr      = diffRows[i]>
         <cfset fldLbl  = structKeyExists(fieldLabels, dr.FIELDNAME) ? fieldLabels[dr.FIELDNAME] : dr.FIELDNAME>
-        <cfset returnTo = "/dir/admin/reporting/uh_sync_report.cfm?runID=#currentRun.RUNID#&tab=diffs#(len(filterField) ? '&filter=' & urlEncodedFormat(filterField) : '')#">
+        <cfset returnTo = "/admin/reporting/uh_sync_report.cfm?runID=#currentRun.RUNID#&tab=diffs#(len(filterField) ? '&filter=' & urlEncodedFormat(filterField) : '')#">
 
         <cfset content &= "
         <tr>
             <td>
-                <a href='/dir/admin/users/edit.cfm?userID=#dr.USERID#' class='text-decoration-none fw-semibold'>
+                <a href='/admin/users/edit.cfm?userID=#dr.USERID#' class='text-decoration-none fw-semibold'>
                     #EncodeForHTML(dr.FIRSTNAME & ' ' & dr.LASTNAME)#
                 </a>
                 <br><small class='text-muted'>#EncodeForHTML(dr.EMAILPRIMARY)#</small>
@@ -325,7 +325,7 @@
             <td><span class='text-muted'>#(len(dr.LOCALVALUE) ? EncodeForHTML(dr.LOCALVALUE) : '<em class=""text-muted"">empty</em>')#</span></td>
             <td><strong>#EncodeForHTML(dr.APIVALUE)#</strong></td>
             <td class='text-end text-nowrap'>
-                <form method='post' action='/dir/admin/users/resolve_uh_sync_diff.cfm' class='d-inline'>
+                <form method='post' action='/admin/users/resolve_uh_sync_diff.cfm' class='d-inline'>
                     <input type='hidden' name='diffID'     value='#dr.DIFFID#'>
                     <input type='hidden' name='resolution' value='synced'>
                     <input type='hidden' name='returnTo'   value='#EncodeForHTMLAttribute(returnTo)#'>
@@ -333,7 +333,7 @@
                         <i class='bi bi-cloud-download'></i> Sync
                     </button>
                 </form>
-                <form method='post' action='/dir/admin/users/resolve_uh_sync_diff.cfm' class='d-inline ms-1'>
+                <form method='post' action='/admin/users/resolve_uh_sync_diff.cfm' class='d-inline ms-1'>
                     <input type='hidden' name='diffID'     value='#dr.DIFFID#'>
                     <input type='hidden' name='resolution' value='discarded'>
                     <input type='hidden' name='returnTo'   value='#EncodeForHTMLAttribute(returnTo)#'>
@@ -376,13 +376,13 @@
         </thead>
         <tbody>
     ">
-    <cfset goneReturnTo = "/dir/admin/reporting/uh_sync_report.cfm?runID=#currentRun.RUNID#&tab=gone">
+    <cfset goneReturnTo = "/admin/reporting/uh_sync_report.cfm?runID=#currentRun.RUNID#&tab=gone">
     <cfloop from="1" to="#arrayLen(goneRows)#" index="i">
         <cfset gr = goneRows[i]>
         <cfset content &= "
         <tr>
             <td>
-                <a href='/dir/admin/users/edit.cfm?userID=#gr.USERID#' class='text-decoration-none fw-semibold'>
+                <a href='/admin/users/edit.cfm?userID=#gr.USERID#' class='text-decoration-none fw-semibold'>
                     #EncodeForHTML(gr.FIRSTNAME & ' ' & gr.LASTNAME)#
                 </a>
                 <br><small class='text-muted'>#EncodeForHTML(gr.EMAILPRIMARY)#</small>
@@ -390,7 +390,7 @@
             <td>#EncodeForHTML(gr.TITLE1 ?: '')#</td>
             <td><code class='small'>#EncodeForHTML(gr.UH_API_ID)#</code></td>
             <td class='text-end text-nowrap'>
-                <form method='post' action='/dir/admin/users/resolve_uh_sync_diff.cfm' class='d-inline'
+                <form method='post' action='/admin/users/resolve_uh_sync_diff.cfm' class='d-inline'
                       onsubmit=""return confirm('Delete #EncodeForJavascript(gr.FIRSTNAME & ' ' & gr.LASTNAME)#? This cannot be undone.')"">
                     <input type='hidden' name='goneID'     value='#gr.GONEID#'>
                     <input type='hidden' name='resolution' value='deleted'>
@@ -400,7 +400,7 @@
                         <i class='bi bi-trash'></i> Delete User
                     </button>
                 </form>
-                <form method='post' action='/dir/admin/users/resolve_uh_sync_diff.cfm' class='d-inline ms-1'>
+                <form method='post' action='/admin/users/resolve_uh_sync_diff.cfm' class='d-inline ms-1'>
                     <input type='hidden' name='goneID'     value='#gr.GONEID#'>
                     <input type='hidden' name='resolution' value='kept'>
                     <input type='hidden' name='returnTo'   value='#EncodeForHTMLAttribute(goneReturnTo)#'>
@@ -408,7 +408,7 @@
                         <i class='bi bi-person-check'></i> Keep
                     </button>
                 </form>
-                <a href='/dir/admin/users/view.cfm?userID=#gr.USERID#' class='btn btn-sm btn-outline-primary py-0 ms-1'>
+                <a href='/admin/users/view.cfm?userID=#gr.USERID#' class='btn btn-sm btn-outline-primary py-0 ms-1'>
                     <i class='bi bi-eye'></i> View
                 </a>
             </td>
@@ -448,7 +448,7 @@
         </thead>
         <tbody>
     ">
-    <cfset newReturnTo = "/dir/admin/reporting/uh_sync_report.cfm?runID=#currentRun.RUNID#&tab=new">
+    <cfset newReturnTo = "/admin/reporting/uh_sync_report.cfm?runID=#currentRun.RUNID#&tab=new">
     <cfloop from="1" to="#arrayLen(newRows)#" index="i">
         <cfset nr = newRows[i]>
         <cfset content &= "
@@ -459,7 +459,7 @@
             <td>#EncodeForHTML(nr.DEPARTMENT)#</td>
             <td><code class='small'>#EncodeForHTML(nr.UHApiID ?: '')#</code></td>
             <td class='text-end text-nowrap'>
-                <form method='post' action='/dir/admin/users/resolve_uh_sync_diff.cfm' class='d-inline'>
+                <form method='post' action='/admin/users/resolve_uh_sync_diff.cfm' class='d-inline'>
                     <input type='hidden' name='newID'      value='#nr.NEWID#'>
                     <input type='hidden' name='resolution' value='imported'>
                     <input type='hidden' name='returnTo'   value='#EncodeForHTMLAttribute(newReturnTo)#'>
@@ -467,7 +467,7 @@
                         <i class='bi bi-person-plus'></i> Import
                     </button>
                 </form>
-                <form method='post' action='/dir/admin/users/resolve_uh_sync_diff.cfm' class='d-inline ms-1'>
+                <form method='post' action='/admin/users/resolve_uh_sync_diff.cfm' class='d-inline ms-1'>
                     <input type='hidden' name='newID'      value='#nr.NEWID#'>
                     <input type='hidden' name='resolution' value='ignored'>
                     <input type='hidden' name='returnTo'   value='#EncodeForHTMLAttribute(newReturnTo)#'>
@@ -506,4 +506,4 @@
 </script>
 ">
 
-<cfinclude template="/dir/admin/layout.cfm">
+<cfinclude template="/admin/layout.cfm">

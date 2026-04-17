@@ -1,0 +1,5 @@
+<cfif CGI.REQUEST_METHOD NEQ "POST" OR NOT structKeyExists(form, "secretID") OR NOT isNumeric(form.secretID)>
+    <cflocation url="#request.webRoot#/admin/settings/uhco-api/secrets/index.cfm" addtoken="false">
+</cfif>
+<cfset createObject("component", "cfc.secret_service").init().deleteSecret(val(form.secretID))>
+<cflocation url="#request.webRoot#/admin/settings/uhco-api/secrets/index.cfm" addtoken="false">

@@ -1,10 +1,52 @@
-<cfset directoryService = createObject("component", "dir.cfc.directory_service").init()>
-<cfset flagsService = createObject("component", "dir.cfc.flags_service").init()>
-<cfset orgsService = createObject("component", "dir.cfc.organizations_service").init()>
+<!--- ============================================================
+     Unified User List Page
+     URL parameter: ?list=problems|all|alumni|current-students|faculty|staff|inactive
+     ============================================================ --->
+<cfparam name="url.list" default="problems">
+<cfset listType = lcase(trim(url.list))>
+<cfif NOT listFindNoCase("problems,all,alumni,current-students,faculty,staff,inactive", listType)>
+    <cfset listType = "problems">
+</cfif>
+
+<!--- Feature flags based on list type --->
+<cfset needsAcademic      = listFindNoCase("all,alumni,current-students", listType) GT 0>
+<cfset needsImages        = listFindNoCase("current-students,faculty", listType) GT 0>
+<cfset showPhoto          = needsImages>
+<cfset showGradYear       = needsAcademic>
+<cfset showOrgFilter      = listFindNoCase("problems,all,staff,inactive,faculty", listType) GT 0>
+<cfset showGradFilter     = needsAcademic>
+<cfset showDeceased       = (listType EQ "alumni")>
+<cfset showManageImages   = needsImages>
+<cfset showTitle          = (listType EQ "current-students")>
+<cfset highlightFlags     = listFindNoCase("problems,all,inactive", listType) GT 0>
+
+<!--- Page title and empty-state message --->
+<cfswitch expression="#listType#">
+    <cfcase value="problems"><cfset pageTitle = "Problem Records"><cfset noDataMsg = "No records found."></cfcase>
+    <cfcase value="all"><cfset pageTitle = "All Records"><cfset noDataMsg = "No records found."></cfcase>
+    <cfcase value="alumni"><cfset pageTitle = "Alumni"><cfset noDataMsg = "No alumni found."></cfcase>
+    <cfcase value="current-students"><cfset pageTitle = "Current Students"><cfset noDataMsg = "No students found."></cfcase>
+    <cfcase value="faculty"><cfset pageTitle = "Faculty"><cfset noDataMsg = "No faculty found."></cfcase>
+    <cfcase value="staff"><cfset pageTitle = "Staff"><cfset noDataMsg = "No staff found."></cfcase>
+    <cfcase value="inactive"><cfset pageTitle = "Inactive Users"><cfset noDataMsg = "No records found."></cfcase>
+</cfswitch>
+
+<!--- Initialize common services --->
+<cfset directoryService = createObject("component", "cfc.directory_service").init()>
+<cfset flagsService     = createObject("component", "cfc.flags_service").init()>
+<cfset orgsService      = createObject("component", "cfc.organizations_service").init()>
+<cfset helpers          = createObject("component", "cfc.helpers")>
+<cfif needsAcademic>
+    <cfset academicService = createObject("component", "cfc.academic_service").init()>
+</cfif>
+<cfif needsImages>
+    <cfset imagesService = createObject("component", "cfc.images_service").init()>
+</cfif>
+
 <cfset pageMessage = "">
 <cfset pageMessageClass = "alert-info">
 
-<!--- Get all users --->
+<!--- Load all users --->
 <cftry>
     <cfset allUsers = directoryService.listUsers()>
     <cfcatch type="any">
@@ -14,85 +56,199 @@
     </cfcatch>
 </cftry>
 
-<!--- Get all flags for filter dropdown --->
+<!--- Load lookup maps --->
 <cfset allFlagsResult = flagsService.getAllFlags()>
-<cfset allFlags = allFlagsResult.data />
+<cfset allFlags       = allFlagsResult.data>
+<cfset allUserFlagMap = flagsService.getAllUserFlagMap()>
+<cfset allUserOrgMap  = orgsService.getAllUserOrgMap()>
+<cfif needsAcademic>
+    <cfset allAcademicMap = academicService.getAllAcademicInfoMap()>
+</cfif>
+<cfif needsImages>
+    <cfset webThumbMap = imagesService.getWebThumbMap()>
+</cfif>
+<cfset emailsService  = createObject("component", "cfc.emails_service").init()>
+<cfset allUserEmailMap = emailsService.getAllEmailsMap()>
 
-<!--- Get top-level orgs (no parent) for tabs --->
-<cfset allOrgsResult = orgsService.getAllOrgs()>
-<cfset allOrgs = allOrgsResult.data>
-<cfset topLevelOrgs = []>
-<cfloop from="1" to="#arrayLen(allOrgs)#" index="iOrg">
-    <cfset orgItem = allOrgs[iOrg]>
-    <cfif NOT (isNumeric(orgItem.PARENTORGID) AND val(orgItem.PARENTORGID) GT 0)>
-        <cfset arrayAppend(topLevelOrgs, orgItem)>
-    </cfif>
-</cfloop>
+<!--- Load top-level orgs for filter dropdown --->
+<cfif showOrgFilter>
+    <cfset allOrgsResult = orgsService.getAllOrgs()>
+    <cfset allOrgs = allOrgsResult.data>
+    <cfset topLevelOrgs = []>
+    <cfloop from="1" to="#arrayLen(allOrgs)#" index="iOrg">
+        <cfset orgItem = allOrgs[iOrg]>
+        <cfif NOT (isNumeric(orgItem.PARENTORGID) AND val(orgItem.PARENTORGID) GT 0)>
+            <cfset arrayAppend(topLevelOrgs, orgItem)>
+        </cfif>
+    </cfloop>
+</cfif>
 
-<cfset selectedFlagFilter = structKeyExists(url, "filterFlag") ? trim(url.filterFlag) : "">
-<cfset searchTerm         = structKeyExists(url, "search")     ? trim(url.search)     : "">
-<cfset selectedOrgFilter  = structKeyExists(url, "filterOrg")  ? trim(url.filterOrg)  : "">
+<!--- Parse URL filters --->
+<cfset selectedFlagFilter = structKeyExists(url, "filterFlag")     ? trim(url.filterFlag)     : "">
+<cfset searchTerm         = structKeyExists(url, "search")         ? trim(url.search)         : "">
+<cfset selectedOrgFilter  = structKeyExists(url, "filterOrg")      ? trim(url.filterOrg)      : "">
+<cfset selectedGradYear   = structKeyExists(url, "filterGradYear") ? trim(url.filterGradYear) : "">
+<cfset selectedLetter     = structKeyExists(url, "letter") AND len(trim(url.letter)) ? ucase(left(trim(url.letter), 1)) : "">
 <cfparam name="pageMessage" default="">
 <cfparam name="pageMessageClass" default="alert-info">
 
-<!--- Load flags and orgs maps once (replaces N+1 per-user queries) --->
-<cfset allUserFlagMap = flagsService.getAllUserFlagMap()>
-<cfset allUserOrgMap  = orgsService.getAllUserOrgMap()>
+<!--- ======================== PRE-FILTER ======================== --->
+<cfset filteredUsers = []>
+<cfswitch expression="#listType#">
 
-<!--- Pre-filter: only users with no flags OR who have "Admin - Check" or "No UH" flag --->
-<cfset includeByFlagNames = "Admin - Check,No UH">
-<cfset otherUsers = []>
-<cfloop from="1" to="#arrayLen(allUsers)#" index="i">
-    <cfset u = allUsers[i]>
-    <cfset uFlags = structKeyExists(allUserFlagMap, toString(u.USERID)) ? allUserFlagMap[toString(u.USERID)] : []>
-    <cfif arrayLen(uFlags) EQ 0>
-        <!--- No flags at all — include --->
-        <cfset arrayAppend(otherUsers, u)>
-    <cfelse>
-        <cfset hasIncludeFlag = false>
-        <cfloop from="1" to="#arrayLen(uFlags)#" index="f">
-            <cfif listFindNoCase(includeByFlagNames, uFlags[f].FLAGNAME)>
-                <cfset hasIncludeFlag = true>
-                <cfbreak>
+    <cfcase value="problems">
+        <cfset includeByFlagNames = "Admin-Check,No-UH-API">
+        <cfloop from="1" to="#arrayLen(allUsers)#" index="i">
+            <cfset u = allUsers[i]>
+            <cfset uFlags = structKeyExists(allUserFlagMap, toString(u.USERID)) ? allUserFlagMap[toString(u.USERID)] : []>
+            <cfif arrayLen(uFlags) EQ 0>
+                <cfset arrayAppend(filteredUsers, u)>
+            <cfelse>
+                <cfloop from="1" to="#arrayLen(uFlags)#" index="f">
+                    <cfif listFindNoCase(includeByFlagNames, uFlags[f].FLAGNAME)>
+                        <cfset arrayAppend(filteredUsers, u)>
+                        <cfbreak>
+                    </cfif>
+                </cfloop>
             </cfif>
         </cfloop>
-        <cfif hasIncludeFlag>
-            <cfset arrayAppend(otherUsers, u)>
-        </cfif>
-    </cfif>
-</cfloop>
-<cfset allUsers = otherUsers>
+    </cfcase>
 
-<!--- Apply filtering if flag is selected --->
-<cfset filteredUsers = allUsers>
-<cfif selectedFlagFilter != "">
-    <cfset filteredUsers = []>
-    
-    <cfloop from="1" to="#arrayLen(allUsers)#" index="i">
-        <cfset u = allUsers[i]>
-        <cfset userFlags = structKeyExists(allUserFlagMap, toString(u.USERID)) ? allUserFlagMap[toString(u.USERID)] : []>
+    <cfcase value="all">
+        <cfset filteredUsers = allUsers>
+    </cfcase>
 
-        <cfif selectedFlagFilter == "NOFLAGS">
-            <cfif arrayLen(userFlags) EQ 0>
+    <cfcase value="alumni">
+        <cfloop from="1" to="#arrayLen(allUsers)#" index="i">
+            <cfset u = allUsers[i]>
+            <cfset uFlags = structKeyExists(allUserFlagMap, toString(u.USERID)) ? allUserFlagMap[toString(u.USERID)] : []>
+            <cfloop from="1" to="#arrayLen(uFlags)#" index="f">
+                <cfif uFlags[f].FLAGNAME EQ "Alumni">
+                    <cfset arrayAppend(filteredUsers, u)>
+                    <cfbreak>
+                </cfif>
+            </cfloop>
+        </cfloop>
+    </cfcase>
+
+    <cfcase value="current-students">
+        <cfloop from="1" to="#arrayLen(allUsers)#" index="i">
+            <cfset u = allUsers[i]>
+            <cfset uFlags = structKeyExists(allUserFlagMap, toString(u.USERID)) ? allUserFlagMap[toString(u.USERID)] : []>
+            <cfloop from="1" to="#arrayLen(uFlags)#" index="f">
+                <cfif uFlags[f].FLAGNAME EQ "Current-Student">
+                    <cfset arrayAppend(filteredUsers, u)>
+                    <cfbreak>
+                </cfif>
+            </cfloop>
+        </cfloop>
+    </cfcase>
+
+    <cfcase value="faculty">
+        <cfloop from="1" to="#arrayLen(allUsers)#" index="i">
+            <cfset u = allUsers[i]>
+            <cfset uFlags = structKeyExists(allUserFlagMap, toString(u.USERID)) ? allUserFlagMap[toString(u.USERID)] : []>
+            <cfloop from="1" to="#arrayLen(uFlags)#" index="f">
+                <cfif listFindNoCase("Faculty-Fulltime,Faculty-Adjunct,Professor-Emeritus", uFlags[f].FLAGNAME)>
+                    <cfset arrayAppend(filteredUsers, u)>
+                    <cfbreak>
+                </cfif>
+            </cfloop>
+        </cfloop>
+    </cfcase>
+
+    <cfcase value="staff">
+        <cfset includeByFlagNames = "Staff,Temporary-Staff">
+        <cfloop from="1" to="#arrayLen(allUsers)#" index="i">
+            <cfset u = allUsers[i]>
+            <cfset uFlags = structKeyExists(allUserFlagMap, toString(u.USERID)) ? allUserFlagMap[toString(u.USERID)] : []>
+            <cfif arrayLen(uFlags) EQ 0>
                 <cfset arrayAppend(filteredUsers, u)>
+            <cfelse>
+                <cfloop from="1" to="#arrayLen(uFlags)#" index="f">
+                    <cfif listFindNoCase(includeByFlagNames, uFlags[f].FLAGNAME)>
+                        <cfset arrayAppend(filteredUsers, u)>
+                        <cfbreak>
+                    </cfif>
+                </cfloop>
+            </cfif>
+        </cfloop>
+    </cfcase>
+
+    <cfcase value="inactive">
+        <cfloop from="1" to="#arrayLen(allUsers)#" index="i">
+            <cfif val(allUsers[i].ACTIVE) EQ 0>
+                <cfset arrayAppend(filteredUsers, allUsers[i])>
+            </cfif>
+        </cfloop>
+    </cfcase>
+
+</cfswitch>
+
+<!--- Merge academic data if needed --->
+<cfif needsAcademic>
+    <cfset mergedUsers = []>
+    <cfloop from="1" to="#arrayLen(filteredUsers)#" index="i">
+        <cfset row = duplicate(filteredUsers[i])>
+        <cfset acadData = structKeyExists(allAcademicMap, toString(row.USERID)) ? allAcademicMap[toString(row.USERID)] : {}>
+        <cfset row.CURRENTGRADYEAR  = (NOT structIsEmpty(acadData) AND structKeyExists(acadData, "CURRENTGRADYEAR"))  ? acadData.CURRENTGRADYEAR  : "">
+        <cfset row.ORIGINALGRADYEAR = (NOT structIsEmpty(acadData) AND structKeyExists(acadData, "ORIGINALGRADYEAR")) ? acadData.ORIGINALGRADYEAR : "">
+        <cfset arrayAppend(mergedUsers, row)>
+    </cfloop>
+    <cfset filteredUsers = mergedUsers>
+
+    <!--- Build grad year dropdown options from pre-filtered rows --->
+    <cfset allGradYears = []>
+    <cfset gradYearSeen = {}>
+    <cfloop from="1" to="#arrayLen(filteredUsers)#" index="i">
+        <cfset gy = filteredUsers[i].CURRENTGRADYEAR ?: "">
+        <cfif isNumeric(gy) AND val(gy) GT 0 AND NOT structKeyExists(gradYearSeen, toString(val(gy)))>
+            <cfset gradYearSeen[toString(val(gy))] = true>
+            <cfset arrayAppend(allGradYears, val(gy))>
+        </cfif>
+    </cfloop>
+    <cfset arraySort(allGradYears, "numeric", "desc")>
+</cfif>
+
+<!--- ======================== APPLY FILTERS ======================== --->
+
+<!--- Flag filter --->
+<cfif selectedFlagFilter NEQ "">
+    <cfset flagFiltered = []>
+    <cfloop from="1" to="#arrayLen(filteredUsers)#" index="i">
+        <cfset u = filteredUsers[i]>
+        <cfset userFlags = structKeyExists(allUserFlagMap, toString(u.USERID)) ? allUserFlagMap[toString(u.USERID)] : []>
+        <cfif selectedFlagFilter EQ "NOFLAGS">
+            <cfif arrayLen(userFlags) EQ 0>
+                <cfset arrayAppend(flagFiltered, u)>
             </cfif>
         <cfelse>
             <cfset selectedFlagID = val(selectedFlagFilter)>
-
-            <!--- Check if user has the selected flag --->
             <cfloop from="1" to="#arrayLen(userFlags)#" index="f">
-                <cfif userFlags[f].FLAGID == selectedFlagID>
-                    <cfset arrayAppend(filteredUsers, u)>
+                <cfif userFlags[f].FLAGID EQ selectedFlagID>
+                    <cfset arrayAppend(flagFiltered, u)>
                     <cfbreak>
                 </cfif>
             </cfloop>
         </cfif>
     </cfloop>
+    <cfset filteredUsers = flagFiltered>
 </cfif>
 
-<!--- Apply search filter --->
-<cfinclude template="/dir/admin/users/_search_helper.cfm">
-<cfif searchTerm != "">
+<!--- Grad year filter --->
+<cfif showGradFilter AND selectedGradYear NEQ "" AND isNumeric(selectedGradYear)>
+    <cfset gradYearFiltered = []>
+    <cfloop from="1" to="#arrayLen(filteredUsers)#" index="i">
+        <cfif isNumeric(filteredUsers[i].CURRENTGRADYEAR) AND val(filteredUsers[i].CURRENTGRADYEAR) EQ val(selectedGradYear)>
+            <cfset arrayAppend(gradYearFiltered, filteredUsers[i])>
+        </cfif>
+    </cfloop>
+    <cfset filteredUsers = gradYearFiltered>
+</cfif>
+
+<!--- Search filter --->
+<cfinclude template="/admin/users/_search_helper.cfm">
+<cfif searchTerm NEQ "">
     <cfset searchedUsers = []>
     <cfloop from="1" to="#arrayLen(filteredUsers)#" index="i">
         <cfif userMatchesSearch(filteredUsers[i], searchTerm)>
@@ -102,105 +258,77 @@
     <cfset filteredUsers = searchedUsers>
 </cfif>
 
-<!--- Apply org filter --->
-<cfif selectedOrgFilter != "">
-    <cfset orgFilteredUsers = []>
+<!--- Org filter --->
+<cfif showOrgFilter AND selectedOrgFilter NEQ "">
+    <cfset orgFiltered = []>
     <cfloop from="1" to="#arrayLen(filteredUsers)#" index="i">
         <cfset u = filteredUsers[i]>
         <cfset userOrgsList = structKeyExists(allUserOrgMap, toString(u.USERID)) ? allUserOrgMap[toString(u.USERID)] : []>
-        <cfif selectedOrgFilter == "NOORGS">
+        <cfif selectedOrgFilter EQ "NOORGS">
             <cfif arrayLen(userOrgsList) EQ 0>
-                <cfset arrayAppend(orgFilteredUsers, u)>
+                <cfset arrayAppend(orgFiltered, u)>
             </cfif>
         <cfelse>
             <cfloop from="1" to="#arrayLen(userOrgsList)#" index="o">
-                <cfif toString(userOrgsList[o].ORGID) == selectedOrgFilter>
-                    <cfset arrayAppend(orgFilteredUsers, u)>
+                <cfif toString(userOrgsList[o].ORGID) EQ selectedOrgFilter>
+                    <cfset arrayAppend(orgFiltered, u)>
                     <cfbreak>
                 </cfif>
             </cfloop>
         </cfif>
     </cfloop>
-    <cfset filteredUsers = orgFilteredUsers>
+    <cfset filteredUsers = orgFiltered>
 </cfif>
 
-<!--- Handle sorting --->
-<cfset sortColumn = structKeyExists(url, "sortCol") ? url.sortCol : "LASTNAME">
+<!--- Letter filter --->
+<cfif selectedLetter NEQ "">
+    <cfset letterFiltered = []>
+    <cfloop from="1" to="#arrayLen(filteredUsers)#" index="i">
+        <cfif len(filteredUsers[i].LASTNAME) AND ucase(left(filteredUsers[i].LASTNAME, 1)) EQ selectedLetter>
+            <cfset arrayAppend(letterFiltered, filteredUsers[i])>
+        </cfif>
+    </cfloop>
+    <cfset filteredUsers = letterFiltered>
+</cfif>
+
+<!--- ======================== SORT ======================== --->
+<cfset sortColumn    = structKeyExists(url, "sortCol") ? url.sortCol : "LASTNAME">
 <cfset sortDirection = structKeyExists(url, "sortDir") ? url.sortDir : "ASC">
+<cfset filteredUsers = helpers.sortUsers(users=filteredUsers, sortColumn=sortColumn, sortDirection=sortDirection)>
 
-<!--- Sort the users array --->
-<cfif sortColumn == "FIRSTNAME">
-    <cfset arraySort(filteredUsers, function(a, b) {
-        return compare(a.FIRSTNAME, b.FIRSTNAME) * (sortDirection == "DESC" ? -1 : 1);
-    })>
-<cfelseif sortColumn == "LASTNAME">
-    <cfset arraySort(filteredUsers, function(a, b) {
-        return compare(a.LASTNAME, b.LASTNAME) * (sortDirection == "DESC" ? -1 : 1);
-    })>
+<!--- ======================== PAGINATE ======================== --->
+<cfset validPerPage = [10, 25, 50, 100]>
+<cfset perPage      = structKeyExists(url, "perPage") AND isNumeric(url.perPage) AND arrayContains(validPerPage, val(url.perPage)) ? val(url.perPage) : 25>
+<cfset totalRecords = arrayLen(filteredUsers)>
+<cfset totalPages   = max(1, ceiling(totalRecords / perPage))>
+<cfset currentPage  = structKeyExists(url, "page") AND isNumeric(url.page) ? max(1, min(val(url.page), totalPages)) : 1>
+<cfset sliceStart   = ((currentPage - 1) * perPage) + 1>
+<cfset sliceEnd     = min(sliceStart + perPage - 1, totalRecords)>
+<cfset pageRows     = totalRecords GT 0 ? arraySlice(filteredUsers, sliceStart, min(perPage, totalRecords - sliceStart + 1)) : []>
 
-<cfelseif sortColumn == "EMAIL">
-    <cfset arraySort(filteredUsers, function(a, b) {
-        var emailA = len(a.EMAILPRIMARY) ? a.EMAILPRIMARY : a.EMAILSECONDARY;
-        var emailB = len(b.EMAILPRIMARY) ? b.EMAILPRIMARY : b.EMAILSECONDARY;
-        return compare(emailA, emailB) * (sortDirection == "DESC" ? -1 : 1);
-    })>
-</cfif>
+<!--- Column count for no-data colspan --->
+<cfset colCount = 7>
+<cfif showPhoto><cfset colCount = colCount + 1></cfif>
+<cfif showGradYear><cfset colCount = colCount + 1></cfif>
+<cfif showTitle><cfset colCount = colCount + 1></cfif>
 
-<!--- Helper function to get email (primary or secondary) --->
-<cffunction name="getDisplayEmail" returntype="string">
-    <cfargument name="emailPrimary" type="string" required="true">
-    <cfargument name="emailSecondary" type="string" required="true">
-    <cfif len(emailPrimary)>
-        <cfreturn emailPrimary>
-    <cfelseif len(emailSecondary)>
-        <cfreturn emailSecondary>
-    <cfelse>
-        <cfreturn "">
-    </cfif>
-</cffunction>
+<!--- Precompute clear-filters link --->
+<cfset hasActiveFilters = (selectedFlagFilter NEQ "" OR selectedOrgFilter NEQ "" OR selectedGradYear NEQ "" OR searchTerm NEQ "" OR selectedLetter NEQ "")>
+<cfset clearLink = "?list=" & listType & "&sortCol=" & sortColumn & "&sortDir=" & sortDirection & "&perPage=" & perPage>
 
-<!--- Helper function to toggle sort direction --->
-<cffunction name="getSortLink" returntype="string">
-    <cfargument name="column"      type="string" required="true">
-    <cfargument name="currentSort" type="string" required="true">
-    <cfargument name="currentDir"  type="string" required="true">
-    <cfset var newDir      = (currentSort == column && currentDir == "ASC") ? "DESC" : "ASC">
-    <cfset var filterParam = selectedFlagFilter != "" ? "&filterFlag=" & urlEncodedFormat(selectedFlagFilter) : "">
-    <cfset var orgParam    = selectedOrgFilter  != "" ? "&filterOrg="  & urlEncodedFormat(selectedOrgFilter)  : "">
-    <cfset var searchParam = searchTerm         != "" ? "&search="     & urlEncodedFormat(searchTerm)         : "">
-    <cfreturn "?sortCol=" & column & "&sortDir=" & newDir & filterParam & orgParam & searchParam & "&perPage=" & perPage & "&page=1">
-</cffunction>
-
-<cffunction name="getPageLink" returntype="string">
-    <cfargument name="p" type="numeric" required="true">
-    <cfset var filterParam = selectedFlagFilter != "" ? "&filterFlag=" & urlEncodedFormat(selectedFlagFilter) : "">
-    <cfset var orgParam    = selectedOrgFilter  != "" ? "&filterOrg="  & urlEncodedFormat(selectedOrgFilter)  : "">
-    <cfset var searchParam = searchTerm         != "" ? "&search="     & urlEncodedFormat(searchTerm)         : "">
-    <cfreturn "?sortCol=" & sortColumn & "&sortDir=" & sortDirection & filterParam & orgParam & searchParam & "&perPage=" & perPage & "&page=" & p>
-</cffunction>
-
-<!--- Server-side pagination --->
-<cfset validPerPage   = [10, 25, 50, 100]>
-<cfset perPage        = structKeyExists(url, "perPage") AND isNumeric(url.perPage) AND arrayContains(validPerPage, val(url.perPage)) ? val(url.perPage) : 25>
-<cfset totalRecords   = arrayLen(filteredUsers)>
-<cfset totalPages     = max(1, ceiling(totalRecords / perPage))>
-<cfset currentPage    = structKeyExists(url, "page") AND isNumeric(url.page) ? max(1, min(val(url.page), totalPages)) : 1>
-<cfset sliceStart     = ((currentPage - 1) * perPage) + 1>
-<cfset sliceEnd       = min(sliceStart + perPage - 1, totalRecords)>
-<cfset pageRows       = totalRecords GT 0 ? arraySlice(filteredUsers, sliceStart, min(perPage, totalRecords - sliceStart + 1)) : []>
-
+<!--- ======================== BUILD PAGE CONTENT ======================== --->
 <cfset content = "
 <div class='d-flex justify-content-between mb-4'>
-    <h1>Problem Records</h1>
+    <h1><i class='bi bi-people-fill me-2'></i>#pageTitle# <span class='badge bg-secondary fs-6'>#totalRecords#</span></h1>
     <div class='d-flex gap-2'>
-        <a href='/dir/admin/users/new.cfm' class='btn btn-primary'>New User</a>
+        <a href='/admin/users/new.cfm' class='btn btn-primary'>New User</a>
     </div>
 </div>
 
-<!--- Filter Form --->
 <div class='card mb-4'>
     <div class='card-body'>
         <form method='get' class='d-flex flex-wrap align-items-center gap-2 my-0'>
+            <input type='hidden' name='list'    value='#listType#'>
             <input type='hidden' name='sortCol' value='#sortColumn#'>
             <input type='hidden' name='sortDir' value='#sortDirection#'>
             <input type='hidden' name='page'    value='1'>
@@ -211,31 +339,54 @@
             <label for='flagFilter' class='mb-0'>Flag:</label>
             <select name='filterFlag' id='flagFilter' class='form-select' style='width:auto;'>
                 <option value=''>All</option>
-                <option value='NOFLAGS'#(selectedFlagFilter == "NOFLAGS" ? " selected" : "")#>No Flags</option>
+                <option value='NOFLAGS'#(selectedFlagFilter == 'NOFLAGS' ? ' selected' : '')#>No Flags</option>
 ">
 
-<!--- Add flag options to dropdown --->
+<!--- Flag dropdown options --->
 <cfloop from="1" to="#arrayLen(allFlags)#" index="i">
     <cfset flag = allFlags[i]>
-    <cfset isSelected = selectedFlagFilter == toString(flag.FLAGID)>
-    <cfset content &= "
-                <option value='#flag.FLAGID#'" & (isSelected ? " selected" : "") & ">#flag.FLAGNAME#</option>
-">
+    <cfset content &= "<option value='#flag.FLAGID#'" & (selectedFlagFilter == toString(flag.FLAGID) ? " selected" : "") & ">#flag.FLAGNAME#</option>">
 </cfloop>
 
 <cfset content &= "
             </select>
+">
+
+<!--- Org filter (conditional) --->
+<cfif showOrgFilter>
+    <cfset content &= "
             <label for='orgFilter' class='mb-0'>Org:</label>
             <select name='filterOrg' id='orgFilter' class='form-select' style='width:auto;'>
                 <option value=''>All Orgs</option>
                 <option value='NOORGS'#(selectedOrgFilter == 'NOORGS' ? ' selected' : '')#>No Org</option>
-">
-<cfloop from="1" to="#arrayLen(topLevelOrgs)#" index="iTab">
-    <cfset tabOrg = topLevelOrgs[iTab]>
-    <cfset content &= "<option value='#tabOrg.ORGID#'" & (selectedOrgFilter == toString(tabOrg.ORGID) ? " selected" : "") & ">#EncodeForHTML(tabOrg.ORGNAME)#</option>">
-</cfloop>
-<cfset content &= "
+    ">
+    <cfloop from="1" to="#arrayLen(topLevelOrgs)#" index="iTab">
+        <cfset tabOrg = topLevelOrgs[iTab]>
+        <cfset content &= "<option value='#tabOrg.ORGID#'" & (selectedOrgFilter == toString(tabOrg.ORGID) ? " selected" : "") & ">#EncodeForHTML(tabOrg.ORGNAME)#</option>">
+    </cfloop>
+    <cfset content &= "
             </select>
+    ">
+</cfif>
+
+<!--- Grad year filter (conditional) --->
+<cfif showGradFilter>
+    <cfset content &= "
+            <label for='gradYearFilter' class='mb-0'>Grad Year:</label>
+            <select name='filterGradYear' id='gradYearFilter' class='form-select' style='width:auto;'>
+                <option value=''>All Years</option>
+    ">
+    <cfloop from="1" to="#arrayLen(allGradYears)#" index="i">
+        <cfset gy = allGradYears[i]>
+        <cfset content &= "<option value='#gy#'" & (selectedGradYear == toString(gy) ? " selected" : "") & ">#gy#</option>">
+    </cfloop>
+    <cfset content &= "
+            </select>
+    ">
+</cfif>
+
+<!--- Per page + buttons --->
+<cfset content &= "
             <label for='perPageSelect' class='mb-0'>Per page:</label>
             <select name='perPage' id='perPageSelect' class='form-select' style='width:auto;'>
                 <option value='10'  #(perPage == 10  ? 'selected' : '')#>10</option>
@@ -244,67 +395,171 @@
                 <option value='100' #(perPage == 100 ? 'selected' : '')#>100</option>
             </select>
             <button type='submit' class='btn btn-sm btn-secondary'>Apply Filter</button>
-            " & ((selectedFlagFilter != "" OR selectedOrgFilter != "" OR searchTerm != "") ? "<a href='?sortCol=" & sortColumn & "&sortDir=" & sortDirection & "&perPage=" & perPage & "' class='btn btn-sm btn-warning'>Clear Filters</a>" : "") & "
+            " & (hasActiveFilters ? "<a href='#clearLink#' class='btn btn-sm btn-warning'>Clear Filters</a>" : "") & "
         </form>
     </div>
 </div>
 
 " & (pageMessage != "" ? "<div class='alert " & pageMessageClass & "'>" & EncodeForHTML(pageMessage) & "</div>" : "") & "
+">
 
-<table id='usersTable' class='table table-striped table-hover'>
+<!--- Top pagination --->
+<cfinclude template="/includes/pagination.cfm">
+
+<!--- Table header --->
+<cfset content &= "
+<table class='table table-striped table-hover align-middle'>
     <thead class='table-dark'>
         <tr>
-            <th><a href='#getSortLink("FIRSTNAME", sortColumn, sortDirection)#' style='color: ##fff; text-decoration: none;'>First Name #(sortColumn == "FIRSTNAME" ? (sortDirection == "ASC" ? "↑" : "↓") : "")#</a></th>
-            <th><a href='#getSortLink("LASTNAME", sortColumn, sortDirection)#' style='color: ##fff; text-decoration: none;'>LastName #(sortColumn == "LASTNAME" ? (sortDirection == "ASC" ? "↑" : "↓") : "")#</a></th>
-            <th><a href='#getSortLink("EMAIL", sortColumn, sortDirection)#' style='color: ##fff; text-decoration: none;'>Email #(sortColumn == "EMAIL" ? (sortDirection == "ASC" ? "↑" : "↓") : "")#</a></th>
-            <th>Organizations</th>
+            <th>##</th>
+">
+<cfif showPhoto>
+    <cfset content &= "            <th class='text-center'>Photo</th>
+">
+</cfif>
+<cfset content &= "
+            <th><a href='#helpers.getSortLink("FIRSTNAME", sortColumn, sortDirection, selectedFlagFilter, selectedGradYear, searchTerm, sortColumn, sortDirection, perPage, selectedLetter, selectedOrgFilter, listType)#' style='color: ##fff; text-decoration: none;'>First Name #(sortColumn == "FIRSTNAME" ? (sortDirection == "ASC" ? "↑" : "↓") : "")#</a></th>
+            <th><a href='#helpers.getSortLink("LASTNAME", sortColumn, sortDirection, selectedFlagFilter, selectedGradYear, searchTerm, sortColumn, sortDirection, perPage, selectedLetter, selectedOrgFilter, listType)#' style='color: ##fff; text-decoration: none;'>Last Name #(sortColumn == "LASTNAME" ? (sortDirection == "ASC" ? "↑" : "↓") : "")#</a></th>
+            <th><a href='#helpers.getSortLink("EMAIL", sortColumn, sortDirection, selectedFlagFilter, selectedGradYear, searchTerm, sortColumn, sortDirection, perPage, selectedLetter, selectedOrgFilter, listType)#' style='color: ##fff; text-decoration: none;'>Email #(sortColumn == "EMAIL" ? (sortDirection == "ASC" ? "↑" : "↓") : "")#</a></th>
+">
+<cfif showGradYear>
+    <cfset content &= "
+            <th class='text-center'><a href='#helpers.getSortLink("CURRENTGRADYEAR", sortColumn, sortDirection, selectedFlagFilter, selectedGradYear, searchTerm, sortColumn, sortDirection, perPage, selectedLetter, selectedOrgFilter, listType)#' style='color: ##fff; text-decoration: none;'>Grad Year #(sortColumn == "CURRENTGRADYEAR" ? (sortDirection == "ASC" ? "↑" : "↓") : "")#</a></th>
+">
+</cfif>
+<cfif showTitle>
+    <cfset content &= "
+            <th class='text-center'>Title</th>
+">
+</cfif>
+<cfset content &= "
+            <th>Organizational Units</th>
             <th>Flags</th>
             <th>Actions</th>
         </tr>
     </thead>
-
     <tbody>
-" />
+">
 
+<!--- Table rows --->
 <cfloop from="1" to="#arrayLen(pageRows)#" index="i">
     <cfset u = pageRows[i]>
-    <cfset userFlags = structKeyExists(allUserFlagMap, toString(u.USERID)) ? allUserFlagMap[toString(u.USERID)] : []>
-    <cfset userOrgsData = structKeyExists(allUserOrgMap, toString(u.USERID)) ? allUserOrgMap[toString(u.USERID)] : []>
-    <cfset userOrgIdList = "">
-    <cfset orgsHTML = "">
+    <cfset userFlags    = structKeyExists(allUserFlagMap, toString(u.USERID)) ? allUserFlagMap[toString(u.USERID)] : []>
+    <cfset userOrgsData = structKeyExists(allUserOrgMap, toString(u.USERID))  ? allUserOrgMap[toString(u.USERID)]  : []>
+    <cfset orgsHTML  = "">
     <cfset flagsHTML = "">
+
     <cfloop from="1" to="#arrayLen(userOrgsData)#" index="o">
-        <cfset userOrgIdList = listAppend(userOrgIdList, userOrgsData[o].ORGID)>
         <cfset orgsHTML &= "<span class='badge bg-primary me-1'>#EncodeForHTML(userOrgsData[o].ORGNAME)#</span>">
     </cfloop>
 
     <cfloop from="1" to="#arrayLen(userFlags)#" index="f">
-        <cfif userFlags[f].FLAGNAME EQ "Admin - Check" OR userFlags[f].FLAGNAME EQ "No-UH">
-             <!--- Highlight these flags since they are criteria for inclusion in this list --->
-             <cfset flagsHTML &= "<span class='badge bg-danger'>#userFlags[f].FLAGNAME#</span> ">
+        <cfif highlightFlags AND (userFlags[f].FLAGNAME EQ "Admin - Check" OR userFlags[f].FLAGNAME EQ "No-UH")>
+            <cfset flagsHTML &= "<span class='badge bg-danger me-1'>#userFlags[f].FLAGNAME#</span>">
         <cfelse>
-            <cfset flagsHTML &= "<span class='badge bg-secondary'>#userFlags[f].FLAGNAME#</span> ">
+            <cfset flagsHTML &= "<span class='badge bg-secondary me-1'>#userFlags[f].FLAGNAME#</span>">
         </cfif>
     </cfloop>
-    <cfset displayEmail = getDisplayEmail(u.EMAILPRIMARY, u.EMAILSECONDARY)>
+
+    <!--- Email display: cascading priority --->
+    <cfset userEmailList = structKeyExists(allUserEmailMap, toString(u.USERID)) ? allUserEmailMap[toString(u.USERID)] : []>
+    <cfset displayEmail = "">
+    <cfset displayEmailExternal = false>
+    <!--- 1. Primary-marked email from UserEmails --->
+    <cfloop from="1" to="#arrayLen(userEmailList)#" index="em">
+        <cfif userEmailList[em].ISPRIMARY EQ 1 AND len(trim(userEmailList[em].EMAILADDRESS))>
+            <cfset displayEmail = userEmailList[em].EMAILADDRESS>
+            <cfbreak>
+        </cfif>
+    </cfloop>
+    <!--- 2. EmailPrimary (@uh.edu) from Users table --->
+    <cfif NOT len(displayEmail) AND len(trim(u.EMAILPRIMARY ?: ""))>
+        <cfset displayEmail = u.EMAILPRIMARY>
+    </cfif>
+    <!--- 3. @cougarnet or @central from UserEmails --->
+    <cfif NOT len(displayEmail)>
+        <cfloop from="1" to="#arrayLen(userEmailList)#" index="em">
+            <cfif reFindNoCase('@cougarnet|@central', userEmailList[em].EMAILADDRESS)>
+                <cfset displayEmail = userEmailList[em].EMAILADDRESS>
+                <cfbreak>
+            </cfif>
+        </cfloop>
+    </cfif>
+    <!--- 4. Personal or Other from UserEmails (mark as external) --->
+    <cfif NOT len(displayEmail)>
+        <cfloop from="1" to="#arrayLen(userEmailList)#" index="em">
+            <cfif len(trim(userEmailList[em].EMAILADDRESS))>
+                <cfset displayEmail = userEmailList[em].EMAILADDRESS>
+                <cfset displayEmailExternal = true>
+                <cfbreak>
+            </cfif>
+        </cfloop>
+    </cfif>
+
+    <!--- Manage Images link (faculty / current-students with media admin role) --->
+    <cfset mediaLink = "">
+    <cfif showManageImages AND (request.hasRole("USER_MEDIA_ADMIN") OR request.hasRole("SUPER_ADMIN"))>
+        <cfset mediaLink = "<a href='/admin/user-media/sources.cfm?userid=#u.USERID#' class='btn btn-sm btn-outline-primary'><i class='bi bi-pencil-square me-1'></i> Manage Images</a>">
+    </cfif>
+
+    <!--- Deceased icon (alumni only) --->
+    <cfset deceasedIcon = "">
+    <cfif showDeceased>
+        <cfloop from="1" to="#arrayLen(userFlags)#" index="f">
+            <cfif lCase(trim(userFlags[f].FLAGNAME)) EQ "deceased">
+                <cfset deceasedIcon = "<i class='bi bi-record-fill me-1' title='Deceased' data-bs-toggle='tooltip' data-bs-title='Deceased'></i>">
+                <cfbreak>
+            </cfif>
+        </cfloop>
+    </cfif>
+
+    <!--- Photo thumbnail --->
+    <cfset thumbURL = "">
+    <cfif showPhoto>
+        <cfset thumbURL = structKeyExists(webThumbMap, toString(u.USERID)) ? webThumbMap[toString(u.USERID)] : "">
+    </cfif>
+
     <cfset content &= "
-            <tr data-orgids='#userOrgIdList#'>
-                <td>#u.FIRSTNAME#</td>
-                <td>#u.LASTNAME#</td>
-                <td>#displayEmail#</td>
-                <td>#orgsHTML#</td>
-                <td>#flagsHTML#</td>
-                <td>
-                    <a class='btn btn-sm btn-info' href='/dir/admin/users/edit.cfm?userID=#u.USERID#'>Edit</a>
-                    <a class='btn btn-sm btn-secondary' href='/dir/admin/users/view.cfm?userID=#u.USERID#'>View</a>
-                    <a class='btn btn-sm btn-danger' href='/dir/admin/users/deleteConfirm.cfm?userID=#u.USERID#'>Delete</a>
-                </td>
-            </tr>
-    " />
+        <tr>
+            <td class='text-center'>#u.USERID#</td>
+    ">
+
+    <cfif showPhoto>
+        <cfset content &= "<td class='text-center'>" & (len(thumbURL) ? "<img src='" & thumbURL & "' alt='thumb' style='width:32px;height:32px;object-fit:cover;border-radius:4px;'>" : "") & "</td>">
+    </cfif>
+
+    <cfset content &= "
+            <td>#deceasedIcon##u.FIRSTNAME#</td>
+            <td>#u.LASTNAME#</td>
+            <td>#displayEmail##(displayEmailExternal ? " <span class='badge bg-warning text-dark' title='Non-UH email'>External</span>" : "")#</td>
+    ">
+
+    <cfif showGradYear>
+        <cfset gradYear      = (structKeyExists(u, "CURRENTGRADYEAR") AND isNumeric(u.CURRENTGRADYEAR) AND val(u.CURRENTGRADYEAR) GT 0) ? u.CURRENTGRADYEAR : "">
+        <cfset hasOrigChange = (structKeyExists(u, "ORIGINALGRADYEAR") AND isNumeric(u.ORIGINALGRADYEAR) AND val(u.ORIGINALGRADYEAR) GT 0) ? true : false>
+        <cfset gradYearDisplay = len(gradYear) ? gradYear & (hasOrigChange ? " *" : "") : "">
+        <cfset content &= "<td class='text-center'>#gradYearDisplay#</td>">
+    </cfif>
+
+    <cfif showTitle>
+        <cfset content &= "<td class='text-center'>#u.TITLE1#</td>">
+    </cfif>
+
+    <cfset content &= "
+            <td>#orgsHTML#</td>
+            <td><small>#flagsHTML#</small></td>
+            <td>
+                <a class='btn btn-sm btn-info' href='/admin/users/edit.cfm?userID=#u.USERID#'>Edit</a>
+                <a class='btn btn-sm btn-secondary' href='/admin/users/view.cfm?userID=#u.USERID#'>View</a>
+                <a class='btn btn-sm btn-danger' href='/admin/users/deleteConfirm.cfm?userID=#u.USERID#'>Delete</a>
+                #mediaLink#
+            </td>
+        </tr>
+    ">
 </cfloop>
 
 <cfif arrayLen(pageRows) EQ 0>
-    <cfset content &= "<tr><td colspan='5' class='text-center text-muted'>No records found.</td></tr>">
+    <cfset content &= "<tr><td colspan='#colCount#' class='text-center text-muted'>#noDataMsg#</td></tr>">
 </cfif>
 
 <cfset content &= "
@@ -312,17 +567,7 @@
 </table>
 ">
 
-<!--- Pagination controls --->
-<cfif totalPages GT 1>
-    <cfset content &= "<nav><ul class='pagination pagination-sm flex-wrap'>">
-    <cfset content &= "<li class='page-item" & (currentPage == 1 ? " disabled" : "") & "'><a class='page-link' href='" & getPageLink(currentPage - 1) & "'>&laquo;</a></li>">
-    <cfloop from="1" to="#totalPages#" index="p">
-        <cfset content &= "<li class='page-item" & (p == currentPage ? " active" : "") & "'><a class='page-link' href='" & getPageLink(p) & "'>#p#</a></li>">
-    </cfloop>
-    <cfset content &= "<li class='page-item" & (currentPage == totalPages ? " disabled" : "") & "'><a class='page-link' href='" & getPageLink(currentPage + 1) & "'>&raquo;</a></li>">
-    <cfset content &= "</ul></nav>">
-</cfif>
+<!--- Bottom pagination --->
+<cfinclude template="/includes/pagination.cfm">
 
-<cfset content &= "<p class='text-muted small'>Showing #sliceStart#&##8211;#sliceEnd# of #totalRecords# records</p>">
-
-<cfinclude template="/dir/admin/layout.cfm">
+<cfinclude template="/admin/layout.cfm">

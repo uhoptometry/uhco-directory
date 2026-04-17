@@ -4,4 +4,4 @@
 <p>The application has been stopped and will be reinitialized on the next request.</p>
 <p>This forces all ColdFusion components to be recompiled.</p>
 
-<p><a href="/dir/admin/users/index.cfm">Proceed to Users Page</a></p>
+<p><a href="/admin/users/index.cfm">Proceed to Users Page</a></p>

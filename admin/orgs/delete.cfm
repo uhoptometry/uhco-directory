@@ -1,12 +1,12 @@
 <cfif !structKeyExists(url, "orgID") OR !isNumeric(url.orgID)>
-    <cflocation url="/dir/admin/orgs/index.cfm" addtoken="false">
+    <cflocation url="#request.webRoot#/admin/orgs/index.cfm" addtoken="false">
 </cfif>
 
-<cfset orgsService = createObject("component", "dir.cfc.organizations_service").init()>
+<cfset orgsService = createObject("component", "cfc.organizations_service").init()>
 <cfset orgResult = orgsService.getOrg(val(url.orgID))>
 
 <cfif NOT orgResult.success>
-    <cflocation url="/dir/admin/orgs/index.cfm" addtoken="false">
+    <cflocation url="#request.webRoot#/admin/orgs/index.cfm" addtoken="false">
 </cfif>
 
 <cfset org = orgResult.data>
@@ -32,7 +32,7 @@
     <input type='hidden' name='OrgID' value='#org.ORGID#'>
     <button type='submit' class='btn btn-danger'>Delete Organization</button>
 </form>
-<a href='/dir/admin/orgs/index.cfm' class='btn btn-secondary ms-2'>Cancel</a>
+<a href='/admin/orgs/index.cfm' class='btn btn-secondary ms-2'>Cancel</a>
 ">
 
-<cfinclude template="/dir/admin/layout.cfm">
+<cfinclude template="/admin/layout.cfm">
