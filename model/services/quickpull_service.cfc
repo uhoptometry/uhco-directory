@@ -30,7 +30,27 @@ component output="false" singleton {
      * Flat list filtered by grad year: UserID, FirstName, MiddleName, LastName, CurrentGradYear.
      */
     public array function getGradClass( required numeric gradYear ) {
-        return variables.dao.getGradClassUsers( arguments.gradYear );
+        var users = variables.dao.getGradClassUsers( arguments.gradYear );
+        if ( arrayLen(users) == 0 ) return [];
+
+        var ids = [];
+        for ( var user in users ) {
+            arrayAppend( ids, user.USERID );
+        }
+
+        var interactiveMap = variables.dao.getImageMapByVariant( "interactive_roster", ids );
+        var rosterMap      = variables.dao.getImageMapByVariant( "KIOSK_ROSTER", ids );
+        var profileMap     = variables.dao.getImageMapByVariant( "KIOSK_PROFILE", ids );
+
+        for ( var i = 1; i <= arrayLen(users); i++ ) {
+            var key = toString( users[i].USERID );
+            users[i]["FULLNAME"] = buildFullName( users[i] );
+            users[i]["INTERACTIVEUSERIMAGE"] = structKeyExists( interactiveMap, key ) ? interactiveMap[ key ] : "";
+            users[i]["KIOSKROSTERIMAGE"] = structKeyExists( rosterMap, key ) ? rosterMap[ key ] : "";
+            users[i]["KIOSKPROFILEIMAGE"] = structKeyExists( profileMap, key ) ? profileMap[ key ] : "";
+        }
+
+        return users;
     }
 
     /**
@@ -50,9 +70,11 @@ component output="false" singleton {
         user["DEGREES"]           = variables.dao.getDegreesForUsers( ids );
         user["AWARDS"]            = variables.dao.getAwardsForUsers( ids );
 
-        var rosterMap  = variables.dao.getImageMapByVariant( "KIOSK_ROSTER",  ids );
-        var profileMap = variables.dao.getImageMapByVariant( "KIOSK_PROFILE", ids );
+        var interactiveMap = variables.dao.getImageMapByVariant( "interactive_roster", ids );
+        var rosterMap      = variables.dao.getImageMapByVariant( "KIOSK_ROSTER",  ids );
+        var profileMap     = variables.dao.getImageMapByVariant( "KIOSK_PROFILE", ids );
         var key = toString( uid );
+        user["INTERACTIVEUSERIMAGE"] = structKeyExists( interactiveMap, key ) ? interactiveMap[ key ] : "";
         user["KIOSKROSTERIMAGE"]  = structKeyExists( rosterMap,  key ) ? rosterMap[ key ]  : "";
         user["KIOSKPROFILEIMAGE"] = structKeyExists( profileMap, key ) ? profileMap[ key ] : "";
 
@@ -75,10 +97,25 @@ component output="false" singleton {
 
         for ( var i = 1; i <= arrayLen(users); i++ ) {
             var uid = toString( users[i].USERID );
+            users[i]["FULLNAME"] = buildFullName( users[i] );
             users[i]["KIOSKNONGRIDIMAGE"] = structKeyExists( nonGridMap, uid ) ? nonGridMap[ uid ] : "";
         }
 
         return users;
+    }
+
+    private string function buildFullName( required struct user ) {
+        var parts = [];
+        if ( len(trim(arguments.user.FIRSTNAME ?: "")) ) {
+            arrayAppend( parts, trim(arguments.user.FIRSTNAME) );
+        }
+        if ( len(trim(arguments.user.MIDDLENAME ?: "")) ) {
+            arrayAppend( parts, trim(arguments.user.MIDDLENAME) );
+        }
+        if ( len(trim(arguments.user.LASTNAME ?: "")) ) {
+            arrayAppend( parts, trim(arguments.user.LASTNAME) );
+        }
+        return arrayToList( parts, " " );
     }
 
 }

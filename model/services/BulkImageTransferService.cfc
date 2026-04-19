@@ -3,8 +3,8 @@ component output="false" singleton {
     variables.sourceWebDir        = "/_temp_source/";
     variables.publishedWebDir     = "/_published_images/";
     variables.allowedExtensions   = ["jpg", "jpeg", "png"];
-    variables.targetSourceKey     = "alumni";
-    variables.targetVariantCodes  = ["interactvie_roster", "interactive_roster", "KIOSK_ROSTER"];
+    variables.defaultSourceKey    = "alumni";
+    variables.defaultVariantCode  = "interactive_roster";
 
     public any function init() {
         variables.UsersDAO     = createObject("component", "dao.users_DAO").init();
@@ -15,6 +15,7 @@ component output="false" singleton {
         variables.VariantDAO   = createObject("component", "dao.UserImageVariantDAO").init();
         variables.ImagesDAO    = createObject("component", "dao.images_DAO").init();
         variables.MediaConfigService = createObject("component", "cfc.mediaConfig_service").init();
+        variables.SourceService = createObject("component", "cfc.UserImageSourceService").init();
 
         var cfcDir = getDirectoryFromPath( getCurrentTemplatePath() );
         var jFile = createObject("java", "java.io.File");
@@ -25,14 +26,64 @@ component output="false" singleton {
         return this;
     }
 
-    public struct function searchFolder( required string folderName ) {
+    public array function getSourceKeys() {
+        return variables.SourceService.getSourceKeys();
+    }
+
+    public array function getTransferOnlyVariantTypes() {
+        var allowed = [];
+        var variantTypes = variables.VariantDAO.getVariantTypesAll();
+
+        for ( var variantType in variantTypes ) {
+            if ( _isTruthy(variantType.ALLOWMANUALCROP ?: 0) OR _isTruthy(variantType.ALLOWRESIZE ?: 0) ) {
+                continue;
+            }
+
+            arrayAppend(allowed, variantType);
+        }
+
+        return allowed;
+    }
+
+    public string function getDefaultSourceKey() {
+        return variables.defaultSourceKey;
+    }
+
+    public string function getDefaultVariantCode() {
+        return variables.defaultVariantCode;
+    }
+
+    public struct function searchFolder(
+        required string folderName,
+        string sourceKey = "",
+        string variantCode = "",
+        boolean includeTransferred = false,
+        boolean includeAmbiguous = false,
+        numeric limit = 25
+    ) {
         var cleanFolder = trim( arguments.folderName );
+        var cleanSourceKey = _normalizeSourceKey( arguments.sourceKey ?: "" );
+        var cleanVariantCode = _normalizeVariantCode( arguments.variantCode ?: "" );
+        var transferVariant = _resolveTargetVariantType( cleanVariantCode );
+        var visibleLimit = max( 1, min( int(val(arguments.limit ?: 25)), 100 ) );
         var tokenProfiles = [];
-        var transferLookup = {};
         var results = [];
+        var transferCache = {};
+        var totalFolderMatches = 0;
+        var transferredHiddenCount = 0;
+        var ambiguousHiddenCount = 0;
+        var limitedResults = [];
 
         if ( !len(cleanFolder) ) {
             return { success=false, message="Folder name is required.", data=[] };
+        }
+
+        if ( !len(cleanSourceKey) ) {
+            return { success=false, message="A valid source key is required.", data=[] };
+        }
+
+        if ( structIsEmpty(transferVariant) ) {
+            return { success=false, message="A valid transfer-only variant is required.", data=[] };
         }
 
         if ( find("..", cleanFolder) OR find(":", cleanFolder) ) {
@@ -44,7 +95,6 @@ component output="false" singleton {
         }
 
         tokenProfiles = _buildUserTokenProfiles();
-    transferLookup = _buildTransferLookup();
 
         var entries = directoryList( variables.sourceDirAbsolute, true, "query" );
         for ( var row in entries ) {
@@ -67,20 +117,34 @@ component output="false" singleton {
                 continue;
             }
 
+            totalFolderMatches++;
+
             var sourcePath = variables.sourceWebDir & replace(relativeDiskPath, "\\", "/", "all");
-            var matchInfo = _matchFileToUser( row.name, tokenProfiles );
+            var matchInfo = _matchFileToUser( row.name, tokenProfiles, transferVariant );
+
+            if ( matchInfo.matchStatus EQ "ambiguous" AND !arguments.includeAmbiguous ) {
+                ambiguousHiddenCount++;
+                continue;
+            }
+
             var transferInfo = _getTransferInfo(
                 userID        = matchInfo.userID,
                 sourcePath    = sourcePath,
+                sourceKey     = cleanSourceKey,
                 variantCode   = matchInfo.variantCode,
-                transferLookup = transferLookup
+                transferCache = transferCache
             );
+
+            if ( transferInfo.isTransferred AND !arguments.includeTransferred ) {
+                transferredHiddenCount++;
+                continue;
+            }
 
             arrayAppend(results, {
                 filename        = row.name,
                 sourcePath      = sourcePath,
                 relativeFolder  = relativeFolder,
-                matchStatus     = matchInfo.status,
+                matchStatus     = matchInfo.matchStatus,
                 userID          = matchInfo.userID,
                 userDisplayName = matchInfo.userDisplayName,
                 userEmail       = matchInfo.userEmail,
@@ -116,23 +180,38 @@ component output="false" singleton {
             return compareNoCase( a.filename, b.filename );
         });
 
+        for ( var i = 1; i <= min(arrayLen(results), visibleLimit); i++ ) {
+            arrayAppend(limitedResults, results[i]);
+        }
+
         return {
             success = true,
-            message = arrayLen(results)
-                ? "Found #arrayLen(results)# image(s) in matching folder path(s)."
-                : "No images found for that folder name.",
-            data = results
+            message = _buildSearchMessage(
+                totalFolderMatches      = totalFolderMatches,
+                visibleCount            = arrayLen(limitedResults),
+                totalVisibleCount       = arrayLen(results),
+                transferredHiddenCount  = transferredHiddenCount,
+                ambiguousHiddenCount    = ambiguousHiddenCount,
+                visibleLimit            = visibleLimit,
+                includeTransferred      = arguments.includeTransferred,
+                includeAmbiguous        = arguments.includeAmbiguous
+            ),
+            data = limitedResults
         };
     }
 
     public struct function transferImage(
         required numeric userID,
-        required string sourcePath
+        required string sourcePath,
+        string sourceKey = "",
+        string variantCode = ""
     ) {
         var cleanSourcePath = trim( arguments.sourcePath );
+        var cleanSourceKey = _normalizeSourceKey( arguments.sourceKey ?: "" );
+        var cleanVariantCode = _normalizeVariantCode( arguments.variantCode ?: "" );
         var sourceAbsolutePath = _resolveSourceAbsolutePath( cleanSourcePath );
         var userResult = variables.UsersService.getUser( arguments.userID );
-        var variantType = _resolveTargetVariantType();
+        var variantType = _resolveTargetVariantType( cleanVariantCode );
         var sourceResult = {};
         var variantRecord = {};
         var publishedFilename = "";
@@ -149,10 +228,14 @@ component output="false" singleton {
             return { success=false, message="User not found.", sourceID=0, userID=arguments.userID };
         }
 
+        if ( !len(cleanSourceKey) ) {
+            return { success=false, message="A valid source key is required.", sourceID=0, userID=arguments.userID };
+        }
+
         if ( structIsEmpty(variantType) ) {
             return {
                 success = false,
-                message = "Target variant type not found. Checked: #arrayToList(variables.targetVariantCodes, ', ')#.",
+                message = "Selected target variant type was not found or is not transfer-only.",
                 sourceID = 0,
                 userID = arguments.userID
             };
@@ -160,7 +243,7 @@ component output="false" singleton {
 
         sourceResult = _ensureSourceRecord(
             userID     = arguments.userID,
-            sourceKey  = variables.targetSourceKey,
+            sourceKey  = cleanSourceKey,
             sourcePath = cleanSourcePath
         );
         if ( !sourceResult.success ) {
@@ -276,59 +359,44 @@ component output="false" singleton {
         return result;
     }
 
-    private struct function _buildTransferLookup() {
-        var lookup = {};
-        var variantType = _resolveTargetVariantType();
-        var users = variables.UsersDAO.getAllUsers();
-
-        if ( structIsEmpty(variantType) ) {
-            return lookup;
-        }
-
-        for ( var user in users ) {
-            var userID = val(user.USERID ?: 0);
-            var sources = variables.SourceDAO.getSourcesForUser( userID );
-            var images = variables.ImagesDAO.getImages( userID );
-
-            for ( var sourceRow in sources ) {
-                if ( compareNoCase(sourceRow.SOURCEKEY ?: "", variables.targetSourceKey) NEQ 0 ) {
-                    continue;
-                }
-
-                var sourceID = val(sourceRow.USERIMAGESOURCEID ?: 0);
-                var sourcePath = trim(sourceRow.DROPBOXPATH ?: "");
-                var isTransferred = false;
-
-                for ( var imageRow in images ) {
-                    if ( compareNoCase(imageRow.IMAGEVARIANT ?: "", variantType.CODE ?: "") EQ 0
-                        AND val(imageRow.USERIMAGESOURCEID ?: 0) EQ sourceID ) {
-                        isTransferred = true;
-                        break;
-                    }
-                }
-
-                if ( len(sourcePath) ) {
-                    lookup[ _buildTransferLookupKey(userID, sourcePath) ] = {
-                        isTransferred = isTransferred,
-                        sourceID = sourceID
-                    };
-                }
-            }
-        }
-
-        return lookup;
-    }
-
     private struct function _getTransferInfo(
         required numeric userID,
         required string sourcePath,
+        required string sourceKey,
         required string variantCode,
-        required struct transferLookup
+        required struct transferCache
     ) {
-        var lookupKey = _buildTransferLookupKey(arguments.userID, arguments.sourcePath);
+        var lookupKey = _buildTransferLookupKey(arguments.userID, arguments.sourceKey, arguments.variantCode, arguments.sourcePath);
+        var sourceID = 0;
+        var context = {};
 
-        if ( arguments.userID GT 0 AND len(arguments.variantCode) AND structKeyExists(arguments.transferLookup, lookupKey) ) {
-            return arguments.transferLookup[ lookupKey ];
+        if ( !structKeyExists(arguments.transferCache, "items") ) {
+            arguments.transferCache.items = {};
+        }
+        if ( !structKeyExists(arguments.transferCache, "contexts") ) {
+            arguments.transferCache.contexts = {};
+        }
+
+        if ( structKeyExists(arguments.transferCache.items, lookupKey) ) {
+            return arguments.transferCache.items[ lookupKey ];
+        }
+
+        if ( arguments.userID GT 0 AND len(arguments.variantCode) AND len(arguments.sourceKey) ) {
+            context = _getTransferContext(
+                userID        = arguments.userID,
+                sourceKey     = arguments.sourceKey,
+                variantCode   = arguments.variantCode,
+                transferCache = arguments.transferCache
+            );
+            if ( structKeyExists(context.sourceMap, lCase(trim(arguments.sourcePath))) ) {
+                sourceID = context.sourceMap[ lCase(trim(arguments.sourcePath)) ];
+            }
+
+            arguments.transferCache.items[ lookupKey ] = {
+                isTransferred = (sourceID GT 0 AND structKeyExists(context.transferredSourceIDs, toString(sourceID))),
+                sourceID = sourceID
+            };
+            return arguments.transferCache.items[ lookupKey ];
         }
 
         return {
@@ -339,18 +407,64 @@ component output="false" singleton {
 
     private string function _buildTransferLookupKey(
         required numeric userID,
+        required string sourceKey,
+        required string variantCode,
         required string sourcePath
     ) {
-        return arguments.userID & "|" & lCase( trim(arguments.sourcePath) );
+        return arguments.userID & "|" & lCase(trim(arguments.sourceKey)) & "|" & lCase(trim(arguments.variantCode)) & "|" & lCase( trim(arguments.sourcePath) );
+    }
+
+    private struct function _getTransferContext(
+        required numeric userID,
+        required string sourceKey,
+        required string variantCode,
+        required struct transferCache
+    ) {
+        var contextKey = arguments.userID & "|" & lCase(trim(arguments.sourceKey)) & "|" & lCase(trim(arguments.variantCode));
+        var sources = [];
+        var images = [];
+        var sourceMap = {};
+        var transferredSourceIDs = {};
+
+        if ( structKeyExists(arguments.transferCache.contexts, contextKey) ) {
+            return arguments.transferCache.contexts[ contextKey ];
+        }
+
+        sources = variables.SourceDAO.getSourcesForUser( arguments.userID );
+        images = variables.ImagesDAO.getImages( arguments.userID );
+
+        for ( var sourceRow in sources ) {
+            if ( compareNoCase(sourceRow.SOURCEKEY ?: "", arguments.sourceKey) NEQ 0 ) {
+                continue;
+            }
+
+            if ( len(trim(sourceRow.DROPBOXPATH ?: "")) ) {
+                sourceMap[ lCase(trim(sourceRow.DROPBOXPATH)) ] = val(sourceRow.USERIMAGESOURCEID ?: 0);
+            }
+        }
+
+        for ( var imageRow in images ) {
+            if ( compareNoCase(imageRow.IMAGEVARIANT ?: "", arguments.variantCode) EQ 0
+                AND val(imageRow.USERIMAGESOURCEID ?: 0) GT 0 ) {
+                transferredSourceIDs[ toString(val(imageRow.USERIMAGESOURCEID)) ] = true;
+            }
+        }
+
+        arguments.transferCache.contexts[ contextKey ] = {
+            sourceMap = sourceMap,
+            transferredSourceIDs = transferredSourceIDs
+        };
+
+        return arguments.transferCache.contexts[ contextKey ];
     }
 
     private struct function _matchFileToUser(
         required string filename,
-        required array tokenProfiles
+        required array tokenProfiles,
+        required struct variantType
     ) {
         var stem = lCase( reReplace(arguments.filename, "\.[^.]+$", "", "one") );
         var candidates = [];
-        var variantType = _resolveTargetVariantType();
 
         for ( var profile in arguments.tokenProfiles ) {
             var matchedTokens = [];
@@ -388,7 +502,7 @@ component output="false" singleton {
                 matchedBy     = "",
                 candidateText = "No user token matched this filename.",
                 canTransfer   = false,
-                variantCode   = structIsEmpty(variantType) ? "" : variantType.CODE
+                variantCode   = structIsEmpty(arguments.variantType) ? "" : arguments.variantType.CODE
             };
         }
 
@@ -430,7 +544,8 @@ component output="false" singleton {
                 matchedBy       = arrayToList(topCandidate.matchedTokens, ", "),
                 candidateText   = "Ambiguous match: #arrayToList(ambiguousNames, ', ')#",
                 canTransfer     = false,
-                variantCode     = structIsEmpty(variantType) ? "" : variantType.CODE
+                variantCode     = structIsEmpty(arguments.variantType) ? "" : arguments.variantType.CODE,
+                matchStatus     = "ambiguous"
             };
         }
 
@@ -441,8 +556,9 @@ component output="false" singleton {
             userEmail       = topCandidate.userEmail,
             matchedBy       = arrayToList(topCandidate.matchedTokens, ", "),
             candidateText   = "",
-            canTransfer     = !structIsEmpty(variantType),
-            variantCode     = structIsEmpty(variantType) ? "" : variantType.CODE
+            canTransfer     = !structIsEmpty(arguments.variantType),
+            variantCode     = structIsEmpty(arguments.variantType) ? "" : arguments.variantType.CODE,
+            matchStatus     = "matched"
         };
     }
 
@@ -492,18 +608,101 @@ component output="false" singleton {
         return tokens;
     }
 
-    private struct function _resolveTargetVariantType() {
-        var variantTypes = variables.VariantDAO.getVariantTypesAllAdmin();
+    private struct function _resolveTargetVariantType( string variantCode = "" ) {
+        var variantTypes = getTransferOnlyVariantTypes();
+        var requestedCode = _normalizeVariantCode( arguments.variantCode ?: "" );
 
-        for ( var preferredCode in variables.targetVariantCodes ) {
+        if ( len(requestedCode) ) {
             for ( var variantType in variantTypes ) {
-                if ( compareNoCase(variantType.CODE ?: "", preferredCode) EQ 0 ) {
+                if ( compareNoCase(variantType.CODE ?: "", requestedCode) EQ 0 ) {
                     return variantType;
                 }
             }
+            return {};
+        }
+
+        for ( var variantType in variantTypes ) {
+            if ( compareNoCase(variantType.CODE ?: "", variables.defaultVariantCode) EQ 0 ) {
+                return variantType;
+            }
+        }
+
+        if ( arrayLen(variantTypes) ) {
+            return variantTypes[1];
         }
 
         return {};
+    }
+
+    private string function _normalizeSourceKey( required string sourceKey ) {
+        var cleanKey = lCase( trim(arguments.sourceKey) );
+        var availableKeys = getSourceKeys();
+
+        if ( !len(cleanKey) ) {
+            cleanKey = variables.defaultSourceKey;
+        }
+
+        if ( arrayFindNoCase(availableKeys, cleanKey) ) {
+            return cleanKey;
+        }
+
+        return "";
+    }
+
+    private string function _normalizeVariantCode( required string variantCode ) {
+        var cleanCode = trim(arguments.variantCode);
+
+        if ( !len(cleanCode) ) {
+            cleanCode = variables.defaultVariantCode;
+        }
+
+        return cleanCode;
+    }
+
+    private boolean function _isTruthy( any value ) {
+        if ( isBoolean(arguments.value) ) {
+            return arguments.value;
+        }
+
+        if ( isNumeric(arguments.value ?: "") ) {
+            return val(arguments.value) NEQ 0;
+        }
+
+        return listFindNoCase("true,yes,on", trim(arguments.value ?: "")) GT 0;
+    }
+
+    private string function _buildSearchMessage(
+        required numeric totalFolderMatches,
+        required numeric visibleCount,
+        required numeric totalVisibleCount,
+        required numeric transferredHiddenCount,
+        required numeric ambiguousHiddenCount,
+        required numeric visibleLimit,
+        required boolean includeTransferred,
+        required boolean includeAmbiguous
+    ) {
+        var parts = [];
+
+        if ( arguments.totalFolderMatches EQ 0 ) {
+            return "No images found for that folder name.";
+        }
+
+        arrayAppend(parts, "Found #arguments.totalFolderMatches# image(s) in matching folder path(s).");
+        arrayAppend(parts, "Showing #arguments.visibleCount# result(s)");
+
+        if ( arguments.totalVisibleCount GT arguments.visibleLimit ) {
+            arrayAppend(parts, "limited to the first #arguments.visibleLimit# after filtering");
+        }
+
+        if ( !arguments.includeTransferred AND arguments.transferredHiddenCount GT 0 ) {
+            arrayAppend(parts, "#arguments.transferredHiddenCount# already transferred hidden");
+        }
+
+        if ( !arguments.includeAmbiguous AND arguments.ambiguousHiddenCount GT 0 ) {
+            arrayAppend(parts, "#arguments.ambiguousHiddenCount# ambiguous hidden");
+        }
+
+        return arrayToList(parts, " | ");
     }
 
     private struct function _ensureSourceRecord(

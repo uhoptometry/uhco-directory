@@ -68,6 +68,10 @@
                     <a class="nav-link py-1" href="#ep-orgs">GET /organizations</a>
                     <a class="nav-link py-1 ps-4 small" href="#ep-org">GET /organizations/{id}</a>
                     <a class="nav-link py-1" href="#ep-flags">GET /flags</a>
+                    <a class="nav-link py-1" href="#ep-quickpull-attending">GET /quickpulls/attending</a>
+                    <a class="nav-link py-1 ps-4 small" href="#ep-quickpull-gradclass">GET /quickpulls/gradclass</a>
+                    <a class="nav-link py-1 ps-4 small" href="#ep-quickpull-graduate">GET /quickpulls/graduate</a>
+                    <a class="nav-link py-1 ps-4 small" href="#ep-quickpull-deans">GET /quickpulls/deans</a>
                     <div class="fw-semibold text-uppercase text-muted small mt-3 mb-1 ps-2">More</div>
                     <a class="nav-link py-1" href="examples.html"><i class="bi bi-code-slash me-1"></i>Code Examples</a>
                 </nav>
@@ -710,6 +714,177 @@ GET /api/v1/organizations/5?return=xml&amp;token=uhcs_...</pre>
 GET /api/v1/flags?return=xml&amp;token=uhcs_...</pre>
                 </div>
             </div>
+
+                        <!-- GET /quickpulls/attending -->
+                        <div class="card endpoint-card shadow-sm mb-4" id="ep-quickpull-attending">
+                                <div class="card-header bg-white">
+                                        <span class="badge bg-primary method-badge me-2">GET</span>
+                                        <code>/api/v1/quickpulls/attending</code>
+                                </div>
+                                <div class="card-body">
+                                        <p class="mb-3">Returns a lightweight list of active users flagged as <code>Clinical-Attending</code>. This quickpull is intended for consumers that need a curated roster without the full person profile payload.</p>
+
+                                        <h6>Authentication</h6>
+                                        <p>Requires a valid API token with <code>read</code> scope. No secret is required.</p>
+
+                                        <h6 class="mt-3">Response</h6>
+                                        <pre class="example">{
+    "TOTAL": 12,
+    "DATA": [
+        {
+            "USERID": 42,
+            "FIRSTNAME": "Jane",
+            "MIDDLENAME": "A",
+            "LASTNAME": "Doe",
+            "DEGREES": "O.D.",
+            "FULLNAME": "Jane A Doe, O.D."
+        }
+    ]
+}</pre>
+
+                                        <h6 class="mt-3">Example Requests</h6>
+                                        <pre class="example">GET /api/v1/quickpulls/attending?token=uhcs_...</pre>
+                                </div>
+                        </div>
+
+                        <!-- GET /quickpulls/gradclass -->
+                        <div class="card endpoint-card shadow-sm mb-4" id="ep-quickpull-gradclass">
+                                <div class="card-header bg-white">
+                                        <span class="badge bg-primary method-badge me-2">GET</span>
+                                        <code>/api/v1/quickpulls/gradclass</code>
+                                </div>
+                                <div class="card-body">
+                                        <p class="mb-3">Returns active alumni for a single graduation year as a flat list. Each result now includes a combined <code>FULLNAME</code> plus image URLs for the <code>interactive_roster</code>, <code>KIOSK_ROSTER</code>, and <code>KIOSK_PROFILE</code> variants. This endpoint is protected because it exposes alumni data.</p>
+
+                                        <h6>Authentication</h6>
+                                        <p>Requires both a valid API token and a valid secret that unlocks the <code>Alumni</code> flag.</p>
+
+                                        <h6 class="mt-3">Query Parameters</h6>
+                                        <table class="table table-sm table-bordered param-table">
+                                                <thead class="table-light">
+                                                        <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+                                                </thead>
+                                                <tbody>
+                                                        <tr><td><code>year</code></td><td>integer</td><td><em>required</em></td><td>Graduation year to filter by, for example <code>2026</code>.</td></tr>
+                                                        <tr><td><code>secret</code></td><td>string</td><td><em>none</em></td><td>API secret with Alumni access, as an alternative to the <code>X-API-Secret</code> header.</td></tr>
+                                                        <tr><td><code>token</code></td><td>string</td><td><em>none</em></td><td>API token, as an alternative to the <code>Authorization</code> header.</td></tr>
+                                                </tbody>
+                                        </table>
+
+                                        <h6 class="mt-3">Response</h6>
+                                        <pre class="example">{
+    "TOTAL": 87,
+    "DATA": [
+        {
+            "USERID": 314,
+            "FIRSTNAME": "Alex",
+            "MIDDLENAME": "",
+            "LASTNAME": "Smith",
+            "CURRENTGRADYEAR": 2026,
+            "FULLNAME": "Alex Smith",
+            "INTERACTIVEUSERIMAGE": "/published_images/interactive_roster/314.jpg",
+            "KIOSKROSTERIMAGE": "/published_images/kiosk_roster/314.jpg",
+            "KIOSKPROFILEIMAGE": "/published_images/kiosk_profile/314.jpg"
+        }
+    ]
+}</pre>
+
+                                        <h6 class="mt-3">Notes</h6>
+                                        <p>If a user does not have one or more of those image variants, the corresponding image field is still included with an empty string value.</p>
+
+                                        <h6 class="mt-3">Example Requests</h6>
+                                        <pre class="example">GET /api/v1/quickpulls/gradclass?year=2026&amp;secret=uhcs_sec_...&amp;token=uhcs_...</pre>
+                                </div>
+                        </div>
+
+                        <!-- GET /quickpulls/graduate -->
+                        <div class="card endpoint-card shadow-sm mb-4" id="ep-quickpull-graduate">
+                                <div class="card-header bg-white">
+                                        <span class="badge bg-primary method-badge me-2">GET</span>
+                                        <code>/api/v1/quickpulls/graduate</code>
+                                </div>
+                                <div class="card-body">
+                                        <p class="mb-3">Returns a single alumni-oriented quickpull record by <code>UserID</code>, including academic fields, externship and hometown details, earned degrees, awards, and image URLs when available.</p>
+
+                                        <h6>Authentication</h6>
+                                        <p>Requires both a valid API token and a valid secret that unlocks the <code>Alumni</code> flag.</p>
+
+                                        <h6 class="mt-3">Query Parameters</h6>
+                                        <table class="table table-sm table-bordered param-table">
+                                                <thead class="table-light">
+                                                        <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+                                                </thead>
+                                                <tbody>
+                                                        <tr><td><code>id</code></td><td>integer</td><td><em>required</em></td><td>The numeric <code>UserID</code> for the graduate record to fetch.</td></tr>
+                                                        <tr><td><code>secret</code></td><td>string</td><td><em>none</em></td><td>API secret with Alumni access, as an alternative to the <code>X-API-Secret</code> header.</td></tr>
+                                                        <tr><td><code>token</code></td><td>string</td><td><em>none</em></td><td>API token, as an alternative to the <code>Authorization</code> header.</td></tr>
+                                                </tbody>
+                                        </table>
+
+                                        <h6 class="mt-3">Response</h6>
+                                        <pre class="example">{
+    "USERID": 314,
+    "DATA": {
+        "USERID": 314,
+        "FIRSTNAME": "Alex",
+        "MIDDLENAME": "",
+        "LASTNAME": "Smith",
+        "CURRENTGRADYEAR": 2026,
+        "FIRSTEXTERNSHIP": "Houston Eye Associates",
+        "SECONDEXTERNSHIP": "VA Eye Clinic",
+        "HOMETOWNCITY": "Houston",
+        "HOMETOWNSTATE": "TX",
+        "DEGREES": [
+            { "USERID": 314, "DEGREENAME": "O.D.", "UNIVERSITY": "University of Houston", "DEGREEYEAR": "2026" }
+        ],
+        "AWARDS": [
+            { "USERID": 314, "AWARDNAME": "Dean's List", "AWARDTYPE": "Honor" }
+        ],
+        "INTERACTIVEUSERIMAGE": "/published_images/interactive_roster/314.jpg",
+        "KIOSKROSTERIMAGE": "/published_images/kiosk_roster/314.jpg",
+        "KIOSKPROFILEIMAGE": "/published_images/kiosk_profile/314.jpg"
+    }
+}</pre>
+
+                                        <h6 class="mt-3">Notes</h6>
+                                        <p>If the <code>UserID</code> does not exist, is inactive, or is not flagged as <code>Alumni</code>, the endpoint returns an empty object in <code>DATA</code> rather than a full profile. If any image variant is unavailable, its field is still present with an empty string value.</p>
+
+                                        <h6 class="mt-3">Example Requests</h6>
+                                        <pre class="example">GET /api/v1/quickpulls/graduate?id=314&amp;secret=uhcs_sec_...&amp;token=uhcs_...</pre>
+                                </div>
+                        </div>
+
+                        <!-- GET /quickpulls/deans -->
+                        <div class="card endpoint-card shadow-sm mb-4" id="ep-quickpull-deans">
+                                <div class="card-header bg-white">
+                                        <span class="badge bg-primary method-badge me-2">GET</span>
+                                        <code>/api/v1/quickpulls/deans</code>
+                                </div>
+                                <div class="card-body">
+                                        <p class="mb-3">Returns active users flagged as <code>Deans</code>, enriched with a combined <code>FULLNAME</code> and the first available <code>KIOSK_NON_GRID</code> image URL for each person.</p>
+
+                                        <h6>Authentication</h6>
+                                        <p>Requires a valid API token with <code>read</code> scope. No secret is required.</p>
+
+                                        <h6 class="mt-3">Response</h6>
+                                        <pre class="example">{
+    "TOTAL": 4,
+    "DATA": [
+        {
+            "USERID": 21,
+            "FIRSTNAME": "Taylor",
+            "MIDDLENAME": "",
+            "LASTNAME": "Brown",
+            "FULLNAME": "Taylor Brown",
+            "KIOSKNONGRIDIMAGE": "/published_images/kiosk_non_grid/21.jpg"
+        }
+    ]
+}</pre>
+
+                                        <h6 class="mt-3">Example Requests</h6>
+                                        <pre class="example">GET /api/v1/quickpulls/deans?token=uhcs_...</pre>
+                                </div>
+                        </div>
 
             <footer class="text-muted small mt-5 pt-4 border-top">
                 UHCO Directory API v1.0 &mdash; University of Houston College of Optometry
