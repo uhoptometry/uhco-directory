@@ -496,6 +496,7 @@ component output="false" singleton {
         if ( !arrayLen(candidates) ) {
             return {
                 status        = "none",
+                matchStatus   = "none",
                 userID        = 0,
                 userDisplayName = "",
                 userEmail     = "",
@@ -578,6 +579,7 @@ component output="false" singleton {
         var tokenMap = {
             "{first}" = first,
             "{last}"  = last,
+                    matchStatus   = "none",
             "{middle}" = middle,
             "{fi}"    = fi,
             "{mi}"    = mi
