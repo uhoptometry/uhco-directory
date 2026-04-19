@@ -10,7 +10,8 @@
   password = form.password
 )>
 
-<!--- Debugging: dump the authentication result and auth service state 
+<!--- 
+Debugging: dump the authentication result and auth service state - uncomment for troubleshooting.
 <cfdump var="#authResult#" label="Authentication Result">
 <cfif authResult.success>
   <cfset application.authService.createSession(authResult.user)>
