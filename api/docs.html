@@ -724,8 +724,8 @@ GET /api/v1/flags?return=xml&amp;token=uhcs_...</pre>
                                 <div class="card-body">
                                         <p class="mb-3">Returns a lightweight list of active users flagged as <code>Clinical-Attending</code>. This quickpull is intended for consumers that need a curated roster without the full person profile payload.</p>
 
-                                        <h6>Configurable Response Sections</h6>
-                                        <p>Admin users can enable additional per-user sections in <strong>Settings &gt; UHCO API</strong>. Depending on configuration, rows may also include <code>GENERAL</code>, <code>CONTACT</code>, <code>BIOGRAPHICAL</code>, <code>IMAGES</code>, <code>EXTERNALIDS</code>, <code>ORGANIZATIONS</code>, and <code>FLAGS</code>.</p>
+                                        <h6>Configurable Response Items</h6>
+                                        <p>Admin users manage quickpull output in <strong>Settings &gt; UHCO API &gt; Quickpulls</strong>. Each quickpull keeps its default return fields, then can append specific general fields, selected email types, selected phone types, selected address types, selected biographical items, selected image variants, selected external systems, and optional full <code>ORGANIZATIONS</code> or <code>FLAGS</code> arrays.</p>
 
                                         <h6>Authentication</h6>
                                         <p>Requires a valid API token with <code>read</code> scope. No secret is required.</p>
@@ -740,10 +740,15 @@ GET /api/v1/flags?return=xml&amp;token=uhcs_...</pre>
             "MIDDLENAME": "A",
             "LASTNAME": "Doe",
             "DEGREES": "O.D.",
-            "FULLNAME": "Jane A Doe, O.D."
+            "FULLNAME": "Jane A Doe, O.D.",
+            "PHONE_OFFICE": "713-555-1212",
+            "IMAGE_WEB_THUMB": "/published_images/web_thumb/42.jpg"
         }
     ]
 }</pre>
+
+                                        <h6 class="mt-3">Notes</h6>
+                                        <p>Configured append fields are added as top-level keys on each row. Examples include <code>EMAIL_CENTRAL</code>, <code>PHONE_OFFICE</code>, <code>ADDRESS_BUSINESS</code>, <code>IMAGE_WEB_THUMB</code>, and <code>EXTERNALID_COUGARNET</code>.</p>
 
                                         <h6 class="mt-3">Example Requests</h6>
                                         <pre class="example">GET /api/v1/quickpulls/attending?token=uhcs_...</pre>
@@ -759,8 +764,8 @@ GET /api/v1/flags?return=xml&amp;token=uhcs_...</pre>
                                 <div class="card-body">
                                         <p class="mb-3">Returns active alumni for a single graduation year as a flat list, filtered to a specific academic program organization. Each result includes the matched <code>PROGRAM</code>, a combined <code>FULLNAME</code>, and image URLs for the <code>interactive_roster</code>, <code>KIOSK_ROSTER</code>, and <code>KIOSK_PROFILE</code> variants. This endpoint is protected because it exposes alumni data.</p>
 
-                                        <h6>Configurable Response Sections</h6>
-                                        <p>Admin users can enable additional per-user sections in <strong>Settings &gt; UHCO API</strong>. Depending on configuration, rows may also include <code>GENERAL</code>, <code>CONTACT</code>, <code>BIOGRAPHICAL</code>, <code>IMAGES</code>, <code>EXTERNALIDS</code>, <code>ORGANIZATIONS</code>, and <code>FLAGS</code>.</p>
+                                        <h6>Configurable Response Items</h6>
+                                        <p>Admin users manage quickpull output in <strong>Settings &gt; UHCO API &gt; Quickpulls</strong>. Each quickpull keeps its default return fields, then can append specific general fields, selected email types, selected phone types, selected address types, selected biographical items, selected image variants, selected external systems, and optional full <code>ORGANIZATIONS</code> or <code>FLAGS</code> arrays.</p>
 
                                         <h6>Authentication</h6>
                                         <p>Requires both a valid API token and a valid secret that unlocks the <code>Alumni</code> flag.</p>
@@ -792,13 +797,15 @@ GET /api/v1/flags?return=xml&amp;token=uhcs_...</pre>
             "FULLNAME": "Alex Smith",
             "INTERACTIVEUSERIMAGE": "/published_images/interactive_roster/314.jpg",
             "KIOSKROSTERIMAGE": "/published_images/kiosk_roster/314.jpg",
-            "KIOSKPROFILEIMAGE": "/published_images/kiosk_profile/314.jpg"
+            "KIOSKPROFILEIMAGE": "/published_images/kiosk_profile/314.jpg",
+            "EMAIL_CENTRAL": "alex.smith@uh.edu",
+            "EXTERNALID_COUGARNET": "asmith7"
         }
     ]
 }</pre>
 
                                         <h6 class="mt-3">Notes</h6>
-                                        <p>Returned users must have the <code>Alumni</code> flag and belong to the selected academic program org. If a user does not have one or more of those image variants, the corresponding image field is still included with an empty string value.</p>
+                                        <p>Returned users must have the <code>Alumni</code> flag and belong to the selected academic program org. If a user does not have one or more default image variants, the corresponding image field is still included with an empty string value. Configured append fields are added as top-level keys such as <code>EMAIL_CENTRAL</code>, <code>PHONE_MOBILE</code>, <code>IMAGE_WEB_THUMB</code>, or <code>EXTERNALID_COUGARNET</code>.</p>
 
                                         <h6 class="mt-3">Example Requests</h6>
                                         <pre class="example">GET /api/v1/quickpulls/gradclass?year=2026&amp;program=OD+Program&amp;secret=uhcs_sec_...&amp;token=uhcs_...
@@ -815,8 +822,8 @@ GET /api/v1/quickpulls/gradclass?year=2026&amp;program=PhD+Program&amp;secret=uh
                                 <div class="card-body">
                                         <p class="mb-3">Returns a single alumni-oriented quickpull record by <code>UserID</code>, including academic fields, externship and hometown details, earned degrees, awards, and image URLs when available.</p>
 
-                                        <h6>Configurable Response Sections</h6>
-                                        <p>Admin users can enable additional sections in <strong>Settings &gt; UHCO API</strong>. Depending on configuration, the returned record may also include <code>GENERAL</code>, <code>CONTACT</code>, <code>BIOGRAPHICAL</code>, <code>IMAGES</code>, <code>EXTERNALIDS</code>, <code>ORGANIZATIONS</code>, and <code>FLAGS</code>.</p>
+                                        <h6>Configurable Response Items</h6>
+                                        <p>Admin users manage quickpull output in <strong>Settings &gt; UHCO API &gt; Quickpulls</strong>. Each quickpull keeps its default return fields, then can append specific general fields, selected email types, selected phone types, selected address types, selected biographical items, selected image variants, selected external systems, and optional full <code>ORGANIZATIONS</code> or <code>FLAGS</code> arrays.</p>
 
                                         <h6>Authentication</h6>
                                         <p>Requires both a valid API token and a valid secret that unlocks the <code>Alumni</code> flag.</p>
@@ -854,12 +861,24 @@ GET /api/v1/quickpulls/gradclass?year=2026&amp;program=PhD+Program&amp;secret=uh
         ],
         "INTERACTIVEUSERIMAGE": "/published_images/interactive_roster/314.jpg",
         "KIOSKROSTERIMAGE": "/published_images/kiosk_roster/314.jpg",
-        "KIOSKPROFILEIMAGE": "/published_images/kiosk_profile/314.jpg"
+        "KIOSKPROFILEIMAGE": "/published_images/kiosk_profile/314.jpg",
+        "EMAIL_CENTRAL": "alex.smith@uh.edu",
+        "ADDRESS_BUSINESS": {
+            "ADDRESSTYPE": "Business",
+            "ADDRESS1": "4901 Calhoun Rd",
+            "CITY": "Houston",
+            "STATE": "TX",
+            "ZIPCODE": "77204"
+        },
+        "EXTERNALID_COUGARNET": "asmith7",
+        "FLAGS": [
+            { "FLAGID": 1, "FLAGNAME": "Alumni" }
+        ]
     }
 }</pre>
 
                                         <h6 class="mt-3">Notes</h6>
-                                        <p>If the <code>UserID</code> does not exist, is inactive, or is not flagged as <code>Alumni</code>, the endpoint returns an empty object in <code>DATA</code> rather than a full profile. If any image variant is unavailable, its field is still present with an empty string value.</p>
+                                        <p>If the <code>UserID</code> does not exist, is inactive, or is not flagged as <code>Alumni</code>, the endpoint returns an empty object in <code>DATA</code> rather than a full profile. If any default image variant is unavailable, its field is still present with an empty string value. Configured append fields are added directly to the returned graduate record rather than being grouped into section objects.</p>
 
                                         <h6 class="mt-3">Example Requests</h6>
                                         <pre class="example">GET /api/v1/quickpulls/graduate?id=314&amp;secret=uhcs_sec_...&amp;token=uhcs_...</pre>
@@ -875,8 +894,8 @@ GET /api/v1/quickpulls/gradclass?year=2026&amp;program=PhD+Program&amp;secret=uh
                                 <div class="card-body">
                                         <p class="mb-3">Returns active users flagged as <code>Deans</code>, enriched with a combined <code>FULLNAME</code> and the first available <code>KIOSK_NON_GRID</code> image URL for each person.</p>
 
-                                        <h6>Configurable Response Sections</h6>
-                                        <p>Admin users can enable additional per-user sections in <strong>Settings &gt; UHCO API</strong>. Depending on configuration, rows may also include <code>GENERAL</code>, <code>CONTACT</code>, <code>BIOGRAPHICAL</code>, <code>IMAGES</code>, <code>EXTERNALIDS</code>, <code>ORGANIZATIONS</code>, and <code>FLAGS</code>.</p>
+                                        <h6>Configurable Response Items</h6>
+                                        <p>Admin users manage quickpull output in <strong>Settings &gt; UHCO API &gt; Quickpulls</strong>. Each quickpull keeps its default return fields, then can append specific general fields, selected email types, selected phone types, selected address types, selected biographical items, selected image variants, selected external systems, and optional full <code>ORGANIZATIONS</code> or <code>FLAGS</code> arrays.</p>
 
                                         <h6>Authentication</h6>
                                         <p>Requires a valid API token with <code>read</code> scope. No secret is required.</p>
@@ -891,10 +910,17 @@ GET /api/v1/quickpulls/gradclass?year=2026&amp;program=PhD+Program&amp;secret=uh
             "MIDDLENAME": "",
             "LASTNAME": "Brown",
             "FULLNAME": "Taylor Brown",
-            "KIOSKNONGRIDIMAGE": "/published_images/kiosk_non_grid/21.jpg"
+            "KIOSKNONGRIDIMAGE": "/published_images/kiosk_non_grid/21.jpg",
+            "TITLE1": "Dean",
+            "ORGANIZATIONS": [
+                { "ORGID": 7, "ORGNAME": "College Leadership" }
+            ]
         }
     ]
 }</pre>
+
+                                        <h6 class="mt-3">Notes</h6>
+                                        <p>Configured append fields are added as top-level keys on each row. If <code>ORGANIZATIONS</code> or <code>FLAGS</code> are enabled for this quickpull, they are appended as full arrays.</p>
 
                                         <h6 class="mt-3">Example Requests</h6>
                                         <pre class="example">GET /api/v1/quickpulls/deans?token=uhcs_...</pre>

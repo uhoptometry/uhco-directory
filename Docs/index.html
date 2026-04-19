@@ -221,6 +221,7 @@
       <section class="card" id="api">
         <h2>7. REST API</h2>
         <p>The API is rooted at <code>/api/v1/</code> and is read-only. All requests require a valid Bearer token, and some protected data additionally requires a secret.</p>
+        <p>For full endpoint reference, authentication examples, quickpull behavior, and response samples, see the dedicated API documentation at <a href="/api/docs.html" target="_blank" rel="noopener">/api/docs.html</a>.</p>
         <h3>Key Endpoints</h3>
         <pre><code>GET /api/v1/people
 GET /api/v1/people/{id}
@@ -443,6 +444,7 @@ GET /api/v1/flags</code></pre>
               <tr><td><code>admin/external/</code></td><td>External system CRUD.</td></tr>
               <tr><td><code>UserReview/</code></td><td>End-user self-service profile review flow with separate authentication.</td></tr>
               <tr><td><code>api/v1/</code></td><td>REST API sub-application and route dispatcher.</td></tr>
+              <tr><td><code>api/docs.html</code></td><td>Dedicated API reference with authentication guidance, endpoint details, and quickpull examples.</td></tr>
               <tr><td><code>cfc/</code></td><td>Service layer components.</td></tr>
               <tr><td><code>dao/</code></td><td>DAO layer including <code>BaseDAO.cfc</code>.</td></tr>
               <tr><td><code>sql/</code></td><td>Schema creation, migration, and utility scripts.</td></tr>
