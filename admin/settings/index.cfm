@@ -134,6 +134,19 @@
         </a>
     </div>
 
+    <!--- Application Settings --->
+    <div class="col-md-6 col-lg-4">
+        <a href="/admin/settings/app-config/" class="text-decoration-none">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-sliders display-4 mb-3"></i>
+                    <h5 class="card-title text-dark">Application Settings</h5>
+                    <p class="card-text text-muted small">Shared key-value configuration such as published media URLs</p>
+                </div>
+            </div>
+        </a>
+    </div>
+
     <!--- Workflows --->
     <div class="col-md-6 col-lg-4">
         <a href="/admin/settings/workflows/" class="text-decoration-none">

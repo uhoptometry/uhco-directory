@@ -34,11 +34,14 @@
 <cfset content = "
 <div class='d-flex justify-content-between align-items-center mb-2'>
     <h1>User Media</h1>
+    <div class='d-flex gap-2'>
+        <a href='#request.webRoot#/admin/user-media/bulk-transfer.cfm' class='btn btn-outline-secondary'>
+            <i class='bi bi-arrow-left-right me-1'></i> Bulk Transfer
+        </a>
 ">
 
 <cfif application.authService.hasRole("SUPER_ADMIN")>
     <cfset content &= "
-    <div class='d-flex gap-2'>
         <a href='/admin/settings/media-config/filename-patterns.cfm' class='btn btn-outline-secondary'>
             <i class='bi bi-file-earmark-text me-1'></i> Filename Patterns
         </a>

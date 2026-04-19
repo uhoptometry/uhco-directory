@@ -24,7 +24,6 @@ component output="false" singleton {
 
     // PUBLISHING SWAP POINT: change these when moving to S3/CDN.
     variables.publishedWebDir  = "/_published_images/";
-    variables.publishedBaseUrl = "http://127.0.0.1/_published_images/";
 
 
     public any function init() {
@@ -32,10 +31,11 @@ component output="false" singleton {
         variables.VariantDAO   = createObject("component", "dao.UserImageVariantDAO").init();
         variables.UsersService = createObject("component", "cfc.users_service").init();
         variables.VariantService = createObject("component", "cfc.UserImageVariantService").init();
+        variables.MediaConfigService = createObject("component", "cfc.mediaConfig_service").init();
 
         var cfc_dir = getDirectoryFromPath( getCurrentTemplatePath() );
-        var rawPublished = cfc_dir & "..\_published_images";
-        var rawVariants  = cfc_dir & "..\_temp_variants";
+        var rawPublished = cfc_dir & "..\..\_published_images";
+        var rawVariants  = cfc_dir & "..\..\_temp_variants";
 
         var jFile = createObject("java", "java.io.File");
         variables.publishedDirAbsolute = jFile.init(rawPublished).getCanonicalPath() & "\";
@@ -264,7 +264,7 @@ component output="false" singleton {
     /**
      * Build the published filename.
      *
-     * Convention: [firstname]_[middleinitial]_[lastname]_[userid]_[variant].[ext]
+     * Convention: [firstinitial]_[middleinitial]_[lastname]_u[userid]_[variant].[ext]
      * All parts are lowercased and non-alphanumeric chars are stripped.
      */
     private string function _buildPublishedFilename(
@@ -273,25 +273,14 @@ component output="false" singleton {
         required string tempFilename,
         numeric userImageSourceID = 0
     ) {
-        var firstName   = lCase(reReplace(trim(arguments.user.FIRSTNAME ?: ""), "[^a-zA-Z0-9]", "", "ALL"));
-        var middleName  = trim(arguments.user.MIDDLENAME ?: "");
-        var middleInit  = len(middleName) ? lCase(left(middleName, 1)) : "";
-        var lastName    = lCase(reReplace(trim(arguments.user.LASTNAME ?: ""), "[^a-zA-Z0-9]", "", "ALL"));
-        var userID      = val(arguments.user.USERID ?: 0);
-        var safeVariant = lCase(reReplace(trim(arguments.variantCode), "[^a-zA-Z0-9_\-]", "_", "ALL"));
         var ext         = lCase(listLast(arguments.tempFilename, "."));
 
-        var parts = [];
-        if ( len(firstName) )   { arrayAppend(parts, firstName); }
-        if ( len(middleInit) )  { arrayAppend(parts, middleInit); }
-        if ( len(lastName) )    { arrayAppend(parts, lastName); }
-        arrayAppend(parts, userID);
-        if ( val(arguments.userImageSourceID) GT 0 ) {
-            arrayAppend(parts, "src" & val(arguments.userImageSourceID));
-        }
-        arrayAppend(parts, safeVariant);
-
-        return arrayToList(parts, "_") & "." & ext;
+        return variables.MediaConfigService.buildPublishedFilename(
+            user              = arguments.user,
+            variantCode       = arguments.variantCode,
+            extension         = ext,
+            userImageSourceID = arguments.userImageSourceID
+        );
     }
 
 
@@ -300,7 +289,7 @@ component output="false" singleton {
      * PUBLISHING SWAP POINT: replace with S3/CDN URL construction.
      */
     private string function _buildPublishedUrl( required string filename ) {
-        return variables.publishedBaseUrl & arguments.filename;
+        return variables.MediaConfigService.buildPublishedUrl( arguments.filename );
     }
 
 

@@ -43,6 +43,32 @@
 
 <div class="row g-4">
 
+    <!--- Publishing Settings Card --->
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="bg-info bg-opacity-10 rounded-3 p-3 me-3">
+                        <i class="bi bi-globe fs-3 text-info"></i>
+                    </div>
+                    <div>
+                        <h5 class="card-title mb-0">Publishing Settings</h5>
+                        <p class="text-muted small mb-0">Environment-specific published media URLs</p>
+                    </div>
+                </div>
+                <p class="card-text small">
+                    Configure the base site URL used when writing <code>UserImages.ImageURL</code>
+                    so local development and production can use different domains safely.
+                </p>
+                <div class="mt-auto">
+                    <a href="/admin/settings/app-config/" class="btn btn-info text-white">
+                        <i class="bi bi-pencil-square me-1"></i> Manage App Settings
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!--- Filename Patterns Card --->
     <div class="col-md-6">
         <div class="card shadow-sm h-100">

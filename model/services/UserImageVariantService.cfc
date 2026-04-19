@@ -67,8 +67,8 @@ component output="false" singleton {
         // safely so directoryExists/fileExists never receive dotted paths.
         var cfc_dir = getDirectoryFromPath( getCurrentTemplatePath() );
 
-        var rawSource  = cfc_dir & "..\_temp_source";
-        var rawVariant = cfc_dir & "..\_temp_variants";
+        var rawSource  = cfc_dir & "..\..\_temp_source";
+        var rawVariant = cfc_dir & "..\..\_temp_variants";
 
         var jFile = createObject("java", "java.io.File");
 
@@ -363,10 +363,10 @@ component output="false" singleton {
     ) {
         // Resolve the absolute disk path of the source file.
         // DROPBOX SWAP POINT: replace this with a Dropbox download call.
-        var sourceFilename    = listLast(arguments.source.DROPBOXPATH, "/\");
-        var sourceAbsolutePath = variables.localSourceDirAbsolute & sourceFilename;
+        var sourceFilename     = listLast(arguments.source.DROPBOXPATH, "/\\");
+        var sourceAbsolutePath = _resolveSourceAbsolutePath( arguments.source.DROPBOXPATH ?: "" );
 
-        if ( !fileExists(sourceAbsolutePath) ) {
+        if ( !len(sourceAbsolutePath) OR !fileExists(sourceAbsolutePath) ) {
             throw(
                 type    = "UserImageVariantService.SourceNotFound",
                 message = "Source file not found on disk: #sourceFilename#. Ensure the file exists in the source directory."
@@ -495,6 +495,28 @@ component output="false" singleton {
             return arguments.maxValue;
         }
         return arguments.value;
+    }
+
+    /**
+     * Resolve a logical /_temp_source/... path to a canonical absolute path.
+     * Nested source folders are supported; traversal is rejected.
+     */
+    private string function _resolveSourceAbsolutePath( required string sourcePath ) {
+        var relativePath = trim( arguments.sourcePath );
+        var normalizedRelative = "";
+
+        if ( left(relativePath, 14) EQ "/_temp_source/" ) {
+            relativePath = mid( relativePath, 15, len(relativePath) );
+        }
+
+        relativePath = replace( relativePath, "/", "\\", "all" );
+        normalizedRelative = reReplace( relativePath, "^[\\/]+", "", "all" );
+
+        if ( !len(normalizedRelative) OR find("..", normalizedRelative) ) {
+            return "";
+        }
+
+        return variables.localSourceDirAbsolute & normalizedRelative;
     }
 
 }

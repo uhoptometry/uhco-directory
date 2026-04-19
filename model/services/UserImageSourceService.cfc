@@ -41,7 +41,7 @@ component output="false" singleton {
         // getCanonicalPath() resolves ".." so directoryExists/directoryList never
         // receive a dotted path, which some CF engines reject.
         var cfc_dir   = getDirectoryFromPath( getCurrentTemplatePath() );
-        var rawPath   = cfc_dir & "..\_temp_source";
+        var rawPath   = cfc_dir & "..\..\_temp_source";
         var canonical = createObject("java", "java.io.File").init( rawPath ).getCanonicalPath();
         variables.localSourceDirAbsolute = canonical & "\";
 
@@ -320,22 +320,48 @@ component output="false" singleton {
      */
     private boolean function _isValidProviderPath( required string path ) {
         var p = trim( arguments.path );
+        var absolutePath = "";
+        var ext = "";
 
         // Must start with the known local source prefix (prevents path traversal).
-        if ( !findNoCase(variables.localSourceDir, p) ) {
+        if ( left( p, len(variables.localSourceDir) ) NEQ variables.localSourceDir ) {
             return false;
         }
 
-        var filename = listLast( p, "/\" );
-        var ext      = lCase( listLast(filename, ".") );
-
+        ext = lCase( listLast(p, ".") );
         if ( !arrayFindNoCase(variables.allowedExtensions, ext) ) {
             return false;
         }
 
-        // Confirm the file actually exists on disk using the absolute path.
-        var filename = listLast( p, "/\" );
-        return fileExists( variables.localSourceDirAbsolute & filename );
+        absolutePath = _resolveProviderAbsolutePath( p );
+        return len(absolutePath) AND fileExists( absolutePath );
+    }
+
+    /**
+     * Convert a logical provider path like /_temp_source/2025/file.jpg into
+     * an absolute local disk path while rejecting traversal.
+     */
+    private string function _resolveProviderAbsolutePath( required string providerPath ) {
+        var relativePath = trim( arguments.providerPath );
+        var normalizedRelative = "";
+
+        if ( left( relativePath, len(variables.localSourceDir) ) NEQ variables.localSourceDir ) {
+            return "";
+        }
+
+        relativePath = mid( relativePath, len(variables.localSourceDir) + 1, len(relativePath) );
+        relativePath = replace( relativePath, "/", "\\", "all" );
+        normalizedRelative = reReplace( relativePath, "^[\\/]+", "", "all" );
+
+        if ( !len(normalizedRelative) ) {
+            return "";
+        }
+
+        if ( find("..", normalizedRelative) ) {
+            return "";
+        }
+
+        return variables.localSourceDirAbsolute & normalizedRelative;
     }
 
 
