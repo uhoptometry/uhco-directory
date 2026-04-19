@@ -26,6 +26,8 @@
 
     <!--- ── Grad Class ────────────────────────────────────────────── --->
     <cfcase value="gradclass">
+        <cfset allowedPrograms = ["OD Program", "PhD Program", "MS Program"]>
+
         <!--- Require secret that unlocks Alumni --->
         <cfset unlockedFlags = auth.checkSecret()>
         <cfif NOT arrayFindNoCase(unlockedFlags, "Alumni")>
@@ -38,7 +40,16 @@
         </cfif>
         <cfset gradYear = int(val(url.year))>
 
-        <cfset data = qpService.getGradClass(gradYear)>
+        <!--- Require ?program= parameter --->
+        <cfset programName = trim(url.program ?: "")>
+        <cfif NOT len(programName)>
+            <cfset auth.sendError(400, "Missing required parameter: program")>
+        </cfif>
+        <cfif NOT arrayFindNoCase(allowedPrograms, programName)>
+            <cfset auth.sendError(400, "Invalid program. Allowed values: OD Program, PhD Program, MS Program")>
+        </cfif>
+
+        <cfset data = qpService.getGradClass(gradYear, programName)>
         <cfset auth.sendResponse({ total: arrayLen(data), data: data })>
         <cfabort>
     </cfcase>

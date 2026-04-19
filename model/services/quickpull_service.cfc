@@ -29,8 +29,8 @@ component output="false" singleton {
      * Alumni graduation class quick pull.
      * Flat list filtered by grad year: UserID, FirstName, MiddleName, LastName, CurrentGradYear.
      */
-    public array function getGradClass( required numeric gradYear ) {
-        var users = variables.dao.getGradClassUsers( arguments.gradYear );
+    public array function getGradClass( required numeric gradYear, required string programName ) {
+        var users = variables.dao.getGradClassUsers( arguments.gradYear, arguments.programName );
         if ( arrayLen(users) == 0 ) return [];
 
         var ids = [];

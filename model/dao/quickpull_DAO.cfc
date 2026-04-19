@@ -31,14 +31,19 @@ component extends="dao.BaseDAO" output="false" singleton {
      * Alumni filtered to a specific graduation year.
      * Returns: UserID, FirstName, MiddleName, LastName, CurrentGradYear
      */
-    public array function getGradClassUsers( required numeric gradYear ) {
+    public array function getGradClassUsers( required numeric gradYear, required string programName ) {
         var qry = executeQueryWithRetry(
             "SELECT u.UserID, u.FirstName, u.MiddleName, u.LastName,
-                    uai.CurrentGradYear
+                    uai.CurrentGradYear,
+                    o.OrgName AS Program
              FROM   Users u
                     INNER JOIN UserAcademicInfo uai ON u.UserID = uai.UserID
+                    INNER JOIN UserOrganizations uo ON u.UserID = uo.UserID
+                    INNER JOIN Organizations o ON uo.OrgID = o.OrgID
              WHERE  u.Active = 1
                AND  uai.CurrentGradYear = :gradYear
+               AND  o.OrgName = :programName
+               AND  o.OrgName IN ('OD Program', 'PhD Program', 'MS Program')
                AND  EXISTS (
                         SELECT 1
                         FROM   UserFlagAssignments ufa
@@ -47,7 +52,10 @@ component extends="dao.BaseDAO" output="false" singleton {
                           AND  uf.FlagName = 'Alumni'
                     )
              ORDER BY u.LastName, u.FirstName",
-            { gradYear = { value=arguments.gradYear, cfsqltype="cf_sql_integer" } },
+            {
+                gradYear = { value=arguments.gradYear, cfsqltype="cf_sql_integer" },
+                programName = { value=arguments.programName, cfsqltype="cf_sql_varchar" }
+            },
             { datasource=variables.datasource, timeout=30, fetchSize=500 }
         );
         return queryToArray(qry);

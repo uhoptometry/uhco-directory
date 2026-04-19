@@ -777,21 +777,24 @@ component output="false" singleton {
     ) {
         var normalizedPath = lCase( replace(arguments.relativeDirectory, "/", "\\", "all") );
         var searchTerm = lCase( trim(arguments.folderName) );
+        var pathSegments = [];
 
         if ( !len(searchTerm) ) {
             return false;
         }
 
-        normalizedPath = "\\" & normalizedPath;
-        if ( right(normalizedPath, 1) NEQ "\\" ) {
-            normalizedPath &= "\\";
+        if ( !len(normalizedPath) ) {
+            return false;
         }
 
-        if ( findNoCase( "\\" & searchTerm & "\\", normalizedPath ) ) {
-            return true;
+        pathSegments = listToArray( normalizedPath, "\\" );
+        for ( var segment in pathSegments ) {
+            if ( compareNoCase(trim(segment), searchTerm) EQ 0 ) {
+                return true;
+            }
         }
 
-        return findNoCase( searchTerm, normalizedPath ) GT 0;
+        return false;
     }
 
     private string function _resolveOutputExtension(

@@ -116,7 +116,7 @@
             <div class='col-md-6 col-lg-4'>
                 <label for='folderName' class='form-label'>Folder Name</label>
                 <input type='text' class='form-control' id='folderName' name='folder' value='#encodeForHTMLAttribute(folderName)#' placeholder='e.g. 2025' required>
-                <div class='form-text'>Matches any image whose path under <code>/_temp_source/</code> contains this folder segment.</div>
+                <div class='form-text'>Matches images only when the path under <code>/_temp_source/</code> contains an exact folder segment with this name.</div>
             </div>
             <div class='col-md-3 col-lg-2'>
                 <label for='sourceKey' class='form-label'>Source Key</label>
