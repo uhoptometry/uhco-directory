@@ -76,8 +76,6 @@ This repository already includes richer HTML documentation:
 
 - app documentation: [Docs/index.html](Docs/index.html)
 - API documentation: [api/docs.html](api/docs.html)
-- deployment task notes: [DEPLOY_TASKS.md](DEPLOY_TASKS.md)
-- git workflow notes: [GIT_CHEATSHEET.md](GIT_CHEATSHEET.md)
 
 ## Local / Server Setup
 
