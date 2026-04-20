@@ -113,6 +113,8 @@ Important tables include:
 
 Schema and migration scripts live under [sql](sql).
 
+Versioned schema migrations are now intended to live under [sql/migrations](sql/migrations), with workflow notes in [DB_MIGRATIONS.md](DB_MIGRATIONS.md).
+
 ## Project Structure
 
 ```text
