@@ -7,6 +7,7 @@ examples/
 sql/
 xml/
 scripts/
+x_attending_wallboard/
 
 # File types
 *.csv

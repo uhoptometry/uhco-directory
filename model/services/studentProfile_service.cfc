@@ -26,6 +26,10 @@ component output="false" singleton {
         });
     }
 
+    public void function syncHometown( required numeric userID, string hometownCity = "", string hometownState = "" ) {
+        variables.ProfileDAO.saveHometown( userID, trim(arguments.hometownCity), trim(arguments.hometownState) );
+    }
+
     public void function replaceAwards( required numeric userID, required array awards ) {
         variables.ProfileDAO.replaceAwards( userID, awards );
     }

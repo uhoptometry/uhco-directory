@@ -11,6 +11,49 @@
 <cfset userID = val(form.userID)>
 <cfset section = lCase(trim(form.section))>
 
+<cffunction name="getFieldValue" access="private" returntype="string" output="false">
+    <cfargument name="value" required="true">
+    <cfif isStruct(arguments.value) AND structKeyExists(arguments.value, "value")>
+        <cfreturn trim(arguments.value.value ?: "")>
+    </cfif>
+    <cfreturn trim(arguments.value ?: "")>
+</cffunction>
+
+<cffunction name="isStudentHometownSyncUser" access="private" returntype="boolean" output="false">
+    <cfargument name="userID" type="numeric" required="true">
+    <cfset var flagsService = createObject("component", "cfc.flags_service").init()>
+    <cfset var userFlags = flagsService.getUserFlags(arguments.userID).data>
+    <cfset var userFlag = {}>
+    <cfloop array="#userFlags#" index="userFlag">
+        <cfif listFindNoCase("current-student,current student,alumni", trim(userFlag.FLAGNAME ?: "")) GT 0>
+            <cfreturn true>
+        </cfif>
+    </cfloop>
+    <cfreturn false>
+</cffunction>
+
+<cffunction name="syncStudentProfileHometownFromAddresses" access="private" returntype="void" output="false">
+    <cfargument name="userID" type="numeric" required="true">
+    <cfargument name="addresses" type="array" required="true">
+    <cfset var studentProfileSvc = createObject("component", "cfc.studentProfile_service").init()>
+    <cfset var addressRow = {}>
+    <cfset var hometownCity = "">
+    <cfset var hometownState = "">
+
+    <cfif NOT isStudentHometownSyncUser(arguments.userID)>
+        <cfreturn>
+    </cfif>
+
+    <cfloop array="#arguments.addresses#" index="addressRow">
+        <cfif compareNoCase(getFieldValue(addressRow.AddressType ?: ""), "Hometown") EQ 0>
+            <cfset hometownCity = getFieldValue(addressRow.City ?: "")>
+            <cfset hometownState = getFieldValue(addressRow.State ?: "")>
+        </cfif>
+    </cfloop>
+
+    <cfset studentProfileSvc.syncHometown(arguments.userID, hometownCity, hometownState)>
+</cffunction>
+
 <!--- Proper-case helper: "JANE DOE" / "jane doe" → "Jane Doe", handles McX / O'X / hyphens --->
 <cffunction name="toProperName" access="private" returntype="string" output="false">
     <cfargument name="input" type="string" required="true">
@@ -199,6 +242,7 @@
             </cfif>
         </cfloop>
         <cfset addressesSvc.replaceAddresses(userID, addressesToSave)>
+        <cfset syncStudentProfileHometownFromAddresses(userID, addressesToSave)>
         <cfoutput>{"success":true,"message":"Addresses saved."}</cfoutput>
     </cfcase>
 
@@ -219,6 +263,9 @@
             isPrimary   = { value=val(form.primary ?: 0), cfsqltype="cf_sql_bit" }
         }>
         <cfset result = addressesSvc.addAddress(addrData)>
+        <cfif compareNoCase(trim(form.type ?: ""), "Hometown") EQ 0>
+            <cfset syncStudentProfileHometownFromAddresses(userID, [addrData])>
+        </cfif>
         <cfoutput>{"success":true,"message":"Address added.","addressID":#result.addressID#}</cfoutput>
     </cfcase>
 

@@ -13,6 +13,7 @@
 <cfset runDetails = []>
 <cfset justRan    = false>
 <cfset runError   = "">
+<cfset startedByUser = trim(session.user.username ?: session.user.displayName ?: "admin")>
 
 <!--- ── Mode 1: Execute new import from uploaded file ── --->
 <cfif cgi.request_method EQ "POST" AND structKeyExists(form, "confirm") AND form.confirm EQ "1">
@@ -31,7 +32,7 @@
                 templateKey = session.import_templateKey,
                 rows        = parsedData.rows,
                 fileName    = session.import_fileName,
-                startedBy   = session.user.cougarnet
+                startedBy   = startedByUser
             )>
 
             <!--- Clean up temp file --->

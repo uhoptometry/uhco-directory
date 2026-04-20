@@ -87,6 +87,16 @@
 <h1 class="mb-1"><i class="bi #tpl.icon# me-2"></i>Import: #tpl.label#</h1>
 <p class="text-muted mb-4">#tpl.description#</p>
 
+<cfif tpl.isGeneratedTemplate ?: false>
+    <div class="alert alert-info d-flex align-items-start gap-2">
+        <i class="bi bi-info-circle fs-5 mt-1"></i>
+        <div>
+            Generate this template from a filtered cohort first so the file includes the correct identity columns and import mode.
+            <a href="generate.cfm?template=#urlEncodedFormat(tpl.key)#" class="alert-link">Open template generator</a>
+        </div>
+    </div>
+</cfif>
+
 <!--- ── Upload Form ── --->
 <cfif NOT showPreview>
     <div class="card shadow-sm mb-4" style="max-width:600px;">
@@ -104,9 +114,15 @@
                 <cfif arrayLen(tpl.optionalCols)>
                     <strong>Optional columns:</strong> #arrayToList(tpl.optionalCols, ", ")#<br>
                 </cfif>
-                <a href="templates/#tpl.key#_template.csv" download class="mt-1 d-inline-block">
-                    <i class="bi bi-download me-1"></i>Download blank CSV template
-                </a>
+                <cfif tpl.isGeneratedTemplate ?: false>
+                    <a href="generate.cfm?template=#urlEncodedFormat(tpl.key)#" class="mt-1 d-inline-block">
+                        <i class="bi bi-sliders me-1"></i>Generate filtered CSV template
+                    </a>
+                <cfelse>
+                    <a href="templates/#tpl.key#_template.csv" download class="mt-1 d-inline-block">
+                        <i class="bi bi-download me-1"></i>Download blank CSV template
+                    </a>
+                </cfif>
             </div>
 
             <form method="post" enctype="multipart/form-data">

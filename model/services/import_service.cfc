@@ -6,6 +6,7 @@ component output="false" singleton {
         variables.flagsSvc    = createObject("component", "cfc.flags_service").init();
         variables.orgsSvc     = createObject("component", "cfc.organizations_service").init();
         variables.studentSvc  = createObject("component", "cfc.studentProfile_service").init();
+        variables.bulkImportSvc = createObject("component", "cfc.bulkImport_service").init();
         return this;
     }
 
@@ -14,14 +15,15 @@ component output="false" singleton {
        ================================================================ */
 
     public array function getTemplates() {
-        return [
+        var templates = [
             {
                 key         = "users",
                 label       = "Users",
                 description = "Create new user records. Required: FirstName, LastName. Optional: EmailPrimary, Title1, Title2, Title3, Room, Building, Prefix, Suffix, Degrees, Campus, Division, DivisionName, Department, DepartmentName, Office_Mailing_Address, Mailcode.",
                 requiredCols = ["FirstName","LastName"],
                 optionalCols = ["EmailPrimary","Title1","Title2","Title3","Room","Building","Prefix","Suffix","Degrees","Campus","Division","DivisionName","Department","DepartmentName","Office_Mailing_Address","Mailcode"],
-                icon         = "bi-person-plus"
+                icon         = "bi-person-plus",
+                workflow     = "direct"
             },
             {
                 key         = "flags",
@@ -29,7 +31,8 @@ component output="false" singleton {
                 description = "Assign flags to existing users. Required: UserID, FlagID. Duplicates are automatically skipped.",
                 requiredCols = ["UserID","FlagID"],
                 optionalCols = [],
-                icon         = "bi-flag"
+                icon         = "bi-flag",
+                workflow     = "direct"
             },
             {
                 key         = "orgs",
@@ -37,7 +40,8 @@ component output="false" singleton {
                 description = "Assign users to organizations. Required: UserID, OrgID. Optional: RoleTitle, RoleOrder.",
                 requiredCols = ["UserID","OrgID"],
                 optionalCols = ["RoleTitle","RoleOrder"],
-                icon         = "bi-diagram-3"
+                icon         = "bi-diagram-3",
+                workflow     = "direct"
             },
             {
                 key         = "student_academic",
@@ -45,9 +49,16 @@ component output="false" singleton {
                 description = "Update student profile data. Required: UserID. Optional: HometownCity, HometownState, FirstExternship, SecondExternship, DOB (MM/DD/YYYY), Gender, CommencementAge.",
                 requiredCols = ["UserID"],
                 optionalCols = ["HometownCity","HometownState","FirstExternship","SecondExternship","DOB","Gender","CommencementAge"],
-                icon         = "bi-mortarboard"
+                icon         = "bi-mortarboard",
+                workflow     = "direct"
             }
         ];
+
+        for (var bulkTemplate in variables.bulkImportSvc.getTemplates()) {
+            arrayAppend(templates, bulkTemplate);
+        }
+
+        return templates;
     }
 
     /**
@@ -151,6 +162,10 @@ component output="false" singleton {
      * Returns { valid=bool, errors=[], missingHeaders=[], warnings=[] }.
      */
     public struct function validateImport(required string templateKey, required array headers, required array rows) {
+        if (variables.bulkImportSvc.supportsTemplate(arguments.templateKey)) {
+            return variables.bulkImportSvc.validateImport(argumentCollection = arguments);
+        }
+
         var tpl = getTemplate(arguments.templateKey);
         var result = { valid = true, errors = [], missingHeaders = [], warnings = [] };
 
@@ -241,6 +256,10 @@ component output="false" singleton {
         required string fileName,
         required string startedBy
     ) {
+        if (variables.bulkImportSvc.supportsTemplate(arguments.templateKey)) {
+            return variables.bulkImportSvc.executeImport(argumentCollection = arguments);
+        }
+
         var runID = variables.importDAO.createRun(
             templateKey = arguments.templateKey,
             fileName    = arguments.fileName,

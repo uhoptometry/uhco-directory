@@ -18,7 +18,16 @@ function formValues(required string fieldName) {
     if (isArray(form[arguments.fieldName])) {
         return form[arguments.fieldName];
     }
-    return [form[arguments.fieldName]];
+
+    var rawValue = trim(form[arguments.fieldName] ?: "");
+    if (!len(rawValue)) {
+        return [];
+    }
+    if (find(",", rawValue)) {
+        return listToArray(rawValue);
+    }
+
+    return [rawValue];
 }
 
 submittedConfig = {

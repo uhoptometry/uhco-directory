@@ -11,6 +11,18 @@
 <cfset templates = importSvc.getTemplates()>
 <cfset recentRuns = importSvc.getRecentRuns(maxRows = 20)>
 
+<cfscript>
+uploadTemplates = [];
+generatedTemplates = [];
+for (tpl in templates) {
+    if ((tpl.workflow ?: "direct") EQ "generated") {
+        arrayAppend(generatedTemplates, tpl);
+    } else {
+        arrayAppend(uploadTemplates, tpl);
+    }
+}
+</cfscript>
+
 <cfset content = "">
 <cfsavecontent variable="content">
 <cfoutput>
@@ -31,7 +43,7 @@
 <!--- ── Template Cards ── --->
 <h5 class="mb-3">Choose Import Template</h5>
 <div class="row g-3 mb-5">
-    <cfloop array="#templates#" index="tpl">
+    <cfloop array="#uploadTemplates#" index="tpl">
         <div class="col-md-6 col-lg-3">
             <a href="upload.cfm?template=#tpl.key#" class="text-decoration-none">
                 <div class="card h-100 shadow-sm border-start border-primary border-3">
@@ -49,6 +61,30 @@
                                 <i class="bi bi-download me-1"></i>Download CSV template
                             </a>
                         </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </cfloop>
+</div>
+
+<h5 class="mb-3">Bulk Section Updates</h5>
+<div class="row g-3 mb-5">
+    <cfloop array="#generatedTemplates#" index="tpl">
+        <div class="col-md-6 col-lg-4">
+            <a href="generate.cfm?template=#tpl.key#" class="text-decoration-none">
+                <div class="card h-100 shadow-sm border-start border-success border-3">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="bi #tpl.icon# fs-3 text-success me-2"></i>
+                            <h5 class="card-title text-dark mb-0">#tpl.label#</h5>
+                        </div>
+                        <p class="card-text text-muted small mb-2">#tpl.description#</p>
+                        <div class="mt-2">
+                            <span class="badge bg-success-subtle text-success">Generated CSV</span>
+                            <span class="badge bg-light text-dark">One section per job</span>
+                        </div>
+                        <div class="mt-2 small text-success">Filter users, download CSV, then upload the completed file.</div>
                     </div>
                 </div>
             </a>

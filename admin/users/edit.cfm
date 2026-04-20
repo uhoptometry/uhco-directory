@@ -924,6 +924,19 @@
                 <div class='col-md-4'></div>
             </div>
             <div class='row mb-3'>
+                <div class='col-md-4'>
+                    <label class='form-label text-muted'>Hometown City</label>
+                    <input class='form-control' value='#EncodeForHTMLAttribute(spHometownCity)#' readonly>
+                </div>
+                <div class='col-md-4'>
+                    <label class='form-label text-muted'>Hometown State</label>
+                    <input class='form-control' value='#EncodeForHTMLAttribute(spHometownState)#' readonly>
+                </div>
+                <div class='col-md-4 d-flex align-items-end'>
+                    <small class='text-muted'>Mirrored from the user's Hometown address for Alumni and Current Student records.</small>
+                </div>
+            </div>
+            <div class='row mb-3'>
                 <div class='col-md-8'>
                     <label class='form-label'>Office Mailing Address</label>
                     <div class='input-group'>

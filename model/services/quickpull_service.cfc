@@ -377,10 +377,10 @@ component output="false" singleton {
                     arguments.row["BIO"] = bio;
                     break;
                 case "HOMETOWNCITY":
-                    arguments.row["HOMETOWNCITY"] = bio.HOMETOWNCITY ?: "";
+                    arguments.row["HOMETOWNCITY"] = studentProfile.HOMETOWNCITY ?: "";
                     break;
                 case "HOMETOWNSTATE":
-                    arguments.row["HOMETOWNSTATE"] = bio.HOMETOWNSTATE ?: "";
+                    arguments.row["HOMETOWNSTATE"] = studentProfile.HOMETOWNSTATE ?: "";
                     break;
                 case "DEGREES":
                     arguments.row["DEGREES"] = arguments.profile.degrees ?: [];
@@ -549,11 +549,22 @@ component output="false" singleton {
         var result = [];
 
         for ( var rawValue in values ) {
-            var cleanValue = trim(rawValue ?: "");
-            var normalizedKey = uCase(cleanValue);
+            var candidateValues = [];
 
-            if ( len(cleanValue) AND structKeyExists(arguments.allowedValues, normalizedKey) AND !arrayFindNoCase(result, arguments.allowedValues[normalizedKey]) ) {
-                arrayAppend(result, arguments.allowedValues[normalizedKey]);
+            if ( isArray(rawValue) ) {
+                candidateValues = rawValue;
+            } else {
+                var cleanRawValue = trim(rawValue ?: "");
+                candidateValues = len(cleanRawValue) ? listToArray(cleanRawValue) : [];
+            }
+
+            for ( var candidateValue in candidateValues ) {
+                var cleanValue = trim(candidateValue ?: "");
+                var normalizedKey = uCase(cleanValue);
+
+                if ( len(cleanValue) AND structKeyExists(arguments.allowedValues, normalizedKey) AND !arrayFindNoCase(result, arguments.allowedValues[normalizedKey]) ) {
+                    arrayAppend(result, arguments.allowedValues[normalizedKey]);
+                }
             }
         }
 

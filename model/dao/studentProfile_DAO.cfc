@@ -16,10 +16,22 @@ component extends="dao.BaseDAO" output="false" singleton {
     public void function saveProfile( required numeric userID, required struct data ) {
         data.id = userID;
         var existing = getProfile( userID );
+        var firstExternship = structKeyExists(data, "FirstExternship") ? data.FirstExternship : "";
+        var secondExternship = structKeyExists(data, "SecondExternship") ? data.SecondExternship : "";
+        var commencementAge = structKeyExists(data, "CommencementAge") ? data.CommencementAge : { value="", cfsqltype="cf_sql_integer", null=true };
+        var hometownCity = structKeyExists(data, "HometownCity") ? data.HometownCity : { value="", cfsqltype="cf_sql_nvarchar", null=true };
+        var hometownState = structKeyExists(data, "HometownState") ? data.HometownState : { value="", cfsqltype="cf_sql_nvarchar", null=true };
+
+        data.FirstExternship = firstExternship;
+        data.SecondExternship = secondExternship;
+        data.CommencementAge = commencementAge;
+        data.HometownCity = hometownCity;
+        data.HometownState = hometownState;
+
         if ( structIsEmpty(existing) ) {
             executeQueryWithRetry(
-                "INSERT INTO UserStudentProfile (UserID, FirstExternship, SecondExternship, CommencementAge)
-                 VALUES (:id, :FirstExternship, :SecondExternship, :CommencementAge)",
+                "INSERT INTO UserStudentProfile (UserID, FirstExternship, SecondExternship, CommencementAge, HometownCity, HometownState)
+                 VALUES (:id, :FirstExternship, :SecondExternship, :CommencementAge, :HometownCity, :HometownState)",
                 data,
                 { datasource=variables.datasource, timeout=30 }
             );
@@ -28,12 +40,21 @@ component extends="dao.BaseDAO" output="false" singleton {
                 "UPDATE UserStudentProfile
                  SET FirstExternship=:FirstExternship, SecondExternship=:SecondExternship,
                      CommencementAge=:CommencementAge,
+                     HometownCity=:HometownCity,
+                     HometownState=:HometownState,
                      UpdatedAt=GETDATE()
                  WHERE UserID=:id",
                 data,
                 { datasource=variables.datasource, timeout=30 }
             );
         }
+    }
+
+    public void function saveHometown( required numeric userID, string hometownCity = "", string hometownState = "" ) {
+        saveProfile( userID, {
+            HometownCity = { value=trim(arguments.hometownCity), cfsqltype="cf_sql_nvarchar", null=!len(trim(arguments.hometownCity)) },
+            HometownState = { value=trim(arguments.hometownState), cfsqltype="cf_sql_nvarchar", null=!len(trim(arguments.hometownState)) }
+        } );
     }
 
     public array function getAwards( required numeric userID ) {
