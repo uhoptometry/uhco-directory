@@ -122,10 +122,7 @@ Docs/               Internal application documentation
 model/services/     Service-layer CF components
 model/dao/          Data access components
 model/includes/     Shared includes and helpers
-sql/                Schema and migration scripts
-scripts/            Utility scripts
 UserReview/         End-user review workflow
-xml/                XML data and integration assets
 ```
 
 ## Notes For Developers
@@ -145,7 +142,3 @@ Recent changes in this codebase include:
 - UserReview workflow and permissions
 - UH sync reporting and field-diff tools
 - student profile hometown synchronization from Hometown addresses
-
-## Maintainer Notes
-
-This repository is operational software tied to a production ColdFusion/IIS environment. Prefer small, targeted changes and verify request context, datasource usage, and admin permission behavior before deploying.
