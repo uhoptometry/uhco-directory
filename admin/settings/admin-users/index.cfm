@@ -147,10 +147,10 @@
                             <span class="text-muted small ms-2">Role defaults are checked automatically. Check extras to augment.</span>
                         </div>
                         <div class="d-flex gap-2">
-                            <span class="badge bg-secondary d-flex align-items-center gap-1">
+                            <span class="badge bg-secondary text-dark d-flex align-items-center gap-1">
                                 <i class="bi bi-circle-fill text-warning" style="font-size:.55rem;"></i>Role default
                             </span>
-                            <span class="badge bg-secondary d-flex align-items-center gap-1">
+                            <span class="badge bg-secondary text-dark d-flex align-items-center gap-1">
                                 <i class="bi bi-circle-fill text-info" style="font-size:.55rem;"></i>Additional
                             </span>
                         </div>
@@ -230,7 +230,7 @@
                             <cfif u.IS_ACTIVE>
                                 <span class="badge settings-badge-active">Active</span>
                             <cfelse>
-                                <span class="badge bg-secondary">Inactive</span>
+                                <span class="badge bg-secondary text-dark">Inactive</span>
                             </cfif>
                         </td>
                         <td>

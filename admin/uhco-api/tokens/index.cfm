@@ -42,7 +42,7 @@
 
         <cfset statusBadge = isActive AND !isExpired
             ? "<span class='badge bg-success'>Active</span>"
-            : "<span class='badge bg-secondary'>#(isActive ? 'Expired' : 'Revoked')#</span>">
+            : "<span class='badge bg-secondary text-dark'>#(isActive ? 'Expired' : 'Revoked')#</span>">
 
         <cfset expiresDisplay = len(trim(t.EXPIRESAT & "")) ? dateFormat(t.EXPIRESAT, "mmm d, yyyy") : "<span class='text-muted'>Never</span>">
         <cfset lastUsedDisplay = len(trim(t.LASTUSEDAT & "")) ? dateFormat(t.LASTUSEDAT, "mmm d, yyyy") & " " & timeFormat(t.LASTUSEDAT, "h:mm tt") : "<span class='text-muted'>Never</span>">

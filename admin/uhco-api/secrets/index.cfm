@@ -37,7 +37,7 @@
     ">
 
     <cfloop array="#secrets#" item="s">
-        <cfset statusBadge    = s.ISACTIVE ? "<span class='badge bg-success'>Active</span>" : "<span class='badge bg-secondary'>Revoked</span>">
+        <cfset statusBadge    = s.ISACTIVE ? "<span class='badge bg-success'>Active</span>" : "<span class='badge bg-secondary text-dark'>Revoked</span>">
         <cfset expiresDisplay = (len(trim(s.EXPIRESAT & "")) AND s.EXPIRESAT NEQ "") ? dateFormat(s.EXPIRESAT, "mmm d, yyyy") : "<span class='text-muted'>Never</span>">
         <cfset lastUsedDisplay = (len(trim(s.LASTUSEDAT & "")) AND s.LASTUSEDAT NEQ "") ? dateFormat(s.LASTUSEDAT, "mmm d, yyyy") : "<span class='text-muted'>Never</span>">
         <cfset ipDisplay = len(trim(s.ALLOWEDIPS & "")) ? EncodeForHTML(s.ALLOWEDIPS) : "<span class='text-muted'>Any</span>">

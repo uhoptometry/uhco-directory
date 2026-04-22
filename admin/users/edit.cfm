@@ -623,7 +623,7 @@
                             <div class='d-flex justify-content-between align-items-center'>
                                 <div>
                                     <strong>#EncodeForHTML(trim(local.alDisplay))#</strong>
-                                    <cfif len(trim(local.al.ALIASTYPE ?: ""))> <span class='badge bg-secondary'>#EncodeForHTML(local.al.ALIASTYPE)#</span></cfif>
+                                    <cfif len(trim(local.al.ALIASTYPE ?: ""))> <span class='badge bg-secondary text-dark'>#EncodeForHTML(local.al.ALIASTYPE)#</span></cfif>
                                     <cfif len(trim(local.al.SOURCESYSTEM ?: ""))> <small class='text-muted'>Source: #EncodeForHTML(local.al.SOURCESYSTEM)#</small></cfif>
                                     <cfif val(local.al.ISACTIVE ?: 0)> <span class='badge bg-success'>Active</span><cfelse> <span class='badge bg-warning text-dark'>Inactive</span></cfif>
                                 </div>
@@ -694,7 +694,7 @@
                             <div class='d-flex justify-content-between align-items-center'>
                                 <div>
                                     <strong>#EncodeForHTML(local.em.EMAILADDRESS)#</strong>
-                                    <cfif len(trim(local.em.EMAILTYPE ?: ""))> <span class='badge bg-secondary'>#EncodeForHTML(local.em.EMAILTYPE)#</span></cfif>
+                                    <cfif len(trim(local.em.EMAILTYPE ?: ""))> <span class='badge bg-secondary text-dark'>#EncodeForHTML(local.em.EMAILTYPE)#</span></cfif>
                                     <cfif val(local.em.ISPRIMARY ?: 0)> <span class='badge bg-success'>Primary</span></cfif>
                                 </div>
                                 <div>
@@ -738,7 +738,7 @@
                             <div class='d-flex justify-content-between align-items-center'>
                                 <div>
                                     <strong>#EncodeForHTML(local.ph.PHONENUMBER)#</strong>
-                                    <cfif len(trim(local.ph.PHONETYPE ?: ""))> <span class='badge bg-secondary'>#EncodeForHTML(local.ph.PHONETYPE)#</span></cfif>
+                                    <cfif len(trim(local.ph.PHONETYPE ?: ""))> <span class='badge bg-secondary text-dark'>#EncodeForHTML(local.ph.PHONETYPE)#</span></cfif>
                                     <cfif val(local.ph.ISPRIMARY ?: 0)> <span class='badge bg-success'>Primary</span></cfif>
                                 </div>
                                 <div>
@@ -1076,7 +1076,7 @@
                             <div class='d-flex justify-content-between align-items-center'>
                                 <div>
                                     <strong>#EncodeForHTML(awName)#</strong>
-                                    <cfif len(trim(aw.AWARDTYPE ?: ""))> <span class='badge bg-secondary'>#EncodeForHTML(aw.AWARDTYPE)#</span></cfif>
+                                    <cfif len(trim(aw.AWARDTYPE ?: ""))> <span class='badge bg-secondary text-dark'>#EncodeForHTML(aw.AWARDTYPE)#</span></cfif>
                                 </div>
                                 <div>
                                     <button type='button' class='btn btn-sm btn-outline-secondary edit-award-btn' data-idx='#(ai-1)#'>Edit</button>
@@ -2440,7 +2440,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     "<div class='card mb-2'><div class='card-body py-2 px-3'>" +
                     "<div class='d-flex justify-content-between align-items-center'><div>" +
                     "<strong>" + esc(d.addr) + "</strong>" +
-                    (d.type ? " <span class='badge bg-secondary'>" + esc(d.type) + "</span>" : "") +
+                    (d.type ? " <span class='badge bg-secondary text-dark'>" + esc(d.type) + "</span>" : "") +
                     (d.primary === '1' ? " <span class='badge bg-success'>Primary</span>" : "") +
                     "</div><div>" +
                     "<button type='button' class='btn btn-sm btn-outline-secondary edit-email-btn' data-idx='" + i + "'>Edit</button> " +
@@ -2548,7 +2548,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     "<div class='card mb-2'><div class='card-body py-2 px-3'>" +
                     "<div class='d-flex justify-content-between align-items-center'><div>" +
                     "<strong>" + esc(d.number) + "</strong>" +
-                    (d.type ? " <span class='badge bg-secondary'>" + esc(d.type) + "</span>" : "") +
+                    (d.type ? " <span class='badge bg-secondary text-dark'>" + esc(d.type) + "</span>" : "") +
                     (d.primary === '1' ? " <span class='badge bg-success'>Primary</span>" : "") +
                     "</div><div>" +
                     "<button type='button' class='btn btn-sm btn-outline-secondary edit-phone-btn' data-idx='" + i + "'>Edit</button> " +
@@ -2666,7 +2666,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     "<strong>" + esc(name) + "</strong>" +
                     (d.type ? " <span class='badge bg-info text-dark'>" + esc(d.type) + "</span>" : "") +
                     (d.source ? " <small class='text-muted'>(" + esc(d.source) + ")</small>" : "") +
-                    (d.active === '1' ? " <span class='badge bg-success'>Active</span>" : " <span class='badge bg-secondary'>Inactive</span>") +
+                    (d.active === '1' ? " <span class='badge bg-success'>Active</span>" : " <span class='badge bg-secondary text-dark'>Inactive</span>") +
                     "</div><div>" +
                     "<button type='button' class='btn btn-sm btn-outline-secondary edit-alias-btn' data-idx='" + i + "'>Edit</button> " +
                     "<button type='button' class='btn btn-sm btn-outline-danger remove-alias-btn' data-idx='" + i + "'>Remove</button>" +

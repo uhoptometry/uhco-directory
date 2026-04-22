@@ -384,6 +384,19 @@ component extends="dao.BaseDAO" output="false" singleton {
     }
 
     /**
+     * Return all variant records for a given UserImageSourceID that have a LocalPath set.
+     * Used before deletion so the caller can remove temp variant files from disk first.
+     */
+    public array function getVariantsBySourceID( required numeric sourceID ) {
+        var qry = executeQueryWithRetry(
+            "SELECT UserImageVariantID, LocalPath FROM UserImageVariants WHERE UserImageSourceID = :srcID AND LTRIM(RTRIM(ISNULL(LocalPath, ''))) <> ''",
+            { srcID = { value=arguments.sourceID, cfsqltype="cf_sql_integer" } },
+            { datasource=variables.datasource, timeout=30, fetchSize=200 }
+        );
+        return queryToArray(qry);
+    }
+
+    /**
      * Delete all UserImageVariants rows that reference a given UserImageSourceID.
      *
      * Called by UserImageSourceService BEFORE the source record is deleted, so

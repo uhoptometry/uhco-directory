@@ -87,6 +87,10 @@ component output="false" singleton {
         var canonical = createObject("java", "java.io.File").init( rawPath ).getCanonicalPath();
         variables.localSourceDirAbsolute = canonical & "\";
 
+        var jFile2 = createObject("java", "java.io.File");
+        variables.publishedDirAbsolute = jFile2.init( cfc_dir & "..\..\_published_images" ).getCanonicalPath() & "\";
+        variables.variantDirAbsolute   = jFile2.init( cfc_dir & "..\..\_temp_variants" ).getCanonicalPath() & "\";
+
         return this;
     }
 
@@ -223,6 +227,23 @@ component output="false" singleton {
         var browseMode     = _getDropboxBrowseMode();
         var rootFolder     = isDropbox ? _normalizeSlashPath( variables.AppConfigService.getValue("dropbox.root_folder", "") ) : "";
         var allowedFolders = _getAllowedFoldersByFlags( arguments.userFlags );
+
+        // ── Faculty + Alumni override: force folder mode ─────────────────────
+        // When a user is both faculty and alumni and browse mode is "mixed",
+        // force folder mode so the lookup uses the per-user subfolder exclusively.
+        if ( isDropbox AND browseMode EQ "mixed" ) {
+            var _facultyFlags = ["Faculty-Fulltime", "Faculty-Adjunct", "Professor-Emeritus", "Active-Retiree"];
+            var _hasFaculty   = false;
+            var _hasAlumni    = false;
+            for ( var _uf in arguments.userFlags ) {
+                var _fn = lCase( trim(_uf.FLAGNAME ?: "") );
+                if ( arrayFindNoCase(_facultyFlags, _fn) ) { _hasFaculty = true; }
+                if ( _fn EQ "alumni" ) { _hasAlumni = true; }
+            }
+            if ( _hasFaculty AND _hasAlumni ) {
+                browseMode = "folders";
+            }
+        }
 
         // ── FOLDER mode: targeted per-user subfolder lookup ──────────────────
         if ( isDropbox AND browseMode EQ "folders" ) {
@@ -475,9 +496,8 @@ component output="false" singleton {
 
     /**
      * Hard-delete a source record from the database.
-     * Enforces ownership.  Marks related variants STALE before deletion.
-     * NOTE: no file deletion occurs — only the DB record is removed.
-     * This may be extended later (e.g. to remove files or Dropbox entries).
+    * Enforces ownership.  Deletes all related variants, published UserImages
+    * records, and their physical files before removing the source record.
      */
     public struct function deleteSource(
         required numeric sourceID,
@@ -493,6 +513,37 @@ component output="false" singleton {
             return { success=false, message="Source does not belong to this user." };
         }
 
+        // ── Step 1: Delete published image files from _published_images ──────
+        var publishedImages = variables.ImagesDAO.getImagesBySourceID( arguments.sourceID );
+        for ( var img in publishedImages ) {
+            var imgUrl = trim(img.IMAGEURL ?: "");
+            if ( len(imgUrl) ) {
+                var publishedFilename = listLast( replace(imgUrl, "\", "/", "all"), "/" );
+                if ( len(publishedFilename) ) {
+                    var publishedAbsPath = variables.publishedDirAbsolute & publishedFilename;
+                    if ( fileExists(publishedAbsPath) ) {
+                        try { fileDelete(publishedAbsPath); } catch (any e) { /* non-fatal */ }
+                    }
+                }
+            }
+        }
+
+        // ── Step 2: Delete any remaining temp variant files from _temp_variants
+        var variantRows = variables.VariantDAO.getVariantsBySourceID( arguments.sourceID );
+        for ( var vr in variantRows ) {
+            var localPath = trim(vr.LOCALPATH ?: "");
+            if ( len(localPath) ) {
+                var variantFilename  = listLast( replace(localPath, "\", "/", "all"), "/" );
+                if ( len(variantFilename) ) {
+                    var variantAbsPath = variables.variantDirAbsolute & variantFilename;
+                    if ( fileExists(variantAbsPath) ) {
+                        try { fileDelete(variantAbsPath); } catch (any e) { /* non-fatal */ }
+                    }
+                }
+            }
+        }
+
+        // ── Step 3: Remove all published images and variant records from DB ───
         // Remove all published images and variant records that reference this source
         // before deleting it.  This satisfies the FK constraints on UserImages and
         // UserImageVariants that reference UserImageSources.

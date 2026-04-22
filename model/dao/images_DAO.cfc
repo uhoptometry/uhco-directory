@@ -274,6 +274,19 @@ component extends="dao.BaseDAO" output="false" singleton {
     }
 
     /**
+     * Return all published image records for a given UserImageSourceID.
+     * Used before deletion so callers can remove the physical files first.
+     */
+    public array function getImagesBySourceID( required numeric sourceID ) {
+        var qry = executeQueryWithRetry(
+            "SELECT ImageID, UserID, ImageVariant, ImageURL FROM UserImages WHERE UserImageSourceID = :srcID",
+            { srcID = { value=arguments.sourceID, cfsqltype="cf_sql_integer" } },
+            { datasource=variables.datasource, timeout=30, fetchSize=200 }
+        );
+        return queryToArray(qry);
+    }
+
+    /**
      * Delete all published image records that reference a given UserImageSourceID.
      * Called during source deletion to satisfy the FK constraint.
      */

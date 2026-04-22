@@ -331,7 +331,7 @@
                 <td class='text-center small'>#vtDims#</td>
                 <td class='text-center'>#vtCrop ? '<i class=""bi bi-check-circle-fill text-success""></i>' : '<i class=""bi bi-dash text-muted""></i>'#</td>
                 <td class='text-center'>#vtResize ? '<i class=""bi bi-check-circle-fill text-success""></i>' : '<i class=""bi bi-dash text-muted""></i>'#</td>
-                <td class='text-center'>#vtActive ? '<span class=""badge settings-badge-active"">Active</span>' : '<span class=""badge bg-secondary"">Inactive</span>'#</td>
+                <td class='text-center'>#vtActive ? '<span class=""badge settings-badge-active"">Active</span>' : '<span class=""badge bg-secondary text-dark"">Inactive</span>'#</td>
                 <td>
                     <div class='settings-action-group'>
                         <a href='/admin/settings/media-config/variant-types.cfm?edit=#vtID#' class='btn btn-sm btn-info users-list-action-button users-list-action-button-edit' title='Edit Variant Type' data-bs-toggle='tooltip' data-bs-title='Edit Variant Type' aria-label='Edit Variant Type'>

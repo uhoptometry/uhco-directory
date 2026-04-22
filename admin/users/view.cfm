@@ -200,7 +200,7 @@
     <cfset userAliasesHtml = "<div class='mb-2'><strong>Aliases:</strong><ul class='mb-0 users-view-org-list'>">
     <cfloop from="1" to="#arrayLen(userAliases)#" index="aliasIndex">
         <cfset aliasItem = userAliases[aliasIndex]>
-        <cfset aliasTypeHtml = len(trim(aliasItem.ALIASTYPE ?: "")) ? " <span class='badge bg-secondary users-view-badge'>" & EncodeForHTML(aliasItem.ALIASTYPE) & "</span>" : "">
+        <cfset aliasTypeHtml = len(trim(aliasItem.ALIASTYPE ?: "")) ? " <span class='badge bg-secondary text-dark users-view-badge'>" & EncodeForHTML(aliasItem.ALIASTYPE) & "</span>" : "">
         <cfset aliasInactiveHtml = val(aliasItem.ISACTIVE ?: 0) NEQ 1 ? " <span class='badge bg-light text-dark users-view-badge'>Inactive</span>" : "">
         <cfset userAliasesHtml &= "<li>" & EncodeForHTML(aliasItem.DISPLAYNAME ?: "") & aliasTypeHtml & aliasInactiveHtml & "</li>">
     </cfloop>
@@ -247,7 +247,7 @@
         </cfif>
     </cfloop>
 <cfelse>
-    <cfset profileThumbnail = "/includes/images/uh.png">
+    <cfset profileThumbnail = "/assets/images/uh.png">
 </cfif>
 
 <cfset SubTitle = "">
@@ -524,7 +524,7 @@
             <cfset award = spAwards[aw]>
             <cfset awardLine = "<li class='list-group-item px-0'>" & EncodeForHTML(award.AWARDNAME)>
             <cfif len(trim(award.AWARDTYPE ?: ""))>
-                <cfset awardLine &= " <span class='badge bg-secondary ms-1 users-view-badge'>" & EncodeForHTML(award.AWARDTYPE) & "</span>">
+                <cfset awardLine &= " <span class='badge bg-secondary text-dark ms-1 users-view-badge'>" & EncodeForHTML(award.AWARDTYPE) & "</span>">
             </cfif>
             <cfset awardLine &= "</li>">
             <cfset content &= awardLine>

@@ -195,7 +195,7 @@
 <div class='card mb-4'>
     <div class='card-header d-flex justify-content-between align-items-center'>
         <span class='fw-semibold'><i class='bi bi-images me-1'></i> Existing Image Sources</span>
-        <span class='badge bg-secondary'>#arrayLen(sources)#</span>
+        <span class='badge bg-secondary text-dark'>#arrayLen(sources)#</span>
     </div>
     <div class='card-body p-0'>
 ">
@@ -229,7 +229,7 @@
         <cfif isActive>
             <cfset content &= "<span class='badge bg-success'>Active</span>">
         <cfelse>
-            <cfset content &= "<span class='badge bg-secondary'>Inactive</span>">
+            <cfset content &= "<span class='badge bg-secondary text-dark'>Inactive</span>">
         </cfif>
 
         <cfset content &= "
@@ -587,7 +587,7 @@
     }
 
     function loadDropboxFiles() {
-        if (sourceProvider !== 'dropbox' || filesLoaded) { return; }
+        if (sourceProvider !== 'dropbox') { return; }
 
         var addStatus = document.getElementById('addFilePickerStatus');
         var editStatus = document.getElementById('editFilePickerStatus');
@@ -637,6 +637,11 @@
             }
 
             filesLoaded = true;
+
+            var loadAddBtn2 = document.getElementById('loadAddImagesBtn');
+            var loadEditBtn2 = document.getElementById('loadEditImagesBtn');
+            if (loadAddBtn2) { loadAddBtn2.innerHTML = "<i class='bi bi-arrow-clockwise me-1'></i>Reload Source Images"; }
+            if (loadEditBtn2) { loadEditBtn2.innerHTML = "<i class='bi bi-arrow-clockwise me-1'></i>Reload Source Images"; }
 
             if (!files.length) {
                 var emptyHtml = "<div class='alert alert-warning mb-0'><i class='bi bi-exclamation-triangle me-1'></i>No images found for this user in the searched folders.</div>";

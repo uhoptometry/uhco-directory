@@ -173,7 +173,7 @@
                             <cfif val(permissionRow.IS_ACTIVE) EQ 1>
                                 <span class="badge settings-badge-active">Active</span>
                             <cfelse>
-                                <span class="badge bg-secondary">Inactive</span>
+                                <span class="badge bg-secondary text-dark">Inactive</span>
                             </cfif>
                         </td>
                         <td>

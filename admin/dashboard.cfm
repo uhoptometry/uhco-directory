@@ -22,13 +22,13 @@
 </cftry>
 
 <cfset dqIssues    = structIsEmpty(dqLastRun) ? -1 : dqLastRun.TOTALISSUES>
-<cfset dqBadgeCls  = dqIssues GT 0 ? "bg-danger" : (dqIssues EQ 0 ? "bg-success" : "bg-secondary")>
+<cfset dqBadgeCls  = dqIssues GT 0 ? "bg-danger" : (dqIssues EQ 0 ? "bg-success" : "bg-secondary text-dark")>
 <cfset dqBadgeTxt  = dqIssues EQ -1 ? "Never run" : dqIssues & " issue(s)">
 <cfset dqSubtitle  = structIsEmpty(dqLastRun) ? "No report has been run yet." : "Last run: " & dateTimeFormat(dqLastRun.RUNAT, "mmm d, yyyy HH:nn") & " UTC">
 
 <!--- ── UH Sync badge values ── --->
 <cfset uhSyncHasPending = false>
-<cfset uhSyncBadgeCls   = "bg-secondary">
+<cfset uhSyncBadgeCls   = "bg-secondary text-dark">
 <cfset uhSyncBadgeTxt   = "Never run">
 <cfset uhSyncSubtitle   = "No sync has been run yet.">
 <cfset uhSyncBorderCls  = "">

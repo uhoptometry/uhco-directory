@@ -319,7 +319,7 @@
                 </a>
                 <br><small class='text-muted'>#EncodeForHTML(dr.EMAILPRIMARY)#</small>
             </td>
-            <td><span class='badge bg-secondary'>#EncodeForHTML(fldLbl)#</span></td>
+            <td><span class='badge bg-secondary text-dark'>#EncodeForHTML(fldLbl)#</span></td>
             <td><span class='text-muted'>#(len(dr.LOCALVALUE) ? EncodeForHTML(dr.LOCALVALUE) : '<em class=""text-muted"">empty</em>')#</span></td>
             <td><strong>#EncodeForHTML(dr.APIVALUE)#</strong></td>
             <td class='text-end text-nowrap'>
