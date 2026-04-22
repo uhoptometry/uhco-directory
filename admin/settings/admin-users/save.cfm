@@ -4,7 +4,7 @@
 --->
 
 <cfset action  = structKeyExists(form, "action") ? trim(form.action) : "">
-<cfset isImpersonationAction = listFindNoCase("startImpersonationRole,startImpersonationPermissions,clearImpersonation", action) GT 0>
+<cfset isImpersonationAction = listFindNoCase("startImpersonation,startImpersonationUser,startImpersonationRole,startImpersonationPermissions,clearImpersonation", action) GT 0>
 <cfset currentAdminUserID = (structKeyExists(session, "user") AND structKeyExists(session.user, "adminUserID") AND isNumeric(session.user.adminUserID)) ? val(session.user.adminUserID) : 0>
 
 <cfif NOT request.hasPermission("settings.admin_users.manage") AND NOT (isImpersonationAction AND application.authService.isActualSuperAdmin())>
@@ -90,6 +90,39 @@
             </cfif>
         </cfcase>
 
+        <cfcase value="startImpersonationUser">
+            <cfset uid = structKeyExists(form, "impersonationUserID") AND isNumeric(form.impersonationUserID) ? val(form.impersonationUserID) : 0>
+            <cfset result = application.authService.startUserImpersonation(uid)>
+            <cfset redirectURL = structKeyExists(form, "returnURL") AND len(trim(form.returnURL)) ? trim(form.returnURL) : "/admin/dashboard.cfm">
+            <cfif NOT result.success>
+                <cfset redirectURL = "/admin/settings/admin-users/?err=" & urlEncodedFormat(result.message)>
+            </cfif>
+        </cfcase>
+
+        <cfcase value="startImpersonation">
+            <cfset rid = structKeyExists(form, "impersonationRoleID") AND isNumeric(form.impersonationRoleID) ? val(form.impersonationRoleID) : 0>
+            <cfset additionalPermissionIDs = []>
+            <cfset permissionIDList = structKeyExists(form, "impersonationPermissionIDs") ? form.impersonationPermissionIDs : "">
+            <cfif isArray(permissionIDList)>
+                <cfloop array="#permissionIDList#" index="permissionIDValue">
+                    <cfif isNumeric(permissionIDValue) AND val(permissionIDValue) GT 0>
+                        <cfset arrayAppend(additionalPermissionIDs, val(permissionIDValue))>
+                    </cfif>
+                </cfloop>
+            <cfelseif len(trim(permissionIDList & ""))>
+                <cfloop list="#permissionIDList#" delimiters="," index="permissionIDValue">
+                    <cfif isNumeric(permissionIDValue) AND val(permissionIDValue) GT 0>
+                        <cfset arrayAppend(additionalPermissionIDs, val(permissionIDValue))>
+                    </cfif>
+                </cfloop>
+            </cfif>
+            <cfset result = application.authService.startImpersonation(rid, additionalPermissionIDs)>
+            <cfset redirectURL = structKeyExists(form, "returnURL") AND len(trim(form.returnURL)) ? trim(form.returnURL) : "/admin/dashboard.cfm">
+            <cfif NOT result.success>
+                <cfset redirectURL = "/admin/settings/admin-users/?err=" & urlEncodedFormat(result.message)>
+            </cfif>
+        </cfcase>
+
         <cfcase value="startImpersonationRole">
             <cfset rid = structKeyExists(form, "impersonationRoleID") AND isNumeric(form.impersonationRoleID) ? val(form.impersonationRoleID) : 0>
             <cfset result = application.authService.startRoleImpersonation(rid)>
@@ -117,8 +150,17 @@
         </cfcase>
 
         <cfcase value="clearImpersonation">
-            <cfset application.authService.clearImpersonation()>
-            <cfset redirectURL = structKeyExists(form, "returnURL") AND len(trim(form.returnURL)) ? trim(form.returnURL) : "/admin/settings/admin-users/?msg=" & urlEncodedFormat("Impersonation cleared.")>
+            <cfset clearResult = application.authService.clearImpersonation()>
+            <cfif clearResult AND NOT application.authService.isImpersonating()>
+                <cfset redirectURL = structKeyExists(form, "returnURL") AND len(trim(form.returnURL)) ? trim(form.returnURL) : "/admin/settings/admin-users/">
+                <cfif findNoCase("?", redirectURL)>
+                    <cfset redirectURL &= "&msg=" & urlEncodedFormat("Impersonation cleared.")>
+                <cfelse>
+                    <cfset redirectURL &= "?msg=" & urlEncodedFormat("Impersonation cleared.")>
+                </cfif>
+            <cfelse>
+                <cfset redirectURL = "/admin/settings/admin-users/?err=" & urlEncodedFormat("Unable to clear impersonation state. Refresh and try again.")>
+            </cfif>
         </cfcase>
 
         <cfdefaultcase>

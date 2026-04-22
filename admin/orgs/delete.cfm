@@ -2,6 +2,10 @@
     <cflocation url="#request.webRoot#/admin/orgs/index.cfm" addtoken="false">
 </cfif>
 
+<cfif NOT request.hasPermission("orgs.manage")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
 <cfset orgsService = createObject("component", "cfc.organizations_service").init()>
 <cfset orgResult = orgsService.getOrg(val(url.orgID))>
 

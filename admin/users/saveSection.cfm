@@ -1,6 +1,10 @@
 <cfsetting showdebugoutput="false">
 <cfcontent type="application/json">
 
+<cfif NOT request.hasPermission("users.edit")>
+    <cfoutput>{"success":false,"message":"Unauthorized: users.edit permission required."}</cfoutput><cfabort>
+</cfif>
+
 <cfif NOT structKeyExists(form, "userID") OR NOT isNumeric(form.userID)>
     <cfoutput>{"success":false,"message":"Missing userID."}</cfoutput><cfabort>
 </cfif>

@@ -9,6 +9,7 @@
 <cfset patterns   = patternDAO.getAllPatterns()>
 <cfset allTypes   = variantDAO.getVariantTypesAllAdmin()>
 <cfset appConfigService = createObject("component", "cfc.appConfig_service").init()>
+<cfset sourceService = createObject("component", "cfc.UserImageSourceService").init()>
 
 <cfset actionMessage = "">
 <cfset actionMessageClass = "alert-success">
@@ -20,8 +21,13 @@
             <cfset newBrowseMode = "files">
         </cfif>
         <cfset newFolderBrowseFolders = trim(form.dropboxFolderBrowseFolders ?: "Faculty,Staff")>
+        <cfset newSourceKeys = trim(form.mediaSourceKeys ?: "")>
+        <cfif !len(newSourceKeys)>
+            <cfset newSourceKeys = "profile,alumni,dean,marketing">
+        </cfif>
         <cfset appConfigService.setValue("dropbox.browse_mode", newBrowseMode)>
         <cfset appConfigService.setValue("dropbox.folder_browse_folders", newFolderBrowseFolders)>
+        <cfset appConfigService.setValue("media.source_keys", lCase(newSourceKeys))>
         <cfset actionMessage = "Dropbox settings saved.">  
     <cfcatch type="any">
         <cfset actionMessage = cfcatch.message>
@@ -32,6 +38,7 @@
 
 <cfset currentBrowseMode = lCase( trim( appConfigService.getValue("dropbox.browse_mode", "files") ) )>
 <cfset currentFolderBrowseFolders = trim( appConfigService.getValue("dropbox.folder_browse_folders", "Faculty,Staff") )>
+<cfset currentSourceKeys = arrayToList(sourceService.getSourceKeys(), ",")>
 
 <cfset activePatterns = 0>
 <cfloop from="1" to="#arrayLen(patterns)#" index="i">
@@ -86,7 +93,7 @@
                     so local development and production can use different domains safely.
                 </p>
                 <div class="mt-auto">
-                    <a href="/admin/settings/app-config/" class="btn btn-info text-white">
+                    <a href="/admin/settings/app-config/" class="btn settings-btn-ocher">
                         <i class="bi bi-pencil-square me-1"></i> Manage App Settings
                     </a>
                 </div>
@@ -237,6 +244,21 @@
                 <div class="form-text">
                     Comma-separated top-level Dropbox folders that should use user-folder lookup when browse mode is <code>mixed</code>.
                     Folders not listed here will use file scan.
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-bold" for="mediaSourceKeys">Source Keys</label>
+                <input
+                    type="text"
+                    class="form-control"
+                    id="mediaSourceKeys"
+                    name="mediaSourceKeys"
+                    value="#encodeForHTMLAttribute(currentSourceKeys)#"
+                    placeholder="profile,alumni,dean,marketing"
+                >
+                <div class="form-text">
+                    Comma-separated source keys shown in User Media Sources forms.
+                    Example: <code>profile, alumni, dean, marketing</code>.
                 </div>
             </div>
             <button type="submit" class="btn btn-primary">

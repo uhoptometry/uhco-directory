@@ -336,6 +336,19 @@
   --bs-btn-padding-x: 0.55rem;
 }
 
+.settings-btn-ocher {
+  --bs-btn-color: #fff;
+  --bs-btn-bg: var(--ocher);
+  --bs-btn-border-color: var(--ocher);
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: color-mix(in srgb, var(--ocher) 88%, #000 12%);
+  --bs-btn-hover-border-color: color-mix(in srgb, var(--ocher) 88%, #000 12%);
+  --bs-btn-focus-shadow-rgb: 185, 120, 0;
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: color-mix(in srgb, var(--ocher) 84%, #000 16%);
+  --bs-btn-active-border-color: color-mix(in srgb, var(--ocher) 84%, #000 16%);
+}
+
 .settings-page .form-control,
 .settings-page .form-select,
 .settings-page .form-check-input {

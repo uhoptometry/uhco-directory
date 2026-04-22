@@ -2,6 +2,10 @@
     <cflocation url="#request.webRoot#/admin/users/index.cfm" addtoken="false">
 </cfif>
 
+<cfif NOT request.hasPermission("users.edit")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
 <cfset directoryService = createObject("component", "cfc.directory_service").init()>
 <cfset flagsService = createObject("component", "cfc.flags_service").init()>
 <cfset organizationsService = createObject("component", "cfc.organizations_service").init()>

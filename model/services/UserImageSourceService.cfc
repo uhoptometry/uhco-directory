@@ -24,8 +24,8 @@ component output="false" singleton {
     variables.localSourceDir    = "/_temp_source/";
     variables.allowedExtensions = ["jpg", "jpeg", "png"];
 
-    // Recognised SourceKey values.  Add or load from DB as needed.
-    variables.sourceKeys = ["profile", "alumni", "dean", "marketing"];
+    // Default SourceKey values. Can be overridden by AppConfig key media.source_keys.
+    variables.defaultSourceKeys = ["profile", "alumni", "dean", "marketing"];
 
     // Dropbox subfolders to search per flag group (populated in init).
     variables.foldersByFlag = [];
@@ -105,7 +105,19 @@ component output="false" singleton {
      * Returns the list of valid SourceKey values for UI dropdowns.
      */
     public array function getSourceKeys() {
-        return variables.sourceKeys;
+        var configured = trim( variables.AppConfigService.getValue("media.source_keys", "") );
+        var parsed = [];
+
+        if ( len(configured) ) {
+            for ( var token in listToArray(configured, ",") ) {
+                token = lCase( trim(token) );
+                if ( len(token) AND !arrayFindNoCase(parsed, token) ) {
+                    arrayAppend(parsed, token);
+                }
+            }
+        }
+
+        return arrayLen(parsed) ? parsed : variables.defaultSourceKeys;
     }
 
     /**
@@ -354,7 +366,7 @@ component output="false" singleton {
         var cleanKey  = trim( arguments.sourceKey );
         var cleanPath = trim( arguments.sourcePath );
 
-        if ( !len(cleanKey) || !arrayFindNoCase(variables.sourceKeys, cleanKey) ) {
+        if ( !len(cleanKey) || !arrayFindNoCase(getSourceKeys(), cleanKey) ) {
             return { success=false, message="Invalid source key." };
         }
 
@@ -400,7 +412,7 @@ component output="false" singleton {
         var cleanKey  = trim( arguments.sourceKey );
         var cleanPath = trim( arguments.sourcePath );
 
-        if ( !len(cleanKey) || !arrayFindNoCase(variables.sourceKeys, cleanKey) ) {
+        if ( !len(cleanKey) || !arrayFindNoCase(getSourceKeys(), cleanKey) ) {
             return { success=false, message="Invalid source key." };
         }
 

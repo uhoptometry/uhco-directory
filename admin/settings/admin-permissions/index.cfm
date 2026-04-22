@@ -9,10 +9,33 @@
 
 <cfset authSvc = createObject("component", "cfc.adminAuth_service").init()>
 <cfset permissions = authSvc.getAllPermissions()>
+<cfset roles = authSvc.getAllRoles()>
 <cfset msgParam = structKeyExists(url, "msg") ? url.msg : "">
 <cfset errParam = structKeyExists(url, "err") ? url.err : "">
 <cfset editID = (structKeyExists(url, "edit") AND isNumeric(url.edit)) ? val(url.edit) : 0>
 <cfset editPermission = editID GT 0 ? authSvc.getPermissionByID(editID) : {}>
+<cfset selectedRoleID = (structKeyExists(url, "role") AND isNumeric(url.role)) ? val(url.role) : 0>
+<cfset rolePermissions = arrayNew(1)>
+<cfif selectedRoleID GT 0>
+    <cfset selectedRole = authSvc.getRoleByID(selectedRoleID)>
+    <cfif structCount(selectedRole)>
+        <cfset rolePermissions = authSvc.getPermissionsForRole(selectedRoleID)>
+        <cfset permissionsToDisplay = arrayNew(1)>
+        <cfloop array="#permissions#" index="p">
+            <cfset inRole = false>
+            <cfloop array="#rolePermissions#" index="rp">
+                <cfif rp.PERMISSION_ID EQ p.PERMISSION_ID>
+                    <cfset inRole = true>
+                    <cfbreak>
+                </cfif>
+            </cfloop>
+            <cfif inRole>
+                <cfset arrayAppend(permissionsToDisplay, p)>
+            </cfif>
+        </cfloop>
+        <cfset permissions = permissionsToDisplay>
+    </cfif>
+</cfif>
 
 <cfset content = "">
 <cfsavecontent variable="content">
@@ -102,6 +125,27 @@
 <div class="card border-0 shadow-sm settings-shell">
     <div class="card-body">
         <h5 class="mb-3 settings-section-title"><i class="bi bi-list-ul me-2"></i>All Permissions</h5>
+        
+        <div class="mb-3 d-flex gap-2 align-items-end">
+            <div style="flex: 1;">
+                <label for="roleFilter" class="form-label">Filter by Role</label>
+                <select id="roleFilter" class="form-select" onchange="window.location.href = this.value === '' ? '/admin/settings/admin-permissions/' : '/admin/settings/admin-permissions/?role=' + this.value">
+                    <option value="">All Permissions</option>
+                    <cfloop array="#roles#" index="role">
+                        <cfif role.ROLE_NAME NEQ "SUPER_ADMIN">
+                            <option value="#role.ROLE_ID#" <cfif selectedRoleID EQ role.ROLE_ID>selected</cfif>>#encodeForHTML(role.ROLE_NAME)#</option>
+                        </cfif>
+                    </cfloop>
+                </select>
+                <div class="form-text">Select a role to see only its assigned permissions.</div>
+            </div>
+            <cfif selectedRoleID GT 0>
+                <div>
+                    <span class="badge bg-info">#arrayLen(permissions)# permission<cfif arrayLen(permissions) NEQ 1>s</cfif></span>
+                </div>
+            </cfif>
+        </div>
+        
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0 settings-table">
                 <thead>

@@ -1,3 +1,7 @@
+<cfif NOT request.hasPermission("flags.manage")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
 <cfset flagsService = createObject("component", "cfc.flags_service").init()>
 
 <cfif !structKeyExists(form, "FlagID") || !isNumeric(form.FlagID)>

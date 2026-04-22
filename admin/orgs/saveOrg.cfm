@@ -1,3 +1,7 @@
+<cfif NOT request.hasPermission("orgs.manage")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
 <cfset orgsService = createObject("component", "cfc.organizations_service").init()>
 
 <cfif !structKeyExists(form, "OrgName") OR !len(trim(form.OrgName))>

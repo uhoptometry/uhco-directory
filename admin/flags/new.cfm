@@ -1,3 +1,7 @@
+<cfif NOT request.hasPermission("flags.manage")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
 <cfset content = "
 <div class='flags-page'>
 <div class='flags-form-shell'>

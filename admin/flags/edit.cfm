@@ -1,3 +1,7 @@
+<cfif NOT request.hasPermission("flags.manage")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
 <cfset flagsDAO = createObject("component", "dao.flags_DAO").init()>
 
 <cfif !structKeyExists(url, "flagID") || !isNumeric(url.flagID)>

@@ -1,3 +1,7 @@
+<cfif NOT request.hasPermission("users.edit")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
 <cfset flagsService = createObject("component", "cfc.flags_service").init()>
 <cfset allFlagsResult = flagsService.getAllFlags()>
 <cfset allFlags = allFlagsResult.data />

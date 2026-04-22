@@ -110,10 +110,19 @@ component output="false" {
 
             var isAdminPage  = (path CONTAINS "/admin/");
             var isPublicPage = arrayFind(publicPages, path);
+            var adminViewBypassPages = [
+                "/admin/unauthorized.cfm",
+                "/admin/settings/admin-users/save.cfm"
+            ];
+            var bypassAdminViewGate = arrayFind(adminViewBypassPages, path) GT 0;
 
             if (isAdminPage AND NOT isPublicPage) {
                 if (!application.authService.isLoggedIn()) {
                     location(application.webRoot & "/admin/login.cfm", false);
+                }
+                // ── Global admin permission gate ───────────────────────
+                if (!request.hasPermission("admin.view") AND !bypassAdminViewGate) {
+                    location(application.webRoot & "/admin/unauthorized.cfm", false);
                 }
             }
         }

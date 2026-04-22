@@ -1,7 +1,11 @@
 <!--- ============================================================
-     Unified User List Page
-     URL parameter: ?list=problems|all|alumni|current-students|faculty|staff|inactive
-     ============================================================ --->
+    Unified User List Page
+    URL parameter: ?list=problems|all|alumni|current-students|faculty|staff|inactive
+    ============================================================ --->
+<cfif NOT request.hasPermission("users.view")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
 <cfparam name="url.list" default="problems">
 <cfset listType = lcase(trim(url.list))>
 <cfif NOT listFindNoCase("problems,all,alumni,current-students,faculty,staff,inactive", listType)>
@@ -671,11 +675,16 @@
         <cfset content &= "<td class='text-center'>#u.TITLE1#</td>">
     </cfif>
 
+    <cfset editLink = "">
+    <cfif request.hasPermission("users.edit")>
+        <cfset editLink = "<a class='btn btn-sm btn-info users-list-action-button users-list-action-button-edit' href='/admin/users/edit.cfm?userID=#u.USERID#' title='Edit User' data-bs-toggle='tooltip' data-bs-title='Edit User'><i class='bi bi-pencil-square'></i></a>">
+    </cfif>
+
     <cfset content &= "
             <td class='users-list-col-orgs'><div class='d-flex flex-wrap gap-1 align-items-start users-list-pill-stack'>#orgsHTML#</div></td>
             <td class='users-list-col-flags'><div class='d-flex flex-wrap gap-1 align-items-start users-list-pill-stack'>#flagsHTML#</div></td>
             <td class='users-list-col-actions text-end'><div class='d-flex flex-wrap gap-1 align-items-start users-list-actions'>
-                <a class='btn btn-sm btn-info users-list-action-button users-list-action-button-edit' href='/admin/users/edit.cfm?userID=#u.USERID#' title='Edit User' data-bs-toggle='tooltip' data-bs-title='Edit User'><i class='bi bi-pencil-square'></i></a>
+                #editLink#
                 <a class='btn btn-sm btn-secondary users-list-action-button users-list-action-button-view' href='/admin/users/view.cfm?userID=#u.USERID#' title='View User' data-bs-toggle='tooltip' data-bs-title='View User'><i class='bi bi-eye'></i></a>
                 #deleteLink#
                 #mediaLink#</div>

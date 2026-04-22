@@ -2,6 +2,10 @@
     <cflocation url="#request.webRoot#/admin/users/index.cfm" addtoken="false">
 </cfif>
 
+<cfif NOT request.hasPermission("users.delete")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
 <cfset directoryService = createObject("component", "cfc.directory_service").init()>
 <cfset user = directoryService.getFullProfile( url.userID ).user>
 

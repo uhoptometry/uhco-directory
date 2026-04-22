@@ -468,6 +468,157 @@
       <cfreturn result>
     </cffunction>
 
+    <cffunction name="startUserImpersonation" access="public" returntype="struct" output="false">
+      <cfargument name="userID" type="numeric" required="true">
+
+      <cfset var result  = { success = false, message = "" }>
+      <cfset var dao     = _getAdminAuthDAO()>
+      <cfset var ctx     = {}>
+      <cfset var roleStr = "">
+      <cfset var labelStr = "">
+      <cfset var targetUser = {}>
+
+      <cfif NOT isActualSuperAdmin()>
+        <cfset result.message = "Only an actual SUPER_ADMIN can start impersonation.">
+        <cfreturn result>
+      </cfif>
+
+      <cfif NOT structKeyExists(session, "user")>
+        <cfset result.message = "No active session found.">
+        <cfreturn result>
+      </cfif>
+
+      <!--- Prevent impersonating yourself or another super admin --->
+      <cfset ctx = _loadAuthorizationContext(arguments.userID)>
+      <cfif NOT structCount(ctx) OR NOT structKeyExists(ctx, "userID")>
+        <cfset result.message = "User not found.">
+        <cfreturn result>
+      </cfif>
+      <cfif ctx.isSuperAdmin>
+        <cfset result.message = "Cannot impersonate a SUPER_ADMIN user.">
+        <cfreturn result>
+      </cfif>
+      <cfif val(arguments.userID) EQ val(session.user.adminUserID ?: 0)>
+        <cfset result.message = "Cannot impersonate yourself.">
+        <cfreturn result>
+      </cfif>
+
+      <!--- Fetch cougarnet for a readable label --->
+      <cfset targetUser = dao.getUserByID(arguments.userID)>
+      <cfset roleStr = arrayLen(ctx.roles) ? arrayToList(ctx.roles, ", ") : "No roles">
+      <cfset labelStr = "User: " & (structKeyExists(targetUser, "COUGARNET") ? targetUser.COUGARNET : arguments.userID) & " (" & roleStr & ")">
+
+      <cfset session.user = _normalizeSessionUser(session.user)>
+      <cfset session.user.impersonation = {
+        active      = true,
+        type        = "user",
+        label       = labelStr,
+        roleIDs     = ctx.roleIDs,
+        roles       = ctx.roles,
+        permissions = ctx.permissions,
+        startedAt   = now()
+      }>
+      <cfset _applyEffectiveAuthorization(ctx.roles, ctx.roleIDs, ctx.permissions, false)>
+
+      <cfset result.success = true>
+      <cfset result.message = "Now impersonating " & labelStr & ".">
+      <cfreturn result>
+    </cffunction>
+
+    <cffunction name="startImpersonation" access="public" returntype="struct" output="false">
+      <cfargument name="roleID"                  type="numeric" required="true">
+      <cfargument name="additionalPermissionIDs" type="array"   required="false" default="#[]#">
+
+      <cfset var result             = { success = false, message = "" }>
+      <cfset var dao                = _getAdminAuthDAO()>
+      <cfset var role               = {}>
+      <cfset var rolePermissionRows = []>
+      <cfset var rolePermissionKeys = []>
+      <cfset var allPermissions     = []>
+      <cfset var permissionLookup   = {}>
+      <cfset var additionalKeys     = []>
+      <cfset var mergedKeys         = []>
+      <cfset var mergedSeen         = {}>
+      <cfset var additionalCount    = 0>
+      <cfset var labelStr           = "">
+      <cfset var permID             = 0>
+      <cfset var permKey            = "">
+      <cfset var permRow            = {}>
+
+      <cfif NOT isActualSuperAdmin()>
+        <cfset result.message = "Only an actual SUPER_ADMIN can start impersonation.">
+        <cfreturn result>
+      </cfif>
+
+      <cfif NOT structKeyExists(session, "user")>
+        <cfset result.message = "No active session found.">
+        <cfreturn result>
+      </cfif>
+
+      <cfset role = dao.getRoleByID(arguments.roleID)>
+      <cfif NOT structCount(role)>
+        <cfset result.message = "Role not found.">
+        <cfreturn result>
+      </cfif>
+
+      <cfif role.ROLE_NAME EQ "SUPER_ADMIN">
+        <cfset result.message = "Cannot impersonate the SUPER_ADMIN role.">
+        <cfreturn result>
+      </cfif>
+
+      <!--- Build role default permission key set --->
+      <cfset rolePermissionRows = dao.getPermissionsForRole(arguments.roleID)>
+      <cfset rolePermissionKeys = _getPermissionKeysFromRows(rolePermissionRows)>
+
+      <!--- Seed merged set with role defaults --->
+      <cfloop array="#rolePermissionKeys#" index="permKey">
+        <cfset mergedSeen[permKey] = true>
+        <cfset arrayAppend(mergedKeys, permKey)>
+      </cfloop>
+
+      <!--- Resolve additional permission IDs to keys --->
+      <cfif arrayLen(arguments.additionalPermissionIDs)>
+        <cfset allPermissions = dao.getAllPermissions()>
+        <cfloop array="#allPermissions#" index="permRow">
+          <cfset permissionLookup[toString(permRow.PERMISSION_ID)] = permRow.PERMISSION_KEY>
+        </cfloop>
+
+        <cfloop array="#arguments.additionalPermissionIDs#" index="permID">
+          <cfif isNumeric(permID) AND val(permID) GT 0 AND structKeyExists(permissionLookup, toString(val(permID)))>
+            <cfset permKey = permissionLookup[toString(val(permID))]>
+            <cfif NOT structKeyExists(mergedSeen, permKey)>
+              <cfset mergedSeen[permKey] = true>
+              <cfset arrayAppend(mergedKeys, permKey)>
+              <cfset additionalCount = additionalCount + 1>
+            </cfif>
+          </cfif>
+        </cfloop>
+      </cfif>
+
+      <!--- Build label --->
+      <cfif additionalCount GT 0>
+        <cfset labelStr = "Role: " & role.ROLE_NAME & " (+" & additionalCount & " additional)">
+      <cfelse>
+        <cfset labelStr = "Role: " & role.ROLE_NAME>
+      </cfif>
+
+      <cfset session.user = _normalizeSessionUser(session.user)>
+      <cfset session.user.impersonation = {
+        active      = true,
+        type        = "role",
+        label       = labelStr,
+        roleIDs     = [role.ROLE_ID],
+        roles       = [role.ROLE_NAME],
+        permissions = duplicate(mergedKeys),
+        startedAt   = now()
+      }>
+      <cfset _applyEffectiveAuthorization([role.ROLE_NAME], [role.ROLE_ID], mergedKeys, false)>
+
+      <cfset result.success = true>
+      <cfset result.message = "Now impersonating " & labelStr & ".">
+      <cfreturn result>
+    </cffunction>
+
     <cffunction name="clearImpersonation" access="public" returntype="boolean" output="false">
       <cfif NOT structKeyExists(session, "user")>
         <cfreturn false>

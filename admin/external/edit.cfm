@@ -2,6 +2,10 @@
     <cflocation url="#request.webRoot#/admin/external/index.cfm" addtoken="false">
 </cfif>
 
+<cfif NOT request.hasPermission("external_ids.manage")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
 <cfset externalService = createObject("component", "cfc.externalID_service").init()>
 <cfset systemResult = externalService.getSystem(val(url.systemID))>
 

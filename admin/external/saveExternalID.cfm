@@ -1,3 +1,7 @@
+<cfif NOT request.hasPermission("external_ids.manage")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
 <cfset externalService = createObject("component", "cfc.externalID_service").init()>
 
 <cfif !structKeyExists(form, "SystemName") OR !len(trim(form.SystemName))>

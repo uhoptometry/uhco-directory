@@ -21,6 +21,7 @@
 <cfset userDirectPermissionsByID = {}>
 <cfset userDirectPermissionLookupByID = {}>
 <cfset userEffectivePermissionsByID = {}>
+<cfset roleDefaultPermissionIDsByRoleID = {}>
 
 <cfloop array="#allPermissions#" index="permissionItem">
     <cfset permissionCategory = lCase(trim(permissionItem.CATEGORY ?: "other"))>
@@ -29,6 +30,17 @@
         <cfset arrayAppend(permissionCategoryOrder, permissionCategory)>
     </cfif>
     <cfset arrayAppend(permissionsByCategory[permissionCategory], permissionItem)>
+</cfloop>
+
+<cfloop array="#allRoles#" index="roleRow">
+    <cfset rolePermissionRows = authSvc.getPermissionsForRole(roleRow.ROLE_ID)>
+    <cfset defaultPermissionIDs = []>
+    <cfloop array="#rolePermissionRows#" index="rolePermissionRow">
+        <cfif structKeyExists(rolePermissionRow, "PERMISSION_ID") AND isNumeric(rolePermissionRow.PERMISSION_ID)>
+            <cfset arrayAppend(defaultPermissionIDs, val(rolePermissionRow.PERMISSION_ID))>
+        </cfif>
+    </cfloop>
+    <cfset roleDefaultPermissionIDsByRoleID[toString(roleRow.ROLE_ID)] = defaultPermissionIDs>
 </cfloop>
 
 <cfloop array="#users#" index="adminUserRow">
@@ -103,64 +115,69 @@
             </div>
         </cfif>
 
-        <div class="row g-4 mt-1">
-            <div class="col-lg-4">
-                <div class="settings-category-card h-100">
-                    <h6 class="mb-3">Impersonate Role</h6>
-                    <form method="post" action="/admin/settings/admin-users/save.cfm">
-                        <input type="hidden" name="action" value="startImpersonationRole">
-                        <input type="hidden" name="returnURL" value="/admin/dashboard.cfm">
-                        <label class="form-label" for="impersonationRoleID">Role</label>
-                        <select name="impersonationRoleID" id="impersonationRoleID" class="form-select mb-3" required>
-                            <option value="">Select a role</option>
+        <div class="mt-3">
+            <form method="post" action="/admin/settings/admin-users/save.cfm" id="impersonationForm">
+                <input type="hidden" name="action" value="startImpersonation">
+                <input type="hidden" name="returnURL" value="/admin/dashboard.cfm">
+
+                <div class="row g-3 align-items-end mb-3">
+                    <div class="col-md-6 col-lg-4">
+                        <label class="form-label fw-semibold" for="impersonationRoleID">Role <span class="text-danger">*</span></label>
+                        <select name="impersonationRoleID" id="impersonationRoleID" class="form-select" required>
+                            <option value="">Select a role&hellip;</option>
                             <cfloop array="#allRoles#" index="role">
                                 <cfif role.ROLE_NAME NEQ "SUPER_ADMIN">
-                                    <option value="#role.ROLE_ID#">#encodeForHTML(role.ROLE_NAME)#</option>
+                                    <cfset roleDefaultPermissionIDs = structKeyExists(roleDefaultPermissionIDsByRoleID, toString(role.ROLE_ID)) ? roleDefaultPermissionIDsByRoleID[toString(role.ROLE_ID)] : []>
+                                    <option value="#role.ROLE_ID#" data-default-permissions="#encodeForHTMLAttribute(arrayToList(roleDefaultPermissionIDs, ','))#">#encodeForHTML(role.ROLE_NAME)#</option>
                                 </cfif>
                             </cfloop>
                         </select>
+                    </div>
+                    <div class="col-md-auto">
                         <button type="submit" class="btn btn-warning text-dark">
-                            <i class="bi bi-person-down me-1"></i>Impersonate Role
+                            <i class="bi bi-person-down me-1"></i>Impersonate
                         </button>
-                    </form>
+                    </div>
                 </div>
-            </div>
-            <div class="col-lg-8">
-                <div class="settings-category-card h-100">
-                    <h6 class="mb-3">Impersonate Custom Permissions</h6>
-                    <form method="post" action="/admin/settings/admin-users/save.cfm">
-                        <input type="hidden" name="action" value="startImpersonationPermissions">
-                        <input type="hidden" name="returnURL" value="/admin/dashboard.cfm">
-                        <div class="row row-cols-1 row-cols-md-2 g-3">
-                            <cfloop list="admin,users,media,settings" index="permissionCategory">
-                                <div class="col">
-                                    <div class="settings-category-card h-100 p-2">
-                                        <div class="fw-semibold text-capitalize mb-2">#encodeForHTML(permissionCategory)#</div>
-                                        <cfset foundCategoryPermission = false>
-                                        <cfloop array="#allPermissions#" index="permissionItem">
-                                            <cfif lCase(permissionItem.CATEGORY ?: "") EQ permissionCategory>
-                                                <cfset foundCategoryPermission = true>
-                                                <div class="form-check mb-1">
-                                                    <input class="form-check-input" type="checkbox" name="impersonationPermissionIDs" value="#permissionItem.PERMISSION_ID#" id="permission#permissionItem.PERMISSION_ID#">
-                                                    <label class="form-check-label small" for="permission#permissionItem.PERMISSION_ID#">#encodeForHTML(permissionItem.DISPLAY_NAME)#</label>
-                                                </div>
-                                            </cfif>
-                                        </cfloop>
-                                        <cfif NOT foundCategoryPermission>
-                                            <div class="text-muted small">No permissions in this category.</div>
-                                        </cfif>
-                                    </div>
+
+                <div class="settings-category-card">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <span class="fw-semibold">Additional Permissions</span>
+                            <span class="text-muted small ms-2">Role defaults are checked automatically. Check extras to augment.</span>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <span class="badge bg-secondary d-flex align-items-center gap-1">
+                                <i class="bi bi-circle-fill text-warning" style="font-size:.55rem;"></i>Role default
+                            </span>
+                            <span class="badge bg-secondary d-flex align-items-center gap-1">
+                                <i class="bi bi-circle-fill text-info" style="font-size:.55rem;"></i>Additional
+                            </span>
+                        </div>
+                    </div>
+                    <div class="row g-3">
+                        <cfloop array="#permissionCategoryOrder#" index="permissionCategory">
+                            <div class="col-md-6 col-lg-4">
+                                <div class="settings-category-card h-100 p-2">
+                                    <div class="fw-semibold text-capitalize mb-2">#encodeForHTML(permissionCategory)#</div>
+                                    <cfloop array="#permissionsByCategory[permissionCategory]#" index="permissionItem">
+                                        <div class="form-check mb-1 impersonation-permission-check">
+                                            <input class="form-check-input" type="checkbox"
+                                                   name="impersonationPermissionIDs"
+                                                   value="#permissionItem.PERMISSION_ID#"
+                                                   id="imperPerm#permissionItem.PERMISSION_ID#">
+                                            <label class="form-check-label small d-flex align-items-center gap-1" for="imperPerm#permissionItem.PERMISSION_ID#">
+                                                <i class="bi bi-circle-fill permission-dot" style="font-size:.55rem; opacity:0;"></i>
+                                                #encodeForHTML(permissionItem.DISPLAY_NAME)#
+                                            </label>
+                                        </div>
+                                    </cfloop>
                                 </div>
-                            </cfloop>
-                        </div>
-                        <div class="mt-3">
-                            <button type="submit" class="btn btn-outline-warning text-dark">
-                                <i class="bi bi-sliders me-1"></i>Impersonate Permissions
-                            </button>
-                        </div>
-                    </form>
+                            </div>
+                        </cfloop>
+                    </div>
                 </div>
-            </div>
+            </form>
         </div>
         </div>
     </div>
@@ -254,12 +271,24 @@
                                     data-bs-target="##rolesModal#u.USER_ID#">
                                 <i class="bi bi-key"></i>
                             </button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                            <button type="button" class="btn btn-sm btn-outline-dark"
                                     title="Manage Permissions"
                                     data-bs-toggle="modal"
                                     data-bs-target="##permissionsModal#u.USER_ID#">
                                 <i class="bi bi-sliders"></i>
                             </button>
+                            <!--- Impersonate User --->
+                            <cfif request.isActualSuperAdmin() AND u.USER_ID NEQ session.user.adminUserID AND NOT listFindNoCase(u.ROLE_NAMES ?: "", "SUPER_ADMIN")>
+                                <button type="button" class="btn btn-sm btn-outline-warning"
+                                        title="Impersonate #encodeForHTMLAttribute(u.COUGARNET)#"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="##impersonateUserConfirmModal"
+                                        data-user-id="#u.USER_ID#"
+                                        data-cougarnet="#encodeForHTMLAttribute(u.COUGARNET)#"
+                                        data-roles="#encodeForHTMLAttribute(u.ROLE_NAMES ?: 'No roles')#">
+                                    <i class="bi bi-person-down"></i>
+                                </button>
+                            </cfif>
                             </div>
                         </td>
                     </tr>
@@ -374,6 +403,41 @@
     </div>
 </div>
 
+<!--- Shared impersonate-user confirmation modal --->
+<cfif request.isActualSuperAdmin()>
+<div class="modal fade settings-modal" id="impersonateUserConfirmModal" tabindex="-1" aria-labelledby="impersonateUserConfirmTitle" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="impersonateUserConfirmTitle">
+                    <i class="bi bi-person-down me-2"></i>Impersonate User
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-1">You are about to impersonate:</p>
+                <p class="mb-3">
+                    <strong id="impersonateUserConfirmName" class="fs-5"></strong><br>
+                    <span class="text-muted small" id="impersonateUserConfirmRoles"></span>
+                </p>
+                <p class="text-muted small mb-0">Your session will reflect this user&rsquo;s exact permission set. You can stop impersonating at any time from the banner at the top of every page.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" action="/admin/settings/admin-users/save.cfm" class="mb-0">
+                    <input type="hidden" name="action" value="startImpersonationUser">
+                    <input type="hidden" name="impersonationUserID" id="impersonateUserConfirmUserID" value="">
+                    <input type="hidden" name="returnURL" value="/admin/dashboard.cfm">
+                    <button type="submit" class="btn btn-warning text-dark">
+                        <i class="bi bi-person-down me-1"></i>Confirm Impersonate
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+</cfif>
+
 <div class="mt-3 d-flex flex-wrap gap-2">
     <a href="/admin/settings/admin-roles/" class="btn btn-outline-secondary">
         <i class="bi bi-gear me-1"></i>Manage Roles
@@ -386,6 +450,88 @@
 </div>
 
 </div>
+
+<script>
+(function () {
+    document.addEventListener('DOMContentLoaded', function () {
+
+        // ── Impersonate-user confirm modal ──────────────────────────────────
+        var impersonateModal = document.getElementById('impersonateUserConfirmModal');
+        if (impersonateModal) {
+            impersonateModal.addEventListener('show.bs.modal', function (event) {
+                var trigger  = event.relatedTarget;
+                var userID   = trigger ? trigger.getAttribute('data-user-id')   : '';
+                var cougarnet = trigger ? trigger.getAttribute('data-cougarnet') : '';
+                var roles    = trigger ? trigger.getAttribute('data-roles')     : '';
+                document.getElementById('impersonateUserConfirmName').textContent  = cougarnet;
+                document.getElementById('impersonateUserConfirmRoles').textContent = roles;
+                document.getElementById('impersonateUserConfirmUserID').value      = userID;
+            });
+        }
+
+        // ── Role-based impersonation panel ──────────────────────────────────
+        var roleSelect = document.getElementById('impersonationRoleID');        if (!roleSelect) { return; }
+
+        var permissionCheckboxes = Array.prototype.slice.call(
+            document.querySelectorAll("input[name='impersonationPermissionIDs']")
+        );
+
+        function applyRoleDefaults() {
+            var selectedOption = roleSelect.options[roleSelect.selectedIndex];
+            var raw = selectedOption ? (selectedOption.getAttribute('data-default-permissions') || '') : '';
+            var defaultSet = {};
+            raw.split(',').forEach(function (token) {
+                var id = (token || '').trim();
+                if (id.length) { defaultSet[id] = true; }
+            });
+
+            permissionCheckboxes.forEach(function (checkbox) {
+                var isDefault = !!defaultSet[checkbox.value];
+                checkbox.checked = isDefault;
+
+                // Colour the dot: gold for role default, teal for additional (checked but not default)
+                var dot = checkbox.closest('.impersonation-permission-check')
+                              ? checkbox.closest('.impersonation-permission-check').querySelector('.permission-dot')
+                              : null;
+                if (dot) {
+                    dot.style.opacity  = isDefault ? '1' : '0';
+                    dot.style.color    = 'var(--bs-warning)';
+                }
+            });
+        }
+
+        // Refresh dots as user manually checks/unchecks extras
+        function refreshDots() {
+            var selectedOption = roleSelect.options[roleSelect.selectedIndex];
+            var raw = selectedOption ? (selectedOption.getAttribute('data-default-permissions') || '') : '';
+            var defaultSet = {};
+            raw.split(',').forEach(function (token) {
+                var id = (token || '').trim();
+                if (id.length) { defaultSet[id] = true; }
+            });
+
+            permissionCheckboxes.forEach(function (checkbox) {
+                var isDefault    = !!defaultSet[checkbox.value];
+                var isChecked    = checkbox.checked;
+                var isAdditional = isChecked && !isDefault;
+                var dot = checkbox.closest('.impersonation-permission-check')
+                              ? checkbox.closest('.impersonation-permission-check').querySelector('.permission-dot')
+                              : null;
+                if (dot) {
+                    dot.style.opacity = (isDefault || isAdditional) ? '1' : '0';
+                    dot.style.color   = isDefault ? 'var(--bs-warning)' : 'var(--bs-info)';
+                }
+            });
+        }
+
+        roleSelect.addEventListener('change', applyRoleDefaults);
+
+        permissionCheckboxes.forEach(function (checkbox) {
+            checkbox.addEventListener('change', refreshDots);
+        });
+    });
+}());
+</script>
 
 </cfoutput>
 </cfsavecontent>

@@ -26,7 +26,7 @@
             }
         </script>
         <div class="sidebar-header">
-            <h4 class="sidebar-title text-white mb-0">UHCO_<em>Ident</em></h4>
+            <h4 class="sidebar-title text-white mb-0">UHCO_<em>Identity</em></h4>
             <button class="sidebar-toggle" id="sidebarToggle" title="Toggle Sidebar">
                 <i class="bi bi-chevron-left"></i>
             </button>
@@ -294,7 +294,7 @@
                     <strong>Impersonation active.</strong>
                     You are currently using <strong><cfoutput>#encodeForHTML(impersonationState.label ?: "")#</cfoutput></strong>.
                 </div>
-                <form method="post" action="#request.webRoot#/admin/settings/admin-users/save.cfm" class="mb-0">
+                <form method="post" action="<cfoutput>#request.webRoot#</cfoutput>/admin/settings/admin-users/save.cfm" class="mb-0">
                     <input type="hidden" name="action" value="clearImpersonation">
                     <input type="hidden" name="returnURL" value="<cfoutput>#encodeForHTMLAttribute(currentRequestUrl)#</cfoutput>">
                     <button type="submit" class="btn btn-sm btn-outline-dark">

@@ -17,6 +17,12 @@
     <cfabort>
 </cfif>
 
+<!--- Permission check --->
+<cfif NOT request.hasPermission("users.edit")>
+    <cfoutput>{"success":false,"message":"Unauthorized: users.edit permission required."}</cfoutput>
+    <cfabort>
+</cfif>
+
 <cfparam name="form.userID" default="0">
 <cfparam name="form.active" default="">
 

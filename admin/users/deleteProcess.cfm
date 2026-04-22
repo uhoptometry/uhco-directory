@@ -2,6 +2,10 @@
     <cflocation url="#request.webRoot#/admin/users/index.cfm" addtoken="false">
 </cfif>
 
+<cfif NOT request.hasPermission("users.delete")>
+    <cflocation url="#request.webRoot#/admin/users/index.cfm" addtoken="false">
+</cfif>
+
 <cfset usersService = createObject("component", "cfc.users_service").init()>
 
 <!--- Perform the deletion --->
