@@ -20,6 +20,20 @@
         <cfif postAction EQ "savePublishedSettings">
             <cfset mediaConfigService.setPublishedSiteBaseUrl( trim(form.publishedSiteBaseUrl ?: "") )>
             <cfset actionMessage = "Application settings saved.">
+        <cfelseif postAction EQ "saveDashboardSettings">
+            <cfset dashboardListPageSize = val(form.dashboardListPageSize ?: 10)>
+            <cfset dashboardStaleMonths = val(form.dashboardStaleMonths ?: 6)>
+
+            <cfif dashboardListPageSize LT 1 OR dashboardListPageSize GT 50>
+                <cfthrow message="Dashboard list page size must be between 1 and 50.">
+            </cfif>
+            <cfif dashboardStaleMonths LT 1 OR dashboardStaleMonths GT 60>
+                <cfthrow message="Dashboard stale-month threshold must be between 1 and 60.">
+            </cfif>
+
+            <cfset appConfigService.setValue("dashboard.list_page_size", toString(dashboardListPageSize))>
+            <cfset appConfigService.setValue("dashboard.stale_months", toString(dashboardStaleMonths))>
+            <cfset actionMessage = "Dashboard list settings saved.">
         <cfelseif postAction EQ "saveLdapSettings">
             <cfset appConfigService.setValue("ldap.cougarnet.server", trim(form.ldapServer ?: ""))>
             <cfset appConfigService.setValue("ldap.cougarnet.start_dn", trim(form.ldapStartDn ?: ""))>
@@ -69,6 +83,10 @@
 <cfset ldapStaffGroups = appConfigService.getValue("ldap.cougarnet.groups.staff", "")>
 <cfset ldapCurrentStudentGroups = appConfigService.getValue("ldap.cougarnet.groups.current_student", "")>
 <cfset ldapBindPasswordIsSet = len(appConfigService.getValue("ldap.cougarnet.bind_password", "")) GT 0>
+<cfset dashboardListPageSize = val(appConfigService.getValue("dashboard.list_page_size", "10"))>
+<cfif dashboardListPageSize LT 1 OR dashboardListPageSize GT 50><cfset dashboardListPageSize = 10></cfif>
+<cfset dashboardStaleMonths = val(appConfigService.getValue("dashboard.stale_months", "6"))>
+<cfif dashboardStaleMonths LT 1 OR dashboardStaleMonths GT 60><cfset dashboardStaleMonths = 6></cfif>
 
 <cfset content = "">
 <cfsavecontent variable="content">
@@ -127,6 +145,67 @@
             Effective published image base URL:
             <span class="font-monospace">#encodeForHTML(publishedImageBaseUrl)#</span>
         </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4 settings-shell settings-summary-card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-list-columns-reverse me-2"></i>Dashboard List Settings</h5>
+    </div>
+    <div class="card-body">
+        <form method="post" class="row g-3 align-items-end">
+            <input type="hidden" name="formAction" value="saveDashboardSettings">
+
+            <div class="col-lg-4">
+                <label for="dashboardListPageSize" class="form-label fw-bold">dashboard.list_page_size</label>
+                <input
+                    type="number"
+                    min="1"
+                    max="50"
+                    class="form-control font-monospace"
+                    id="dashboardListPageSize"
+                    name="dashboardListPageSize"
+                    value="#dashboardListPageSize#"
+                    required
+                >
+                <div class="form-text">Rows per page for dashboard list widgets (stale users, stale media, unpublished variants).</div>
+            </div>
+
+            <div class="col-lg-4">
+                <label for="dashboardStaleMonths" class="form-label fw-bold">dashboard.stale_months</label>
+                <input
+                    type="number"
+                    min="1"
+                    max="60"
+                    class="form-control font-monospace"
+                    id="dashboardStaleMonths"
+                    name="dashboardStaleMonths"
+                    value="#dashboardStaleMonths#"
+                    required
+                >
+                <div class="form-text">Age threshold in months for stale-record and stale-media dashboard cards.</div>
+            </div>
+
+            <div class="col-lg-4">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-save me-1"></i>Save Dashboard Settings
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4 settings-shell settings-summary-card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-journal-text me-2"></i>Recommended AppConfig Keys</h5>
+    </div>
+    <div class="card-body small text-muted">
+        <p class="mb-2">These keys are currently consumed by the dashboard summary cards in <span class="font-monospace">/admin/dashboard.cfm</span>:</p>
+        <ul class="mb-2">
+            <li><span class="font-monospace">dashboard.list_page_size</span> (default: <strong>10</strong>)</li>
+            <li><span class="font-monospace">dashboard.stale_months</span> (default: <strong>6</strong>)</li>
+        </ul>
+        <p class="mb-0">Use the Dashboard List Settings panel above to update these values safely.</p>
     </div>
 </div>
 

@@ -3,6 +3,10 @@
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
+<cfset appConfigService = createObject("component", "cfc.appConfig_service").init()>
+<cfset scheduleTaskToken = trim(appConfigService.getValue("scheduled_tasks.shared_secret", ""))>
+<cfset scheduleTaskTokenParam = len(scheduleTaskToken) ? "&token=" & urlEncodedFormat(scheduleTaskToken) : "">
+
 <!--- ── Task definitions ─────────────────────────────────────────────────── --->
 <cfset baseUrl = request.siteBaseUrl>
 
@@ -13,11 +17,12 @@
         icon           = "bi-mortarboard",
         color          = "primary",
         description    = "Migrates graduating students to alumni status. Date guard restricts execution to Memorial Day weekend window.",
-        endpoint       = "/admin/settings/migrations/run_grad_migration.cfm?triggeredBy=scheduled&format=json",
+        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_grad_migration_task.cfm?triggeredBy=scheduled&format=json#scheduleTaskTokenParam#",
         startTime      = "12:01 AM",
+        frequency      = "daily",
         timeout        = 600,
         dashboardLink  = "/admin/settings/migrations/",
-        runNowLink     = "/admin/settings/migrations/run_grad_migration.cfm?force=true"
+        runNowLink     = "/admin/settings/scheduled-tasks/tasks/run_grad_migration_task.cfm?force=true"
     },
     {
         key            = "UHCO_BulkExclusions",
@@ -25,8 +30,9 @@
         icon           = "bi-funnel",
         color          = "warning",
         description    = "Runs all 6 data quality exclusion rule sets (adjunct faculty, alumni, current students, faculty, retirees, staff).",
-        endpoint       = "/admin/settings/bulk-exclusions/run_scheduled.cfm?triggeredBy=scheduled&format=json",
+        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_bulk_exclusions_task.cfm?triggeredBy=scheduled&format=json#scheduleTaskTokenParam#",
         startTime      = "01:00 AM",
+        frequency      = "daily",
         timeout        = 900,
         dashboardLink  = "/admin/settings/bulk-exclusions/",
         runNowLink     = ""
@@ -37,11 +43,12 @@
         icon           = "bi-clipboard-check",
         color          = "success",
         description    = "Scans all users for data quality issues and generates an issue-level report.",
-        endpoint       = "/admin/reporting/run_data_quality_report.cfm?triggeredBy=scheduled&format=json",
+        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_data_quality_report_task.cfm?triggeredBy=scheduled&format=json#scheduleTaskTokenParam#",
         startTime      = "02:00 AM",
+        frequency      = "daily",
         timeout        = 300,
         dashboardLink  = "/admin/reporting/data_quality_report.cfm",
-        runNowLink     = "/admin/reporting/run_data_quality_report.cfm"
+        runNowLink     = "/admin/settings/scheduled-tasks/tasks/run_data_quality_report_task.cfm"
     },
     {
         key            = "UHCO_UHSyncReport",
@@ -49,11 +56,12 @@
         icon           = "bi-arrow-left-right",
         color          = "info",
         description    = "Compares local user data against UH API to detect field-level diffs and membership changes.",
-        endpoint       = "/admin/reporting/run_uh_sync_report.cfm?triggeredBy=scheduled&format=json",
+        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_uh_sync_report_task.cfm?triggeredBy=scheduled&format=json#scheduleTaskTokenParam#",
         startTime      = "03:00 AM",
+        frequency      = "daily",
         timeout        = 600,
         dashboardLink  = "/admin/reporting/uh_sync_report.cfm",
-        runNowLink     = "/admin/reporting/run_uh_sync_report.cfm"
+        runNowLink     = "/admin/settings/scheduled-tasks/tasks/run_uh_sync_report_task.cfm"
     },
     {
         key            = "UHCO_HometownProfileSync",
@@ -61,11 +69,51 @@
         icon           = "bi-geo-alt",
         color          = "secondary",
         description    = "Checks Hometown addresses for Alumni and Current-Students, and fills blank UserStudentProfile hometown city/state values when available.",
-        endpoint       = "/admin/settings/scheduled-tasks/run_hometown_sync.cfm?triggeredBy=scheduled&format=json",
+        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_hometown_sync.cfm?triggeredBy=scheduled&format=json#scheduleTaskTokenParam#",
         startTime      = "04:00 AM",
+        frequency      = "daily",
         timeout        = 600,
         dashboardLink  = "",
-        runNowLink     = "/admin/settings/scheduled-tasks/run_hometown_sync.cfm"
+        runNowLink     = "/admin/settings/scheduled-tasks/tasks/run_hometown_sync.cfm"
+    },
+    {
+        key            = "UHCO_DashboardStaleUsers",
+        label          = "Dashboard Stale Users Snapshot",
+        icon           = "bi-person-exclamation",
+        color          = "warning",
+        description    = "Calculates stale user-record totals for dashboard summary cards using dashboard.stale_months.",
+        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_dashboard_stale_users_snapshot.cfm?triggeredBy=scheduled&format=json#scheduleTaskTokenParam#",
+        startTime      = "04:10 AM",
+        frequency      = "daily",
+        timeout        = 180,
+        dashboardLink  = "/admin/dashboard.cfm",
+        runNowLink     = "/admin/settings/scheduled-tasks/tasks/run_dashboard_stale_users_snapshot.cfm"
+    },
+    {
+        key            = "UHCO_DashboardStaleMedia",
+        label          = "Dashboard Stale Media Snapshot",
+        icon           = "bi-images",
+        color          = "info",
+        description    = "Calculates stale media totals for dashboard summary cards using dashboard.stale_months.",
+        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_dashboard_stale_media_snapshot.cfm?triggeredBy=scheduled&format=json#scheduleTaskTokenParam#",
+        startTime      = "04:12 AM",
+        frequency      = "daily",
+        timeout        = 180,
+        dashboardLink  = "/admin/dashboard.cfm",
+        runNowLink     = "/admin/settings/scheduled-tasks/tasks/run_dashboard_stale_media_snapshot.cfm"
+    },
+    {
+        key            = "UHCO_DashboardUnpublishedVariants",
+        label          = "Dashboard Unpublished Variants Snapshot",
+        icon           = "bi-file-earmark-image",
+        color          = "secondary",
+        description    = "Calculates generated-but-unpublished variant totals for dashboard summary cards.",
+        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_dashboard_unpublished_variants_snapshot.cfm?triggeredBy=scheduled&format=json#scheduleTaskTokenParam#",
+        startTime      = "04:14 AM",
+        frequency      = "daily",
+        timeout        = 180,
+        dashboardLink  = "/admin/dashboard.cfm",
+        runNowLink     = "/admin/settings/scheduled-tasks/tasks/run_dashboard_unpublished_variants_snapshot.cfm"
     }
 ]>
 
@@ -87,7 +135,6 @@
 <cfset uhDAO   = createObject("component", "dao.uhSync_DAO").init()>
 <cfset gmDAO   = createObject("component", "dao.gradMigration_DAO").init()>
 <cfset beDAO   = createObject("component", "dao.bulkExclusions_DAO").init()>
-
 <cfset latestRuns = {}>
 <cftry>
     <cfset dqRuns = dqDAO.getRecentRuns(1)>
@@ -107,6 +154,42 @@
     <cfset latestRuns["UHCO_BulkExclusions"] = arrayLen(beRuns) ? beRuns[1] : {}>
 <cfcatch><cfset latestRuns["UHCO_BulkExclusions"] = {}></cfcatch>
 </cftry>
+<cftry>
+    <cfset rawSnapshot = appConfigService.getValue("scheduled_tasks.dashboard_stale_users.last_run", "")>
+    <cfset latestRuns["UHCO_DashboardStaleUsers"] = len(rawSnapshot) AND isJSON(rawSnapshot) ? deserializeJSON(rawSnapshot) : {}>
+<cfcatch><cfset latestRuns["UHCO_DashboardStaleUsers"] = {}></cfcatch>
+</cftry>
+<cftry>
+    <cfset rawSnapshot = appConfigService.getValue("scheduled_tasks.dashboard_stale_media.last_run", "")>
+    <cfset latestRuns["UHCO_DashboardStaleMedia"] = len(rawSnapshot) AND isJSON(rawSnapshot) ? deserializeJSON(rawSnapshot) : {}>
+<cfcatch><cfset latestRuns["UHCO_DashboardStaleMedia"] = {}></cfcatch>
+</cftry>
+<cftry>
+    <cfset rawSnapshot = appConfigService.getValue("scheduled_tasks.dashboard_unpublished_variants.last_run", "")>
+    <cfset latestRuns["UHCO_DashboardUnpublishedVariants"] = len(rawSnapshot) AND isJSON(rawSnapshot) ? deserializeJSON(rawSnapshot) : {}>
+<cfcatch><cfset latestRuns["UHCO_DashboardUnpublishedVariants"] = {}></cfcatch>
+</cftry>
+
+<!--- ── Load schedule settings (time + frequency) from AppConfig ───────── --->
+<cfset scheduleSettings = {}>
+<cfloop from="1" to="#arrayLen(tasks)#" index="ti">
+    <cfset taskKey = tasks[ti].key>
+    <cfset keyBase = "scheduled_tasks." & lCase(taskKey)>
+    <cfset configuredTime = trim(appConfigService.getValue(keyBase & ".start_time", tasks[ti].startTime))>
+    <cfset configuredFrequency = lCase(trim(appConfigService.getValue(keyBase & ".frequency", tasks[ti].frequency ?: "daily")))>
+
+    <cfif NOT reFindNoCase("^[0-9]{1,2}:[0-9]{2}\s?(AM|PM)$", configuredTime)>
+        <cfset configuredTime = tasks[ti].startTime>
+    </cfif>
+    <cfif NOT listFindNoCase("daily,weekly,monthly", configuredFrequency)>
+        <cfset configuredFrequency = "daily">
+    </cfif>
+
+    <cfset scheduleSettings[taskKey] = {
+        startTime = configuredTime,
+        frequency = configuredFrequency
+    }>
+</cfloop>
 
 <!--- ── Handle POST actions ──────────────────────────────────────────────── --->
 <cfset actionMessage      = "">
@@ -125,7 +208,9 @@
 
     <cfif url.msg EQ "ran">
         <cfset actionMessage = "<strong>#encodeForHTML(messageTaskLabel)#</strong> ran successfully.">
-        <cfif isNumeric(url.total ?: "")>
+        <cfif left(messageTaskKey, 14) EQ "UHCO_Dashboard" AND isNumeric(url.total ?: "")>
+            <cfset actionMessage &= " Found #val(url.total)# record(s).">
+        <cfelseif isNumeric(url.total ?: "")>
             <cfset actionMessage &= " Synced #val(url.total)# profile(s).">
             <cfif isNumeric(url.updated ?: "") OR isNumeric(url.inserted ?: "")>
                 <cfset actionMessage &= " (Updated: #val(url.updated ?: 0)#, Inserted: #val(url.inserted ?: 0)#)">
@@ -155,7 +240,28 @@
     <cfif NOT validTask>
         <cfset actionMessage      = "Invalid task key.">
         <cfset actionMessageClass = "alert-danger">
+    <cfelseif action EQ "saveScheduleSettings">
+        <cfset submittedTime = trim(form.scheduleTime ?: "")>
+        <cfset submittedFrequency = lCase(trim(form.scheduleFrequency ?: "daily"))>
+
+        <cfif NOT reFindNoCase("^[0-9]{1,2}:[0-9]{2}\s?(AM|PM)$", submittedTime)>
+            <cfset actionMessage      = "Invalid time format. Use hh:mm AM/PM.">
+            <cfset actionMessageClass = "alert-danger">
+        <cfelseif NOT listFindNoCase("daily,weekly,monthly", submittedFrequency)>
+            <cfset actionMessage      = "Invalid frequency.">
+            <cfset actionMessageClass = "alert-danger">
+        <cfelse>
+            <cfset keyBase = "scheduled_tasks." & lCase(taskKey)>
+            <cfset appConfigService.setValue(keyBase & ".start_time", submittedTime)>
+            <cfset appConfigService.setValue(keyBase & ".frequency", submittedFrequency)>
+            <cfset scheduleSettings[taskKey] = {
+                startTime = submittedTime,
+                frequency = submittedFrequency
+            }>
+            <cfset actionMessage = "<strong>#encodeForHTML(taskDef.label)#</strong> schedule settings saved (#encodeForHTML(submittedTime)#, #encodeForHTML(uCase(left(submittedFrequency,1)) & mid(submittedFrequency,2,len(submittedFrequency)))#).">
+        </cfif>
     <cfelseif action EQ "enable">
+        <cfset effectiveSchedule = structKeyExists(scheduleSettings, taskKey) ? scheduleSettings[taskKey] : { startTime = taskDef.startTime, frequency = taskDef.frequency ?: "daily" }>
         <cftry>
             <cfschedule
                 action         = "update"
@@ -163,12 +269,12 @@
                 operation      = "HTTPRequest"
                 url            = "#baseUrl##taskDef.endpoint#"
                 startDate      = "#dateFormat(now(), 'MM/DD/YYYY')#"
-                startTime      = "#taskDef.startTime#"
-                interval       = "daily"
+                startTime      = "#effectiveSchedule.startTime#"
+                interval       = "#effectiveSchedule.frequency#"
                 requesttimeout = "#taskDef.timeout#"
                 resolveurl     = "false"
                 publish        = "false">
-            <cfset actionMessage = "<strong>#encodeForHTML(taskDef.label)#</strong> scheduled daily at #encodeForHTML(taskDef.startTime)#.">
+            <cfset actionMessage = "<strong>#encodeForHTML(taskDef.label)#</strong> scheduled #encodeForHTML(effectiveSchedule.frequency)# at #encodeForHTML(effectiveSchedule.startTime)#.">
         <cfcatch>
             <cfset actionMessage      = "Could not enable schedule: #encodeForHTML(cfcatch.message)#">
             <cfset actionMessageClass = "alert-danger">
@@ -222,8 +328,8 @@
     <div class="card-body py-3">
         <div class="settings-task-timeline">
             <cfloop from="1" to="#arrayLen(tasks)#" index="i">
-                <span class="badge bg-#tasks[i].color# bg-opacity-75 fs-6 py-2 px-3">
-                    <i class="bi #tasks[i].icon# me-1"></i>
+                <span class="badge bg-light text-dark border fs-6 py-2 px-3">
+                    <i class="bi #tasks[i].icon# text-#tasks[i].color# me-1"></i>
                     #encodeForHTML(tasks[i].startTime)#
                     <span class="ms-1 fw-normal">#encodeForHTML(tasks[i].label)#</span>
                 </span>
@@ -243,27 +349,29 @@
     <cfset hasRun = NOT structIsEmpty(lr)>
     <cfset fullUrl = baseUrl & t.endpoint>
     <cfset collapseId = "taskCollapse_" & t.key>
+    <cfset headerBgClass = (i MOD 2 EQ 0) ? "bg-light" : "bg-white">
+    <cfset effectiveSchedule = structKeyExists(scheduleSettings, t.key) ? scheduleSettings[t.key] : { startTime = t.startTime, frequency = t.frequency ?: "daily" }>
 
     <div class="task-masonry-item">
         <div class="card shadow-sm">
             <div class="settings-task-card">
-            <div class="card-header bg-#t.color# bg-opacity-10 p-0">
-                <button class="btn w-100 text-start p-3 border-0 rounded-0 d-flex justify-content-between align-items-center #(i EQ 1 ? '' : 'collapsed')#"
+            <div class="card-header #headerBgClass# p-0">
+                <button class="btn w-100 text-start text-dark p-3 border-0 rounded-0 d-flex justify-content-between align-items-center #(i EQ 1 ? '' : 'collapsed')#"
                         type="button"
                         data-bs-toggle="collapse"
                         data-bs-target="###collapseId#"
                     aria-expanded="false"
                         aria-controls="#collapseId#">
                     <span>
-                        <span class="h5 mb-0 text-#t.color# d-inline-flex align-items-center">
-                            <i class="bi #t.icon# me-2"></i>#encodeForHTML(t.label)#
+                        <span class="h5 mb-0 text-dark d-inline-flex align-items-center">
+                            <i class="bi #t.icon# text-#t.color# me-2"></i>#encodeForHTML(t.label)#
                         </span>
                     </span>
                     <span class="d-inline-flex align-items-center gap-2">
                         <cfif structKeyExists(enabledTasks, t.key)>
                             <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Enabled</span>
                         <cfelse>
-                            <span class="badge bg-secondary">Disabled</span>
+                            <span class="badge bg-secondary text-dark">Disabled</span>
                         </cfif>
                         <i class="bi bi-chevron-down text-muted"></i>
                     </span>
@@ -277,12 +385,35 @@
                     <div class="row g-2 mb-3">
                         <div class="col-6">
                             <div class="small text-muted">Scheduled Time</div>
-                            <strong>#encodeForHTML(t.startTime)#</strong> <span class="text-muted small">daily</span>
+                            <strong>#encodeForHTML(effectiveSchedule.startTime)#</strong> <span class="text-muted small">#encodeForHTML(effectiveSchedule.frequency)#</span>
                         </div>
                         <div class="col-6">
                             <div class="small text-muted">Timeout</div>
                             <strong>#t.timeout#s</strong> <span class="text-muted small">(#int(t.timeout / 60)# min)</span>
                         </div>
+                    </div>
+
+                    <div class="mb-3 border-top pt-3">
+                        <div class="small text-muted mb-2">Schedule Settings</div>
+                        <form method="post" class="row g-2 align-items-end">
+                            <input type="hidden" name="action" value="saveScheduleSettings">
+                            <input type="hidden" name="taskKey" value="#encodeForHTMLAttribute(t.key)#">
+                            <div class="col-md-5">
+                                <label class="form-label form-label-sm mb-1">Time</label>
+                                <input type="text" name="scheduleTime" class="form-control form-control-sm" value="#encodeForHTMLAttribute(effectiveSchedule.startTime)#" placeholder="hh:mm AM/PM" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label form-label-sm mb-1">Frequency</label>
+                                <select name="scheduleFrequency" class="form-select form-select-sm">
+                                    <option value="daily" #effectiveSchedule.frequency EQ "daily" ? "selected" : ""#>Daily</option>
+                                    <option value="weekly" #effectiveSchedule.frequency EQ "weekly" ? "selected" : ""#>Weekly</option>
+                                    <option value="monthly" #effectiveSchedule.frequency EQ "monthly" ? "selected" : ""#>Monthly</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <button type="submit" class="btn btn-sm btn-outline-primary w-100">Save</button>
+                            </div>
+                        </form>
                     </div>
 
                     <!--- Last run info --->
@@ -382,6 +513,7 @@
             <li>Each task card header can be clicked to expand or collapse its details and actions.</li>
             <li><strong>Enable</strong> registers (or re-registers) the task in the ColdFusion Scheduler to run daily at the configured time.</li>
             <li><strong>Disable</strong> removes the task from the ColdFusion Scheduler entirely.</li>
+            <li>Scheduler requests use a shared token from <span class="font-monospace">scheduled_tasks.shared_secret</span>. Configure this in Application Settings before enabling tasks.</li>
             <li>Tasks can also be managed directly in the ColdFusion Administrator under <em>Server Settings &rarr; Scheduled Tasks</em>.</li>
             <li>The <strong>Graduation Migration</strong> task has an additional date guard — it only executes during the Memorial Day weekend window even if the schedule fires daily.</li>
             <li>Endpoint URLs are shown for reference. You can paste them into CF Administrator or use them to trigger tasks via external schedulers.</li>

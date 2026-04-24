@@ -115,6 +115,134 @@ component extends="dao.BaseDAO" output="false" singleton {
         return rows;
     }
 
+    /**
+     * Return active users whose record update timestamp is older than the
+     * configured number of months. Intended for compact dashboard summaries.
+     */
+    public array function getStaleUsersForDashboard(
+        numeric maxRows = 8,
+        numeric staleMonths = 6
+    ) {
+        var qry = executeQueryWithRetry(
+            "
+            WITH ranked AS (
+                SELECT u.UserID,
+                       u.FirstName,
+                       u.MiddleName,
+                       u.LastName,
+                       u.UpdatedAt,
+                       COALESCE(pa.FirstName, '')  AS PreferredFirstName,
+                       COALESCE(pa.MiddleName, '') AS PreferredMiddleName,
+                       COALESCE(pa.LastName, '')   AS PreferredLastName,
+                       ROW_NUMBER() OVER (ORDER BY ISNULL(u.UpdatedAt, '1900-01-01') ASC, u.UserID ASC) AS rn
+                FROM   Users u
+                OUTER APPLY (
+                    SELECT TOP 1 ua.FirstName, ua.MiddleName, ua.LastName
+                    FROM UserAliases ua
+                    WHERE ua.UserID = u.UserID
+                      AND ua.IsActive = 1
+                    ORDER BY
+                        CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
+                        ISNULL(ua.SortOrder, 999999),
+                        ua.AliasID
+                ) pa
+                WHERE ISNULL(u.Active, 1) = 1
+                  AND ISNULL(u.UpdatedAt, '1900-01-01') < DATEADD(month, -:staleMonths, GETDATE())
+            )
+            SELECT UserID,
+                   FirstName,
+                   MiddleName,
+                   LastName,
+                   UpdatedAt,
+                   PreferredFirstName,
+                   PreferredMiddleName,
+                   PreferredLastName
+            FROM ranked
+            WHERE rn <= :maxRows
+            ORDER BY rn
+            ",
+            {
+                staleMonths = { value=val(arguments.staleMonths), cfsqltype="cf_sql_integer" },
+                maxRows     = { value=val(arguments.maxRows),     cfsqltype="cf_sql_integer" }
+            },
+            { datasource=variables.datasource, timeout=60, fetchSize=100 }
+        );
+
+        var rows = queryToArray(qry);
+        _applyPreferredNameToRows( rows );
+        return rows;
+    }
+
+    /**
+     * Return one page of stale users plus total count for dashboard pagination.
+     */
+    public struct function getStaleUsersForDashboardPage(
+        numeric pageSize = 10,
+        numeric pageNumber = 1,
+        numeric staleMonths = 6
+    ) {
+        var size = max(1, min(100, int(val(arguments.pageSize ?: 10))));
+        var page = max(1, int(val(arguments.pageNumber ?: 1)));
+        var offsetRows = (page - 1) * size;
+
+        var countQry = executeQueryWithRetry(
+            "
+            SELECT COUNT(*) AS TotalCount
+            FROM Users u
+            WHERE ISNULL(u.Active, 1) = 1
+              AND ISNULL(u.UpdatedAt, '1900-01-01') < DATEADD(month, -:staleMonths, GETDATE())
+            ",
+            {
+                staleMonths = { value=val(arguments.staleMonths), cfsqltype="cf_sql_integer" }
+            },
+            { datasource=variables.datasource, timeout=60 }
+        );
+
+        var dataQry = executeQueryWithRetry(
+            "
+            SELECT u.UserID,
+                   u.FirstName,
+                   u.MiddleName,
+                   u.LastName,
+                   u.UpdatedAt,
+                   COALESCE(pa.FirstName, '')  AS PreferredFirstName,
+                   COALESCE(pa.MiddleName, '') AS PreferredMiddleName,
+                   COALESCE(pa.LastName, '')   AS PreferredLastName
+            FROM Users u
+            OUTER APPLY (
+                SELECT TOP 1 ua.FirstName, ua.MiddleName, ua.LastName
+                FROM UserAliases ua
+                WHERE ua.UserID = u.UserID
+                  AND ua.IsActive = 1
+                ORDER BY
+                    CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
+                    ISNULL(ua.SortOrder, 999999),
+                    ua.AliasID
+            ) pa
+            WHERE ISNULL(u.Active, 1) = 1
+              AND ISNULL(u.UpdatedAt, '1900-01-01') < DATEADD(month, -:staleMonths, GETDATE())
+            ORDER BY ISNULL(u.UpdatedAt, '1900-01-01') ASC, u.UserID ASC
+            OFFSET :offsetRows ROWS FETCH NEXT :pageSize ROWS ONLY
+            ",
+            {
+                staleMonths = { value=val(arguments.staleMonths), cfsqltype="cf_sql_integer" },
+                offsetRows  = { value=offsetRows,                 cfsqltype="cf_sql_integer" },
+                pageSize    = { value=size,                       cfsqltype="cf_sql_integer" }
+            },
+            { datasource=variables.datasource, timeout=60, fetchSize=200 }
+        );
+
+        var rows = queryToArray(dataQry);
+        _applyPreferredNameToRows( rows );
+
+        return {
+            data = rows,
+            totalCount = val(countQry.TotalCount ?: 0),
+            pageSize = size,
+            pageNumber = page
+        };
+    }
+
     public struct function searchUsers(
         string searchTerm   = "",
         string filterFlag   = "",

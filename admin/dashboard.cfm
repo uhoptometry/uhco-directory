@@ -44,6 +44,185 @@
     <cfset uhSyncBorderCls    = uhSyncHasPending ? "border-warning" : "border-success">
 </cfif>
 
+<!--- ── Dashboard summary lists: stale users, unpublished variants, stale media ── --->
+<cfset usersDAO_dash = createObject("component", "dao.users_DAO").init()>
+<cfset variantsDAO_dash = createObject("component", "dao.UserImageVariantDAO").init()>
+<cfset appConfigService_dash = createObject("component", "cfc.appConfig_service").init()>
+
+<cfset canUsersView = request.hasPermission("users.view")>
+<cfset canUsersEdit = request.hasPermission("users.edit")>
+<cfset canMediaEdit = request.hasPermission("media.edit")>
+<cfset canMediaPublish = request.hasPermission("media.publish")>
+
+<cfset dashboardPageSize = val(appConfigService_dash.getValue("dashboard.list_page_size", "10"))>
+<cfif dashboardPageSize LT 1><cfset dashboardPageSize = 10></cfif>
+<cfif dashboardPageSize GT 50><cfset dashboardPageSize = 50></cfif>
+
+<cfset staleThresholdMonths = val(appConfigService_dash.getValue("dashboard.stale_months", "6"))>
+<cfif staleThresholdMonths LT 1><cfset staleThresholdMonths = 6></cfif>
+<cfif staleThresholdMonths GT 60><cfset staleThresholdMonths = 60></cfif>
+
+<cfset staleThresholdLabel = staleThresholdMonths & " month" & (staleThresholdMonths EQ 1 ? "" : "s")>
+
+<cfset suPage = (isNumeric(url.suPage ?: "") AND val(url.suPage) GT 0) ? val(url.suPage) : 1>
+<cfset uvPage = (isNumeric(url.uvPage ?: "") AND val(url.uvPage) GT 0) ? val(url.uvPage) : 1>
+<cfset smPage = (isNumeric(url.smPage ?: "") AND val(url.smPage) GT 0) ? val(url.smPage) : 1>
+
+<cfset staleUsersPageData = { data = [], totalCount = 0, pageSize = dashboardPageSize, pageNumber = suPage }>
+<cfset staleMediaPageData = { data = [], totalCount = 0, pageSize = dashboardPageSize, pageNumber = smPage }>
+<cfset unpublishedPageData = { data = [], totalCount = 0, pageSize = dashboardPageSize, pageNumber = uvPage }>
+
+<cftry>
+    <cfset staleUsersPageData = usersDAO_dash.getStaleUsersForDashboardPage(pageSize=dashboardPageSize, pageNumber=suPage, staleMonths=staleThresholdMonths)>
+<cfcatch></cfcatch>
+</cftry>
+
+<cftry>
+    <cfset staleMediaPageData = variantsDAO_dash.getStaleMediaUsersForDashboardPage(pageSize=dashboardPageSize, pageNumber=smPage, staleMonths=staleThresholdMonths)>
+<cfcatch></cfcatch>
+</cftry>
+
+<cftry>
+    <cfset unpublishedPageData = variantsDAO_dash.getGeneratedUnpublishedVariantsForDashboardPage(pageSize=dashboardPageSize, pageNumber=uvPage)>
+<cfcatch></cfcatch>
+</cftry>
+
+<cfset staleUsers = staleUsersPageData.data ?: []>
+<cfset staleMediaUsers = staleMediaPageData.data ?: []>
+<cfset unpublishedVariants = unpublishedPageData.data ?: []>
+
+<cfset staleUsersTotalCount = val(staleUsersPageData.totalCount ?: 0)>
+<cfset staleMediaTotalCount = val(staleMediaPageData.totalCount ?: 0)>
+<cfset unpublishedTotalCount = val(unpublishedPageData.totalCount ?: 0)>
+
+<cfset staleUsersTotalPages = max(1, ceiling(staleUsersTotalCount / dashboardPageSize))>
+<cfset staleMediaTotalPages = max(1, ceiling(staleMediaTotalCount / dashboardPageSize))>
+<cfset unpublishedTotalPages = max(1, ceiling(unpublishedTotalCount / dashboardPageSize))>
+
+<cfif suPage GT staleUsersTotalPages>
+    <cfset suPage = staleUsersTotalPages>
+    <cftry>
+        <cfset staleUsersPageData = usersDAO_dash.getStaleUsersForDashboardPage(pageSize=dashboardPageSize, pageNumber=suPage, staleMonths=staleThresholdMonths)>
+        <cfset staleUsers = staleUsersPageData.data ?: []>
+    <cfcatch></cfcatch>
+    </cftry>
+</cfif>
+<cfif smPage GT staleMediaTotalPages>
+    <cfset smPage = staleMediaTotalPages>
+    <cftry>
+        <cfset staleMediaPageData = variantsDAO_dash.getStaleMediaUsersForDashboardPage(pageSize=dashboardPageSize, pageNumber=smPage, staleMonths=staleThresholdMonths)>
+        <cfset staleMediaUsers = staleMediaPageData.data ?: []>
+    <cfcatch></cfcatch>
+    </cftry>
+</cfif>
+<cfif uvPage GT unpublishedTotalPages>
+    <cfset uvPage = unpublishedTotalPages>
+    <cftry>
+        <cfset unpublishedPageData = variantsDAO_dash.getGeneratedUnpublishedVariantsForDashboardPage(pageSize=dashboardPageSize, pageNumber=uvPage)>
+        <cfset unpublishedVariants = unpublishedPageData.data ?: []>
+    <cfcatch></cfcatch>
+    </cftry>
+</cfif>
+
+<cfset staleUsersListHtml = "<div class='small text-muted'>No stale users found.</div>">
+<cfif arrayLen(staleUsers)>
+    <cfset staleUsersListHtml = "<ul class='list-unstyled small mb-0'>">
+    <cfloop array="#staleUsers#" index="su">
+        <cfset staleUserName = trim(su.FULLNAME ?: ((su.FIRSTNAME ?: "") & " " & (su.LASTNAME ?: "")))>
+        <cfif !len(staleUserName)>
+            <cfset staleUserName = "User ##" & val(su.USERID)>
+        </cfif>
+        <cfset staleUsersActions = "">
+        <cfif canUsersEdit>
+            <cfset staleUsersActions &= " <a href='/admin/users/edit.cfm?userID=#val(su.USERID)#' class='btn btn-sm btn-outline-primary ms-1 py-0 px-1'>Edit</a>">
+        </cfif>
+        <cfif canUsersView>
+            <cfset staleUsersActions &= " <a href='/admin/users/index.cfm?search=#val(su.USERID)#' class='btn btn-sm btn-outline-secondary ms-1 py-0 px-1'>View</a>">
+        </cfif>
+        <cfset staleUsersListHtml &= "<li class='mb-1'><span class='fw-semibold'>#val(su.USERID)#</span> &mdash; #encodeForHTML(staleUserName)##staleUsersActions#</li>">
+    </cfloop>
+    <cfset staleUsersListHtml &= "</ul>">
+</cfif>
+
+<cfset staleUsersPagerHtml = "">
+<cfif staleUsersTotalCount GT dashboardPageSize>
+    <cfset staleUsersPagerHtml = "<div class='d-flex align-items-center justify-content-between mt-2 small text-muted'><span>Showing page #suPage# of #staleUsersTotalPages#</span><div class='btn-group btn-group-sm'>">
+    <cfif suPage GT 1>
+        <cfset staleUsersPagerHtml &= "<a class='btn btn-outline-secondary' href='/admin/dashboard.cfm?suPage=#(suPage - 1)#&uvPage=#uvPage#&smPage=#smPage#'>&laquo; Prev</a>">
+    </cfif>
+    <cfset staleUsersPagerHtml &= "<span class='btn btn-outline-secondary disabled'>#suPage#</span>">
+    <cfif suPage LT staleUsersTotalPages>
+        <cfset staleUsersPagerHtml &= "<a class='btn btn-outline-secondary' href='/admin/dashboard.cfm?suPage=#(suPage + 1)#&uvPage=#uvPage#&smPage=#smPage#'>Next &raquo;</a>">
+    </cfif>
+    <cfset staleUsersPagerHtml &= "</div></div>">
+</cfif>
+
+<cfset staleMediaListHtml = "<div class='small text-muted'>No stale media records found.</div>">
+<cfif arrayLen(staleMediaUsers)>
+    <cfset staleMediaListHtml = "<ul class='list-unstyled small mb-0'>">
+    <cfloop array="#staleMediaUsers#" index="sm">
+        <cfset staleMediaName = trim((sm.PREFERREDFIRSTNAME ?: sm.FIRSTNAME ?: "") & " " & (sm.PREFERREDLASTNAME ?: sm.LASTNAME ?: ""))>
+        <cfif !len(staleMediaName)>
+            <cfset staleMediaName = "User ##" & val(sm.USERID)>
+        </cfif>
+        <cfset staleMediaActions = "">
+        <cfif canMediaEdit>
+            <cfset staleMediaActions &= " <a href='/admin/user-media/sources.cfm?userid=#val(sm.USERID)#' class='btn btn-sm btn-outline-primary ms-1 py-0 px-1'>Media</a>">
+        </cfif>
+        <cfif canUsersView>
+            <cfset staleMediaActions &= " <a href='/admin/users/index.cfm?search=#val(sm.USERID)#' class='btn btn-sm btn-outline-secondary ms-1 py-0 px-1'>View</a>">
+        </cfif>
+        <cfset staleMediaListHtml &= "<li class='mb-1'><span class='fw-semibold'>#val(sm.USERID)#</span> &mdash; #encodeForHTML(staleMediaName)##staleMediaActions#</li>">
+    </cfloop>
+    <cfset staleMediaListHtml &= "</ul>">
+</cfif>
+
+<cfset staleMediaPagerHtml = "">
+<cfif staleMediaTotalCount GT dashboardPageSize>
+    <cfset staleMediaPagerHtml = "<div class='d-flex align-items-center justify-content-between mt-2 small text-muted'><span>Showing page #smPage# of #staleMediaTotalPages#</span><div class='btn-group btn-group-sm'>">
+    <cfif smPage GT 1>
+        <cfset staleMediaPagerHtml &= "<a class='btn btn-outline-secondary' href='/admin/dashboard.cfm?suPage=#suPage#&uvPage=#uvPage#&smPage=#(smPage - 1)#'>&laquo; Prev</a>">
+    </cfif>
+    <cfset staleMediaPagerHtml &= "<span class='btn btn-outline-secondary disabled'>#smPage#</span>">
+    <cfif smPage LT staleMediaTotalPages>
+        <cfset staleMediaPagerHtml &= "<a class='btn btn-outline-secondary' href='/admin/dashboard.cfm?suPage=#suPage#&uvPage=#uvPage#&smPage=#(smPage + 1)#'>Next &raquo;</a>">
+    </cfif>
+    <cfset staleMediaPagerHtml &= "</div></div>">
+</cfif>
+
+<cfset unpublishedVariantsListHtml = "<div class='small text-muted'>No unpublished variants found.</div>">
+<cfif arrayLen(unpublishedVariants)>
+    <cfset unpublishedVariantsListHtml = "<ul class='list-unstyled small mb-0'>">
+    <cfloop array="#unpublishedVariants#" index="uv">
+        <cfset unpublishedName = trim((uv.PREFERREDFIRSTNAME ?: uv.FIRSTNAME ?: "") & " " & (uv.PREFERREDLASTNAME ?: uv.LASTNAME ?: ""))>
+        <cfif !len(unpublishedName)>
+            <cfset unpublishedName = "User ##" & val(uv.USERID)>
+        </cfif>
+        <cfset unpublishedActions = "">
+        <cfif canMediaEdit>
+            <cfset unpublishedActions &= " <a href='/admin/user-media/variants.cfm?userid=#val(uv.USERID)#&sourceid=#val(uv.USERIMAGESOURCEID)#' class='btn btn-sm btn-outline-primary ms-1 py-0 px-1'>Open</a>">
+        </cfif>
+        <cfif canMediaPublish>
+            <cfset unpublishedActions &= " <a href='/admin/user-media/variants.cfm?userid=#val(uv.USERID)#&sourceid=#val(uv.USERIMAGESOURCEID)#' class='btn btn-sm btn-outline-success ms-1 py-0 px-1'>Publish</a>">
+        </cfif>
+        <cfset unpublishedVariantsListHtml &= "<li class='mb-1'><span class='fw-semibold'>#val(uv.USERID)#</span> &mdash; #encodeForHTML(unpublishedName)# <span class='text-muted'>(#encodeForHTML(uv.VARIANTCODE ?: "")#)</span>#unpublishedActions#</li>">
+    </cfloop>
+    <cfset unpublishedVariantsListHtml &= "</ul>">
+</cfif>
+
+<cfset unpublishedPagerHtml = "">
+<cfif unpublishedTotalCount GT dashboardPageSize>
+    <cfset unpublishedPagerHtml = "<div class='d-flex align-items-center justify-content-between mt-2 small text-muted'><span>Showing page #uvPage# of #unpublishedTotalPages#</span><div class='btn-group btn-group-sm'>">
+    <cfif uvPage GT 1>
+        <cfset unpublishedPagerHtml &= "<a class='btn btn-outline-secondary' href='/admin/dashboard.cfm?suPage=#suPage#&uvPage=#(uvPage - 1)#&smPage=#smPage#'>&laquo; Prev</a>">
+    </cfif>
+    <cfset unpublishedPagerHtml &= "<span class='btn btn-outline-secondary disabled'>#uvPage#</span>">
+    <cfif uvPage LT unpublishedTotalPages>
+        <cfset unpublishedPagerHtml &= "<a class='btn btn-outline-secondary' href='/admin/dashboard.cfm?suPage=#suPage#&uvPage=#(uvPage + 1)#&smPage=#smPage#'>Next &raquo;</a>">
+    </cfif>
+    <cfset unpublishedPagerHtml &= "</div></div>">
+</cfif>
+
 <cfset content = "
 <div class='dashboard-shell'>
     <div>
@@ -52,9 +231,9 @@
     </div>
 
 <div class='row'>
-    <div class='col-md-8'>
+    <div class='col-md-9'>
         <div class='row g-4'>
-            <div class='col-md-6'>
+            <div class='col-md-12'>
                 <div class='card shadow-sm dashboard-card'>
                     <div class='card-body d-flex flex-wrap align-items-center justify-content-between gap-3'>
                         <div>
@@ -64,7 +243,7 @@
                         <div class='dashboard-actions'>
                             <div class='dropdown'>
                                 <button class='btn btn-primary btn-sm dropdown-toggle' type='button' data-bs-toggle='dropdown' data-bs-boundary='viewport' aria-expanded='false'>
-                                    <i class='bi bi-gear-fill sidebar-icon me-2'></i>Manage Users
+                                    <i class='bi bi-people-fill sidebar-icon me-2'></i>Manage Users
                                 </button>
                                 <ul class='dropdown-menu'>
                                     <li><a class='dropdown-item' href='/admin/users/index.cfm'><i class='bi bi-exclamation-triangle sidebar-icon me-2'></i>Problem Records</a></li>
@@ -76,18 +255,66 @@
                                     <li><a class='dropdown-item' href='/admin/users/index.cfm?list=all'><i class='bi bi-list sidebar-icon me-2'></i>All Records</a></li>
                                     <li><a class='dropdown-item' href='/admin/users/search-uh-api.cfm'><i class='bi bi-search sidebar-icon me-2'></i>Search UH API</a></li>
                                 </ul>
-                                </div>
+                            </div>
+                        </div>
+                        <div class='w-100 d-flex flex-wrap align-items-center justify-content-between gap-3 mt-3 border-top pt-3'>
+                            <div class='border m-auto p-2 flex-card'>
+                                <h5>Stale Records</h5>
+                                <p class='mb-0'>Records that haven't been updated in over #staleThresholdLabel#.</p>
+                                <div class='mt-2 py-2 border-top'>#staleUsersListHtml##staleUsersPagerHtml#</div>
+                            </div>
+                            <div class='border m-auto p-2 flex-card'>
+                                <h5>Problem Records</h5>
+                                <p class='mb-0'>Records with potential issues flagged by the system or users.</p>
+                                <div class='mt-2 py-2 border-top'>-</div>
+                            </div>
+                            <div class='border m-auto p-2 flex-card'>
+                                <h5>UH API Sync Changes</h5>
+                                <p class='mb-0'>Changes detected during the last UH Sync.</p>
+                                <div class='mt-2 py-2 border-top'>-</div>
+                            </div>
+                            <div class='border m-auto p-2 flex-card'>
+                                <h5>User Review Queue</h5>
+                                <p class='mb-0'>Submitted profile updates submitted waiting for approval.</p>
+                                <div class='mt-2 py-2 border-top'>-</div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class='col-md-6'>
+            <div class='col-md-12'>
+                <div class='card shadow-sm dashboard-card'>
+                    <div class='card-body d-flex flex-wrap align-items-center justify-content-between gap-3'>
+                        <div>
+                            <h5 class='card-title dashboard-card-title'><i class='bi bi-collection-fill sidebar-icon'></i><span>User Media</span></h5>
+                            <p class='card-text dashboard-card-text'>Manage Media.</p>
+                        </div>
+                        <div class='dashboard-actions'>
+                            <a href='/admin/media/index.cfm' class='btn btn-sm btn-primary stretched-link'><i class='bi bi-collection-fill sidebar-icon me-2'></i>Manage Media</a>
+                        </div>
+                        <div class='w-100 d-flex flex-wrap align-items-center justify-content-between gap-3 mt-3 border-top pt-3'>
+                            <div class='border m-auto p-2 flex-card'>
+                                <h5>Unpublished Variants</h5>
+                                <p class='mb-0'>Media variants that have been generated but not yet published.</p>
+                                <div class='mt-2 py-2 border-top'>#unpublishedVariantsListHtml##unpublishedPagerHtml#</div>
+                            </div>
+                            <div class='border m-auto p-2 flex-card'>
+                                <h5>Stale Media</h5>
+                                <p class='mb-0'>Media variants that haven't been updated in over #staleThresholdLabel#.</p>
+                                <div class='mt-2 py-2 border-top'>#staleMediaListHtml##staleMediaPagerHtml#</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class='col-md-4'>
                 <div class='card shadow-sm dashboard-card'>
                     <div class='card-body d-flex flex-wrap align-items-center justify-content-between gap-3'>
                         <div>
                             <h5 class='card-title dashboard-card-title'><i class='bi bi-flag-fill sidebar-icon'></i><span>Flags</span></h5>
-                            <p class='card-text dashboard-card-text'>Assign display flags.</p>
+                            <p class='card-text dashboard-card-text'>Create and manage display flags.</p>
                         </div>
                         <div class='dashboard-actions'>
                             <a href='/admin/flags/index.cfm' class='btn btn-sm btn-primary stretched-link'><i class='bi bi-gear-fill sidebar-icon me-2'></i>Manage Flags</a>
@@ -96,12 +323,12 @@
                 </div>
             </div>
 
-            <div class='col-md-6'>
+            <div class='col-md-4'>
                 <div class='card shadow-sm dashboard-card'>
                     <div class='card-body d-flex flex-wrap align-items-center justify-content-between gap-3'>
                         <div>
                             <h5 class='card-title dashboard-card-title'><i class='bi bi-building-fill sidebar-icon'></i><span>Organizations</span></h5>
-                            <p class='card-text dashboard-card-text'>Manage organizational groups.</p>
+                            <p class='card-text dashboard-card-text'>Create and manage organizational groups.</p>
                         </div>
                         <div class='dashboard-actions'>
                             <a href='/admin/orgs/index.cfm' class='btn btn-sm btn-primary stretched-link'><i class='bi bi-gear-fill sidebar-icon me-2'></i>Manage Orgs</a>
@@ -110,12 +337,12 @@
                 </div>
             </div>
 
-            <div class='col-md-6'>
+            <div class='col-md-4'>
                 <div class='card shadow-sm dashboard-card'>
                     <div class='card-body d-flex flex-wrap align-items-center justify-content-between gap-3'>
                         <div>
                             <h5 class='card-title dashboard-card-title'><i class='bi bi-person-bounding-box sidebar-icon'></i><span>External IDs</span></h5>
-                            <p class='card-text dashboard-card-text'>Manage external IDs for users.</p>
+                            <p class='card-text dashboard-card-text'>Create and manage external ID sources.</p>
                         </div>
                         <div class='dashboard-actions'>
                             <a href='/admin/external/index.cfm' class='btn btn-sm btn-primary stretched-link'><i class='bi bi-gear-fill sidebar-icon me-2'></i>Manage IDs</a>
@@ -125,7 +352,7 @@
             </div>
         </div>
     </div>
-    <div class='col-md-4'>
+    <div class='col-md-3'>
         <div class='row g-4'>
             <div class='col-md-12'>
                 <div class='card shadow-sm dashboard-card'>

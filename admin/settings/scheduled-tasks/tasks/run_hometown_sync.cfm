@@ -17,6 +17,8 @@
     <cfset triggeredBy = trim(form.triggeredBy)>
 </cfif>
 
+<cfinclude template="/admin/settings/scheduled-tasks/tasks/_scheduled_task_auth.cfm">
+
 <cfif triggeredBy NEQ "scheduled" AND NOT request.hasPermission("settings.scheduled_tasks.manage")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>

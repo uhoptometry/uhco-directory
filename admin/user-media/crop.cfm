@@ -176,7 +176,7 @@
             &mdash; #displayName#
         </p>
     </div>
-    <a href='/admin/user-media/variants.cfm?userid=#userID#&sourceid=#sourceID#' class='btn btn-outline-secondary'>
+    <a href='/admin/user-media/variants.cfm?userid=#userID#&sourceid=#sourceID#' class='btn btn-secondary text-dark'>
         <i class='bi bi-arrow-left me-1'></i> Back to Variants
     </a>
 </div>

@@ -37,6 +37,33 @@
 
 <div class="row g-4 mt-3">
 
+    <!--- Application Settings --->
+    <cfif request.hasPermission("settings.admin_permissions.manage")>
+        <div class="col-md-6 col-lg-4">
+            <a href="/admin/settings/app-config/" class="text-decoration-none">
+                <div class="card h-100 border-0 shadow-sm settings-hub-card">
+                    <div class="card-body text-center py-4">
+                        <i class="bi bi-sliders display-4 mb-3 settings-hub-icon"></i>
+                        <h5 class="card-title text-dark">Application Settings</h5>
+                        <p class="card-text text-muted small">Shared key-value configuration such as published media URLs</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <!---- Admin Permissions --->
+        <div class="col-md-6 col-lg-4">
+            <a href="/admin/settings/admin-permissions/" class="text-decoration-none">
+                <div class="card h-100 border-0 shadow-sm settings-hub-card">
+                    <div class="card-body text-center py-4">
+                        <i class="bi bi-sliders display-4 mb-3 settings-hub-icon"></i>
+                        <h5 class="card-title text-dark">Admin Permissions</h5>
+                        <p class="card-text text-muted small">Create, edit, and retire permission definitions</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </cfif>
+
     <!--- Admin Users & Roles --->
     <div class="col-md-6 col-lg-4">
         <a href="/admin/settings/admin-users/" class="text-decoration-none">
@@ -50,32 +77,18 @@
         </a>
     </div>
 
-    <cfif request.hasPermission("settings.admin_permissions.manage")>
-    <div class="col-md-6 col-lg-4">
-        <a href="/admin/settings/admin-permissions/" class="text-decoration-none">
-            <div class="card h-100 border-0 shadow-sm settings-hub-card">
-                <div class="card-body text-center py-4">
-                    <i class="bi bi-sliders display-4 mb-3 settings-hub-icon"></i>
-                    <h5 class="card-title text-dark">Admin Permissions</h5>
-                    <p class="card-text text-muted small">Create, edit, and retire permission definitions</p>
-                </div>
-            </div>
-        </a>
-    </div>
-    </cfif>
-
     <cfif request.hasAnyPermission(["settings.user_review.manage", "users.approve_user_review"] )>
-    <div class="col-md-6 col-lg-4">
-        <a href="/admin/settings/user-review/" class="text-decoration-none">
-            <div class="card h-100 border-0 shadow-sm settings-hub-card">
-                <div class="card-body text-center py-4">
-                    <i class="bi bi-person-lines-fill display-4 mb-3 settings-hub-icon"></i>
-                    <h5 class="card-title text-dark">User Review</h5>
-                    <p class="card-text text-muted small">Configure self-service profile review and process submissions</p>
+        <div class="col-md-6 col-lg-4">
+            <a href="/admin/settings/user-review/" class="text-decoration-none">
+                <div class="card h-100 border-0 shadow-sm settings-hub-card">
+                    <div class="card-body text-center py-4">
+                        <i class="bi bi-person-lines-fill display-4 mb-3 settings-hub-icon"></i>
+                        <h5 class="card-title text-dark">User Review</h5>
+                        <p class="card-text text-muted small">Configure self-service profile review and process submissions</p>
+                    </div>
                 </div>
-            </div>
-        </a>
-    </div>
+            </a>
+        </div>
     </cfif>
 
     <!--- User Media Config --->
@@ -86,6 +99,19 @@
                     <i class="bi bi-image display-4 mb-3 settings-hub-icon"></i>
                     <h5 class="card-title text-dark">User Media Config</h5>
                     <p class="card-text text-muted small">Filename patterns and image variant types</p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <!--- UHCO API --->
+    <div class="col-md-6 col-lg-4">
+        <a href="/admin/settings/uhco-api/" class="text-decoration-none">
+            <div class="card h-100 border-0 shadow-sm settings-hub-card">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-braces display-4 mb-3 settings-hub-icon"></i>
+                    <h5 class="card-title text-dark">UHCO API</h5>
+                    <p class="card-text text-muted small">Manage API tokens and secrets for external integrations</p>
                 </div>
             </div>
         </a>
@@ -104,14 +130,14 @@
         </a>
     </div>
 
-    <!--- Migrations --->
+    <!--- Import Data --->
     <div class="col-md-6 col-lg-4">
-        <a href="/admin/settings/migrations/" class="text-decoration-none">
+        <a href="/admin/settings/import/" class="text-decoration-none">
             <div class="card h-100 border-0 shadow-sm settings-hub-card">
                 <div class="card-body text-center py-4">
-                    <i class="bi bi-mortarboard display-4 mb-3 settings-hub-icon"></i>
-                    <h5 class="card-title text-dark">Migrations <span class="badge settings-status-badge settings-status-badge--alpha">Alpha</span></h5>
-                    <p class="card-text text-muted small">Graduation migration and future migration tools</p>
+                    <i class="bi bi-upload display-4 mb-3 settings-hub-icon"></i>
+                    <h5 class="card-title text-dark">Import Data <span class="badge settings-status-badge settings-status-badge--beta">Beta</span></h5>
+                    <p class="card-text text-muted small">Import users, flags, organizations via CSV or Excel</p>
                 </div>
             </div>
         </a>
@@ -125,6 +151,19 @@
                     <i class="bi bi-funnel display-4 mb-3 settings-hub-icon"></i>
                     <h5 class="card-title text-dark">Bulk Exclusions <span class="badge settings-status-badge settings-status-badge--beta">Beta</span></h5>
                     <p class="card-text text-muted small">Data quality exclusion rules by user type</p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <!--- Migrations --->
+    <div class="col-md-6 col-lg-4">
+        <a href="/admin/settings/migrations/" class="text-decoration-none">
+            <div class="card h-100 border-0 shadow-sm settings-hub-card">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-mortarboard display-4 mb-3 settings-hub-icon"></i>
+                    <h5 class="card-title text-dark">Migrations <span class="badge settings-status-badge settings-status-badge--alpha">Alpha</span></h5>
+                    <p class="card-text text-muted small">Graduation migration and future migration tools</p>
                 </div>
             </div>
         </a>
@@ -156,46 +195,7 @@
         </a>
     </div>
 
-    <!--- Import Data --->
-    <div class="col-md-6 col-lg-4">
-        <a href="/admin/settings/import/" class="text-decoration-none">
-            <div class="card h-100 border-0 shadow-sm settings-hub-card">
-                <div class="card-body text-center py-4">
-                    <i class="bi bi-upload display-4 mb-3 settings-hub-icon"></i>
-                    <h5 class="card-title text-dark">Import Data <span class="badge settings-status-badge settings-status-badge--beta">Beta</span></h5>
-                    <p class="card-text text-muted small">Import users, flags, organizations via CSV or Excel</p>
-                </div>
-            </div>
-        </a>
-    </div>
-
-    <!--- UHCO API --->
-    <div class="col-md-6 col-lg-4">
-        <a href="/admin/settings/uhco-api/" class="text-decoration-none">
-            <div class="card h-100 border-0 shadow-sm settings-hub-card">
-                <div class="card-body text-center py-4">
-                    <i class="bi bi-braces display-4 mb-3 settings-hub-icon"></i>
-                    <h5 class="card-title text-dark">UHCO API</h5>
-                    <p class="card-text text-muted small">Manage API tokens and secrets for external integrations</p>
-                </div>
-            </div>
-        </a>
-    </div>
-
-    <!--- Application Settings --->
-    <div class="col-md-6 col-lg-4">
-        <a href="/admin/settings/app-config/" class="text-decoration-none">
-            <div class="card h-100 border-0 shadow-sm settings-hub-card">
-                <div class="card-body text-center py-4">
-                    <i class="bi bi-sliders display-4 mb-3 settings-hub-icon"></i>
-                    <h5 class="card-title text-dark">Application Settings</h5>
-                    <p class="card-text text-muted small">Shared key-value configuration such as published media URLs</p>
-                </div>
-            </div>
-        </a>
-    </div>
-
-    <!--- Workflows --->
+    <!--- Workflows 
     <div class="col-md-6 col-lg-4">
         <a href="/admin/settings/workflows/" class="text-decoration-none">
             <div class="card h-100 border-0 shadow-sm settings-hub-card">
@@ -206,7 +206,7 @@
                 </div>
             </div>
         </a>
-    </div>
+    </div>--->
 
 </div>
 

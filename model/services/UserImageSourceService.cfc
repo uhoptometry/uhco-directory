@@ -685,6 +685,15 @@ component output="false" singleton {
         var nameToken = fi & mi & last;
         var nameTokenShort = fi & last;
 
+        // Normalize multi-word names to Dropbox folder naming style.
+        first = reReplace(first, "\s+", "-", "all");
+        last = reReplace(last, "\s+", "-", "all");
+        middle = reReplace(middle, "\s+", "-", "all");
+        fi = len(first) ? left(first, 1) : "";
+        mi = len(middle) ? left(middle, 1) : "";
+        nameToken = fi & mi & last;
+        nameTokenShort = fi & last;
+
         for ( var extID in arguments.externalIDs ) {
             var extVal = lCase( trim(extID.EXTERNALVALUE ?: "") );
             if ( len(extVal) GTE 2 AND left(extVal, 4) NEQ "http" AND !arrayFindNoCase(candidates, extVal) ) {

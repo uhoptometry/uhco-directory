@@ -72,3 +72,7 @@
     height: 36px;
     padding: 0;
 }
+
+.flex-card {
+  flex: 0 0 calc(50% - 1rem); /* adjust for gap-3 */
+}

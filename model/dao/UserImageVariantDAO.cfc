@@ -315,6 +315,343 @@ component extends="dao.BaseDAO" output="false" singleton {
     }
 
     /**
+     * Return generated variants that have no corresponding published image row.
+     * Used by dashboard summary cards.
+     */
+    public array function getGeneratedUnpublishedVariantsForDashboard(
+        numeric maxRows = 8
+    ) {
+        var qry = executeQueryWithRetry(
+            "
+            WITH ranked AS (
+                SELECT uis.UserID,
+                       uis.UserImageSourceID,
+                       ivt.Code AS VariantCode,
+                       uiv.GeneratedAt,
+                       u.FirstName,
+                       u.LastName,
+                       COALESCE(pa.FirstName, '') AS PreferredFirstName,
+                       COALESCE(pa.LastName, '')  AS PreferredLastName,
+                       ROW_NUMBER() OVER (
+                           ORDER BY ISNULL(uiv.GeneratedAt, '1900-01-01') DESC,
+                                    uis.UserID ASC,
+                                    ivt.Code ASC
+                       ) AS rn
+                FROM   UserImageVariants uiv
+                JOIN   UserImageSources uis
+                       ON uis.UserImageSourceID = uiv.UserImageSourceID
+                JOIN   ImageVariantTypes ivt
+                       ON ivt.ImageVariantTypeID = uiv.ImageVariantTypeID
+                JOIN   Users u
+                       ON u.UserID = uis.UserID
+                OUTER APPLY (
+                    SELECT TOP 1 ua.FirstName, ua.LastName
+                    FROM UserAliases ua
+                    WHERE ua.UserID = u.UserID
+                      AND ua.IsActive = 1
+                    ORDER BY
+                        CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
+                        ISNULL(ua.SortOrder, 999999),
+                        ua.AliasID
+                ) pa
+                LEFT JOIN UserImages ui
+                       ON ui.UserImageSourceID = uiv.UserImageSourceID
+                      AND UPPER(ui.ImageVariant) = UPPER(ivt.Code)
+                WHERE  uis.IsActive = 1
+                  AND  LTRIM(RTRIM(ISNULL(uiv.LocalPath, ''))) <> ''
+                  AND  ui.ImageID IS NULL
+            )
+            SELECT UserID,
+                   UserImageSourceID,
+                   VariantCode,
+                   GeneratedAt,
+                   FirstName,
+                   LastName,
+                   PreferredFirstName,
+                   PreferredLastName
+            FROM ranked
+            WHERE rn <= :maxRows
+            ORDER BY rn
+            ",
+            {
+                maxRows = { value=val(arguments.maxRows), cfsqltype="cf_sql_integer" }
+            },
+            { datasource=variables.datasource, timeout=30, fetchSize=100 }
+        );
+
+        return queryToArray(qry);
+    }
+
+    /**
+     * Return one page of generated-but-unpublished variants plus total count.
+     */
+    public struct function getGeneratedUnpublishedVariantsForDashboardPage(
+        numeric pageSize = 10,
+        numeric pageNumber = 1
+    ) {
+        var size = max(1, min(100, int(val(arguments.pageSize ?: 10))));
+        var page = max(1, int(val(arguments.pageNumber ?: 1)));
+        var offsetRows = (page - 1) * size;
+
+        var countQry = executeQueryWithRetry(
+            "
+            SELECT COUNT(*) AS TotalCount
+            FROM   UserImageVariants uiv
+            JOIN   UserImageSources uis
+                   ON uis.UserImageSourceID = uiv.UserImageSourceID
+            JOIN   ImageVariantTypes ivt
+                   ON ivt.ImageVariantTypeID = uiv.ImageVariantTypeID
+            LEFT JOIN UserImages ui
+                   ON ui.UserImageSourceID = uiv.UserImageSourceID
+                  AND UPPER(ui.ImageVariant) = UPPER(ivt.Code)
+            WHERE  uis.IsActive = 1
+              AND  LTRIM(RTRIM(ISNULL(uiv.LocalPath, ''))) <> ''
+              AND  ui.ImageID IS NULL
+            ",
+            {},
+            { datasource=variables.datasource, timeout=30 }
+        );
+
+        var dataQry = executeQueryWithRetry(
+            "
+            SELECT uis.UserID,
+                   uis.UserImageSourceID,
+                   ivt.Code AS VariantCode,
+                   uiv.GeneratedAt,
+                   u.FirstName,
+                   u.LastName,
+                   COALESCE(pa.FirstName, '') AS PreferredFirstName,
+                   COALESCE(pa.LastName, '')  AS PreferredLastName
+            FROM   UserImageVariants uiv
+            JOIN   UserImageSources uis
+                   ON uis.UserImageSourceID = uiv.UserImageSourceID
+            JOIN   ImageVariantTypes ivt
+                   ON ivt.ImageVariantTypeID = uiv.ImageVariantTypeID
+            JOIN   Users u
+                   ON u.UserID = uis.UserID
+            OUTER APPLY (
+                SELECT TOP 1 ua.FirstName, ua.LastName
+                FROM UserAliases ua
+                WHERE ua.UserID = u.UserID
+                  AND ua.IsActive = 1
+                ORDER BY
+                    CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
+                    ISNULL(ua.SortOrder, 999999),
+                    ua.AliasID
+            ) pa
+            LEFT JOIN UserImages ui
+                   ON ui.UserImageSourceID = uiv.UserImageSourceID
+                  AND UPPER(ui.ImageVariant) = UPPER(ivt.Code)
+            WHERE  uis.IsActive = 1
+              AND  LTRIM(RTRIM(ISNULL(uiv.LocalPath, ''))) <> ''
+              AND  ui.ImageID IS NULL
+            ORDER BY ISNULL(uiv.GeneratedAt, '1900-01-01') DESC,
+                     uis.UserID ASC,
+                     ivt.Code ASC
+            OFFSET :offsetRows ROWS FETCH NEXT :pageSize ROWS ONLY
+            ",
+            {
+                offsetRows = { value=offsetRows, cfsqltype="cf_sql_integer" },
+                pageSize   = { value=size,       cfsqltype="cf_sql_integer" }
+            },
+            { datasource=variables.datasource, timeout=30, fetchSize=100 }
+        );
+
+        return {
+            data = queryToArray(dataQry),
+            totalCount = val(countQry.TotalCount ?: 0),
+            pageSize = size,
+            pageNumber = page
+        };
+    }
+
+    /**
+     * Return users whose most recent media activity is older than the
+     * configured number of months.
+     */
+    public array function getStaleMediaUsersForDashboard(
+        numeric maxRows = 8,
+        numeric staleMonths = 6
+    ) {
+        var qry = executeQueryWithRetry(
+            "
+            WITH mediaActivity AS (
+                SELECT ui.UserID,
+                       ui.PublishedAt AS ActivityAt
+                FROM   UserImages ui
+                WHERE  ui.PublishedAt IS NOT NULL
+
+                UNION ALL
+
+                SELECT uis.UserID,
+                       uiv.GeneratedAt AS ActivityAt
+                FROM   UserImageVariants uiv
+                JOIN   UserImageSources uis
+                       ON uis.UserImageSourceID = uiv.UserImageSourceID
+                WHERE  uis.IsActive = 1
+                  AND  uiv.GeneratedAt IS NOT NULL
+            ),
+            latestActivity AS (
+                SELECT ma.UserID,
+                       MAX(ma.ActivityAt) AS LastMediaAt
+                FROM mediaActivity ma
+                GROUP BY ma.UserID
+            ),
+            ranked AS (
+                SELECT u.UserID,
+                       u.FirstName,
+                       u.LastName,
+                       la.LastMediaAt,
+                       COALESCE(pa.FirstName, '') AS PreferredFirstName,
+                       COALESCE(pa.LastName, '')  AS PreferredLastName,
+                       ROW_NUMBER() OVER (ORDER BY la.LastMediaAt ASC, u.UserID ASC) AS rn
+                FROM   latestActivity la
+                JOIN   Users u ON u.UserID = la.UserID
+                OUTER APPLY (
+                    SELECT TOP 1 ua.FirstName, ua.LastName
+                    FROM UserAliases ua
+                    WHERE ua.UserID = u.UserID
+                      AND ua.IsActive = 1
+                    ORDER BY
+                        CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
+                        ISNULL(ua.SortOrder, 999999),
+                        ua.AliasID
+                ) pa
+                WHERE ISNULL(u.Active, 1) = 1
+                  AND la.LastMediaAt < DATEADD(month, -:staleMonths, GETDATE())
+            )
+            SELECT UserID,
+                   FirstName,
+                   LastName,
+                   PreferredFirstName,
+                   PreferredLastName,
+                   LastMediaAt
+            FROM ranked
+            WHERE rn <= :maxRows
+            ORDER BY rn
+            ",
+            {
+                staleMonths = { value=val(arguments.staleMonths), cfsqltype="cf_sql_integer" },
+                maxRows     = { value=val(arguments.maxRows),     cfsqltype="cf_sql_integer" }
+            },
+            { datasource=variables.datasource, timeout=30, fetchSize=100 }
+        );
+
+        return queryToArray(qry);
+    }
+
+    /**
+     * Return one page of stale-media users plus total count.
+     */
+    public struct function getStaleMediaUsersForDashboardPage(
+        numeric pageSize = 10,
+        numeric pageNumber = 1,
+        numeric staleMonths = 6
+    ) {
+        var size = max(1, min(100, int(val(arguments.pageSize ?: 10))));
+        var page = max(1, int(val(arguments.pageNumber ?: 1)));
+        var offsetRows = (page - 1) * size;
+
+        var countQry = executeQueryWithRetry(
+            "
+            WITH mediaActivity AS (
+                SELECT ui.UserID,
+                       ui.PublishedAt AS ActivityAt
+                FROM   UserImages ui
+                WHERE  ui.PublishedAt IS NOT NULL
+
+                UNION ALL
+
+                SELECT uis.UserID,
+                       uiv.GeneratedAt AS ActivityAt
+                FROM   UserImageVariants uiv
+                JOIN   UserImageSources uis
+                       ON uis.UserImageSourceID = uiv.UserImageSourceID
+                WHERE  uis.IsActive = 1
+                  AND  uiv.GeneratedAt IS NOT NULL
+            ),
+            latestActivity AS (
+                SELECT ma.UserID,
+                       MAX(ma.ActivityAt) AS LastMediaAt
+                FROM mediaActivity ma
+                GROUP BY ma.UserID
+            )
+            SELECT COUNT(*) AS TotalCount
+            FROM latestActivity la
+            JOIN Users u ON u.UserID = la.UserID
+            WHERE ISNULL(u.Active, 1) = 1
+              AND la.LastMediaAt < DATEADD(month, -:staleMonths, GETDATE())
+            ",
+            {
+                staleMonths = { value=val(arguments.staleMonths), cfsqltype="cf_sql_integer" }
+            },
+            { datasource=variables.datasource, timeout=30 }
+        );
+
+        var dataQry = executeQueryWithRetry(
+            "
+            WITH mediaActivity AS (
+                SELECT ui.UserID,
+                       ui.PublishedAt AS ActivityAt
+                FROM   UserImages ui
+                WHERE  ui.PublishedAt IS NOT NULL
+
+                UNION ALL
+
+                SELECT uis.UserID,
+                       uiv.GeneratedAt AS ActivityAt
+                FROM   UserImageVariants uiv
+                JOIN   UserImageSources uis
+                       ON uis.UserImageSourceID = uiv.UserImageSourceID
+                WHERE  uis.IsActive = 1
+                  AND  uiv.GeneratedAt IS NOT NULL
+            ),
+            latestActivity AS (
+                SELECT ma.UserID,
+                       MAX(ma.ActivityAt) AS LastMediaAt
+                FROM mediaActivity ma
+                GROUP BY ma.UserID
+            )
+            SELECT u.UserID,
+                   u.FirstName,
+                   u.LastName,
+                   la.LastMediaAt,
+                   COALESCE(pa.FirstName, '') AS PreferredFirstName,
+                   COALESCE(pa.LastName, '')  AS PreferredLastName
+            FROM   latestActivity la
+            JOIN   Users u ON u.UserID = la.UserID
+            OUTER APPLY (
+                SELECT TOP 1 ua.FirstName, ua.LastName
+                FROM UserAliases ua
+                WHERE ua.UserID = u.UserID
+                  AND ua.IsActive = 1
+                ORDER BY
+                    CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
+                    ISNULL(ua.SortOrder, 999999),
+                    ua.AliasID
+            ) pa
+            WHERE ISNULL(u.Active, 1) = 1
+              AND la.LastMediaAt < DATEADD(month, -:staleMonths, GETDATE())
+            ORDER BY la.LastMediaAt ASC, u.UserID ASC
+            OFFSET :offsetRows ROWS FETCH NEXT :pageSize ROWS ONLY
+            ",
+            {
+                staleMonths = { value=val(arguments.staleMonths), cfsqltype="cf_sql_integer" },
+                offsetRows  = { value=offsetRows,                 cfsqltype="cf_sql_integer" },
+                pageSize    = { value=size,                       cfsqltype="cf_sql_integer" }
+            },
+            { datasource=variables.datasource, timeout=30, fetchSize=100 }
+        );
+
+        return {
+            data = queryToArray(dataQry),
+            totalCount = val(countQry.TotalCount ?: 0),
+            pageSize = size,
+            pageNumber = page
+        };
+    }
+
+    /**
      * Return a single variant record for a source + ImageVariantTypeID.
      * Returns an empty struct when not found.
      */
