@@ -595,8 +595,8 @@
 
 <cfset usersListMenuHTML = "
             <div class='dropdown users-list-view-selector'>
-                <button class='btn btn-link navbar-brand text-white users-list-toolbar-brand users-list-view-selector-toggle dropdown-toggle' type='button' data-bs-toggle='dropdown' aria-expanded='false'>
-                    <i class='bi bi-people-fill me-2'></i>Users: #pageTitle#
+                <button class='btn btn-sm btn-outline-light users-list-view-selector-toggle dropdown-toggle' type='button' data-bs-toggle='dropdown' aria-expanded='false'>
+                    #pageTitle#
                 </button>
                 <ul class='dropdown-menu dropdown-menu-end'>
                     <li><a class='dropdown-item#(listType EQ "problems" ? " active" : "")#' href='/admin/users/index.cfm?list=problems'><i class='bi bi-exclamation-triangle me-2'></i>Problem Records</a></li>
@@ -614,7 +614,16 @@
     <nav class='navbar sticky-top bg-slate text-white users-list-toolbar'>
         <div class='container-fluid users-list-toolbar-shell'>
             <div class='users-list-toolbar-primary'>
-                #usersListMenuHTML#
+                <button class='sidebar-toggle' id='sidebarToggle' title='Toggle Sidebar' aria-label='Toggle Sidebar'>
+                    <i class='bi bi-chevron-left'></i>
+                </button>
+                <div class='navbar-brand text-white users-list-toolbar-brand mb-0 fs-5 d-flex align-items-center gap-2'>
+                    <span>UHCO_Identity</span>
+                    <span>|</span>
+                    <i class='bi bi-people-fill'></i>
+                    <span>Users:</span>
+                    #usersListMenuHTML#
+                </div>
                 <div class='users-list-toolbar-controls'>
                     <form method='get' class='users-list-toolbar-search-form'>
                         <input type='hidden' name='list'    value='#listType#'>

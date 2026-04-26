@@ -2,7 +2,7 @@
   top: 0;
   z-index: 1020;
   overflow: visible;
-  padding: 0.75rem 1rem;
+  padding: 0.75rem 0;
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
 }
 
@@ -13,6 +13,8 @@
   gap: 1rem;
   flex-wrap: nowrap;
   overflow: visible;
+  padding-left: 0;
+  padding-right: 1rem;
 }
 
 .users-list-toolbar-primary {
@@ -34,12 +36,16 @@
   padding: 0;
   border: 0;
   text-decoration: none;
+  font-size: 1.25rem;
+  background: none !important;
+  color: #fff !important;
 }
 
 .users-list-view-selector-toggle:hover,
 .users-list-view-selector-toggle:focus {
   color: #fff;
   text-decoration: none;
+  background: none !important;
 }
 
 .users-list-toolbar-controls {
