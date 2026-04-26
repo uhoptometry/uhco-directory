@@ -137,6 +137,80 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    function normalizeFlagName(flagName) {
+        return String(flagName || '')
+            .toLowerCase()
+            .trim()
+            .replace(/[\s_]+/g, '-')
+            .replace(/-+/g, '-');
+    }
+
+    function hasAnyCheckedFlagName(normalizedNames) {
+        var pane = document.getElementById('flags-pane');
+        if (!pane) return false;
+
+        var checked = pane.querySelectorAll('input[name="Flags"]:checked');
+        for (var i = 0; i < checked.length; i++) {
+            var normalized = normalizeFlagName(checked[i].getAttribute('data-flagname'));
+            if (normalizedNames.indexOf(normalized) !== -1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function hasAnyCheckedFlagToken(flagTokens) {
+        var pane = document.getElementById('flags-pane');
+        if (!pane) return false;
+
+        var checked = pane.querySelectorAll('input[name="Flags"]:checked');
+        for (var i = 0; i < checked.length; i++) {
+            var normalized = normalizeFlagName(checked[i].getAttribute('data-flagname'));
+            for (var j = 0; j < flagTokens.length; j++) {
+                if (normalized.indexOf(flagTokens[j]) !== -1) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    function shouldShowDegreesAwardsFromFlagsPane() {
+        return (
+            hasAnyCheckedFlagToken(['faculty']) ||
+            hasAnyCheckedFlagToken(['alumni']) ||
+            hasAnyCheckedFlagToken(['current-student', 'current-students']) ||
+            hasAnyCheckedFlagToken(['emeritus']) ||
+            hasAnyCheckedFlagToken(['resident'])
+        );
+    }
+
+    function shouldShowFacultyBioFromFlagsPane() {
+        return hasAnyCheckedFlagToken(['faculty']);
+    }
+
+    function toggleDisplayById(id, isVisible) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.style.display = isVisible ? '' : 'none';
+    }
+
+    function syncBiographicalDegreesAwardsVisibility(isVisible) {
+        toggleDisplayById('bioActionsLabel', isVisible);
+        toggleDisplayById('addDegreeBtn', isVisible);
+        toggleDisplayById('addAwardBtn', isVisible);
+        toggleDisplayById('degreesSaveStatus', isVisible);
+        toggleDisplayById('awardsSaveStatus', isVisible);
+        toggleDisplayById('bioDegreesAwardsDivider', isVisible);
+        toggleDisplayById('bioDegreesAwardsHeading', isVisible);
+        toggleDisplayById('bioDegreesSection', isVisible);
+        toggleDisplayById('bioAwardsSection', isVisible);
+    }
+
+    function syncBiographicalFacultyVisibility(isVisible) {
+        toggleDisplayById('bioFacultySection', isVisible);
+    }
+
     function getRefreshButtonIdByTab(tabId) {
         var map = {
             'general-tab': 'refreshGeneralInfoBtn',
@@ -770,7 +844,10 @@ document.addEventListener('DOMContentLoaded', function () {
             };
         }
 
-        document.getElementById('addDegreeBtn').addEventListener('click', function () { clearModal(); modal.show(); });
+        var addDegreeBtn = document.getElementById('addDegreeBtn');
+        if (addDegreeBtn) {
+            addDegreeBtn.addEventListener('click', function () { clearModal(); modal.show(); });
+        }
 
         document.getElementById('saveDegreeModalBtn').addEventListener('click', function () {
             var d = readModal();
@@ -904,7 +981,10 @@ document.addEventListener('DOMContentLoaded', function () {
             return { name: name, type: document.getElementById('awardType').value };
         }
 
-        document.getElementById('addAwardBtn').addEventListener('click', function () { clearModal(); modal.show(); });
+        var addAwardBtn = document.getElementById('addAwardBtn');
+        if (addAwardBtn) {
+            addAwardBtn.addEventListener('click', function () { clearModal(); modal.show(); });
+        }
 
         document.getElementById('saveAwardModalBtn').addEventListener('click', function () {
             var d = readModal();
@@ -1125,7 +1205,7 @@ document.addEventListener('DOMContentLoaded', function () {
        Per-Tab AJAX Save Handlers
        ══════════════════════════════════════════════════════════════ */
 
-    function saveSectionAjax(section, body, statusEl) {
+    function saveSectionAjax(section, body, statusEl, onSuccess) {
         if (statusEl) { statusEl.textContent = ''; }
         fetch('/admin/users/saveSection.cfm', { method: 'POST', body: body })
             .then(function (r) { return r.json(); })
@@ -1133,6 +1213,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (data.success) {
                     showSaveToast('Saved successfully.');
                     clearDirty(section);
+                    if (onSuccess) {
+                        onSuccess(data);
+                    }
                 } else {
                     showSaveToast((data.message || 'Error saving.'), true);
                 }
@@ -1384,7 +1467,28 @@ document.addEventListener('DOMContentLoaded', function () {
             body.append('userID', pageUserID);
             body.append('section', 'flags');
             body.append('flagIDs', ids.join(','));
-            saveSectionAjax('flags', body, document.getElementById('save-flags-status'));
+            saveSectionAjax('flags', body, document.getElementById('save-flags-status'), function () {
+                var shouldShowDegreesAwards = shouldShowDegreesAwardsFromFlagsPane();
+                var shouldShowFacultyBio = shouldShowFacultyBioFromFlagsPane();
+                var hasFacultySection = !!document.getElementById('bioFacultySection');
+
+                syncBiographicalDegreesAwardsVisibility(shouldShowDegreesAwards);
+                syncBiographicalFacultyVisibility(shouldShowFacultyBio);
+
+                // Faculty bio editor is server-rendered only when faculty flags are present.
+                // If it needs to appear but doesn't exist in DOM yet, soft-reload to current page/tab.
+                if (shouldShowFacultyBio && !hasFacultySection) {
+                    var refreshedUrl = new URL(window.location.href);
+                    refreshedUrl.searchParams.set('tab', 'bio-info-tab');
+                    refreshedUrl.searchParams.set('_flagsUpdated', String(Date.now()));
+                    window.location.assign(refreshedUrl.toString());
+                    return;
+                }
+
+                if (shouldShowDegreesAwards) {
+                    refreshTabData('bio-info-tab');
+                }
+            });
         });
     }
 

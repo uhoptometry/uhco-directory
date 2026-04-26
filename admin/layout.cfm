@@ -411,12 +411,14 @@
 
         const sidebar = document.getElementById('sidebar');
         const sidebarToggle = document.getElementById('sidebarToggle');
-        const toggleIcon = sidebarToggle.querySelector('i');
+        const toggleIcon = sidebarToggle ? sidebarToggle.querySelector('i') : null;
         
         // Initialize toggle icon based on current collapsed state
-        if (sidebar.classList.contains('collapsed')) {
-            toggleIcon.classList.remove('bi-chevron-left');
-            toggleIcon.classList.add('bi-chevron-right');
+        if (sidebar && sidebar.classList.contains('collapsed')) {
+            if (toggleIcon) {
+                toggleIcon.classList.remove('bi-chevron-left');
+                toggleIcon.classList.add('bi-chevron-right');
+            }
         }
 
         // Hide duplicate top-level page title if it matches the global toolbar title.
@@ -468,26 +470,30 @@
         }
         
         // Toggle sidebar on button click
-        sidebarToggle.addEventListener('click', function() {
-            sidebar.classList.toggle('collapsed');
-            const nowCollapsed = sidebar.classList.contains('collapsed');
-            localStorage.setItem('sidebarCollapsed', nowCollapsed);
+        if (sidebarToggle) {
+            sidebarToggle.addEventListener('click', function() {
+                if (sidebar) sidebar.classList.toggle('collapsed');
+                const nowCollapsed = sidebar ? sidebar.classList.contains('collapsed') : false;
+                localStorage.setItem('sidebarCollapsed', nowCollapsed);
 
-            // Sync main content offset
-            const mainContent = document.getElementById('mainContent');
-            if (mainContent) {
-                mainContent.classList.toggle('sidebar-collapsed', nowCollapsed);
-            }
-            
-            // Update icon
-            if (nowCollapsed) {
-                toggleIcon.classList.remove('bi-chevron-left');
-                toggleIcon.classList.add('bi-chevron-right');
-            } else {
-                toggleIcon.classList.remove('bi-chevron-right');
-                toggleIcon.classList.add('bi-chevron-left');
-            }
-        });
+                // Sync main content offset
+                const mainContent = document.getElementById('mainContent');
+                if (mainContent) {
+                    mainContent.classList.toggle('sidebar-collapsed', nowCollapsed);
+                }
+                
+                // Update icon
+                if (toggleIcon) {
+                    if (nowCollapsed) {
+                        toggleIcon.classList.remove('bi-chevron-left');
+                        toggleIcon.classList.add('bi-chevron-right');
+                    } else {
+                        toggleIcon.classList.remove('bi-chevron-right');
+                        toggleIcon.classList.add('bi-chevron-left');
+                    }
+                }
+            });
+        }
         
         // Mark active link and its top-level nav-item based on current page
         const currentURL  = new URL(window.location.href);

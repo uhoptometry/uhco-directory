@@ -515,7 +515,7 @@
 
 <cffunction name="renderDegreesPanel" access="private" returntype="string" output="false">
     <cfargument name="degrees" type="array" required="true">
-    <cfargument name="prefix" type="string" required="true" hint="Unique prefix per tab, e.g. fac, emer, res">
+    <cfargument name="prefix" type="string" required="true" hint="Unique prefix per tab, e.g. O.D., Ph.D., etc.">
     <cfargument name="showComposite" type="boolean" required="false" default="false" hint="Show read-only composite Degrees field for Super Admins">
     <cfargument name="compositeValue" type="string" required="false" default="">
 
@@ -1285,6 +1285,30 @@
 
 ">
 
+<!--- Precompute biographical degree/award visibility and safe composite value --->
+<cfset showCurrentStudent = false>
+<cfset showAlumni = false>
+<cfloop from="1" to="#arrayLen(allFlags)#" index="i">
+    <cfset local.flagName = "">
+    <cfif structKeyExists(allFlags[i], "FLAGNAME") AND NOT isNull(allFlags[i].FLAGNAME)>
+        <cfset local.flagName = trim(toString(allFlags[i].FLAGNAME))>
+    </cfif>
+    <cfset local.fn = lCase(local.flagName)>
+    <cfif local.fn EQ "current-student" AND arrayFindNoCase(userFlagIDs, allFlags[i].FLAGID) GT 0>
+        <cfset showCurrentStudent = true>
+    </cfif>
+    <cfif local.fn EQ "alumni" AND arrayFindNoCase(userFlagIDs, allFlags[i].FLAGID) GT 0>
+        <cfset showAlumni = true>
+    </cfif>
+</cfloop>
+
+<cfset showDegreesAwards = showFacultyProfile OR showAlumni OR showCurrentStudent OR showEmeritusProfile OR showResidentProfile>
+<cfset local.bioDegreesDisplayStyle = showDegreesAwards ? "" : " style='display:none'">
+<cfset local.compositeDegreesValue = "">
+<cfif structKeyExists(user, "DEGREES") AND NOT isNull(user.DEGREES)>
+    <cfset local.compositeDegreesValue = trim(toString(user.DEGREES))>
+</cfif>
+
 <!--- ── Biographical Information pane ── --->
 <cfset content &= "
         <div class='tab-pane fade' id='bio-info-pane' role='tabpanel' aria-labelledby='bio-info-tab'>
@@ -1292,11 +1316,11 @@
             <div class='d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom pb-2 mb-3'>
                 <div class='d-flex align-items-center flex-wrap gap-2'>
                     #renderTabActionButtonGroup("refreshBiographicalInfoBtn")#
-                    <span class='navbar-text'><strong>Actions:</strong></span>
-                    <button type='button' class='btn btn-sm btn-ui-add' id='addDegreeBtn'><i class='bi bi-mortarboard me-1'></i>Add Degree</button>
-                    <button type='button' class='btn btn-sm btn-ui-add' id='addAwardBtn'><i class='bi bi-award me-1'></i>Add Award</button>
-                    <span id='degreesSaveStatus' class='save-status ms-1'></span>
-                    <span id='awardsSaveStatus' class='save-status ms-1'></span>
+                    <span id='bioActionsLabel' class='navbar-text'#local.bioDegreesDisplayStyle#><strong>Actions:</strong></span>
+                    <button type='button' class='btn btn-sm btn-ui-add' id='addDegreeBtn'#local.bioDegreesDisplayStyle#><i class='bi bi-mortarboard me-1'></i>Add Degree</button>
+                    <button type='button' class='btn btn-sm btn-ui-add' id='addAwardBtn'#local.bioDegreesDisplayStyle#><i class='bi bi-award me-1'></i>Add Award</button>
+                    <span id='degreesSaveStatus' class='save-status ms-1'#local.bioDegreesDisplayStyle#></span>
+                    <span id='awardsSaveStatus' class='save-status ms-1'#local.bioDegreesDisplayStyle#></span>
                 </div>
                 <div class='d-flex align-items-center gap-2'>
                     <button type='button' class='btn btn-sm btn-ui-success' id='save-bioinfo-btn'><i class='bi bi-floppy me-1'></i>Save Biographical Info</button>
@@ -1322,38 +1346,31 @@
 
 ">
 
-<!--- ── Determine which role flags are active ── --->
-<cfset showCurrentStudent = false>
-<cfset showAlumni = false>
-<cfloop from="1" to="#arrayLen(allFlags)#" index="i">
-    <cfset local.fn = lCase(trim(allFlags[i].FLAGNAME))>
-    <cfif local.fn EQ "current-student" AND arrayFindNoCase(userFlagIDs, allFlags[i].FLAGID) GT 0>
-        <cfset showCurrentStudent = true>
-    </cfif>
-    <cfif local.fn EQ "alumni" AND arrayFindNoCase(userFlagIDs, allFlags[i].FLAGID) GT 0>
-        <cfset showAlumni = true>
-    </cfif>
-</cfloop>
-
-<cfset showDegreesAwards = showFacultyProfile OR showAlumni OR showCurrentStudent OR showEmeritusProfile OR showResidentProfile>
-
 <!--- ── Degrees & Awards (shared, shown once) ── --->
+<!---
+     degreesContainer and awardsContainer are ALWAYS rendered (possibly hidden) so
+     users-edit.js can always find them and wire the Add Degree / Add Award buttons.
+     The wrapping div uses display:none when showDegreesAwards is false so nothing
+     is visible, but the JS IIFE no longer bails out on a null container.
+--->
+<cfset content &= "<hr id='bioDegreesAwardsDivider'#local.bioDegreesDisplayStyle#><h6 id='bioDegreesAwardsHeading' class='fw-bold mb-3'#local.bioDegreesDisplayStyle#>Degrees &amp; Awards</h6>">
+
 <cfif showDegreesAwards>
-    <cfset content &= "<hr><h6 class='fw-bold mb-3'>Degrees &amp; Awards</h6>">
-    
-    <!--- Degrees as cards --->
-    <cfif isSuperAdmin AND len(trim(user.DEGREES ?: ""))>
+    <!--- Degrees composite read-only field for super-admin --->
+    <cfif isSuperAdmin AND len(local.compositeDegreesValue)>
         <cfset content &= "<div class='row mb-3'><div class='col-md-8'>
             <label class='form-label text-muted'>Combined Degrees (auto-generated, read-only)</label>
-            <input class='form-control form-control-sm' id='bio_composite' value='#EncodeForHTMLAttribute(user.DEGREES ?: "")#' readonly disabled>
+            <input class='form-control form-control-sm' id='bio_composite' value='#EncodeForHTMLAttribute(local.compositeDegreesValue)#' readonly disabled>
         </div></div>">
     </cfif>
-    <cfset content &= "
-            <div class='mb-4'>
+</cfif>
+
+<!--- Always render degreesContainer --->
+<cfset content &= "
+            <div id='bioDegreesSection' class='mb-4'#(NOT showDegreesAwards ? ' style=''display:none''' : '')#>
                 <label class='form-label fw-semibold'>Degrees</label>
                 <div id='degreesContainer'>
-    ">
-</cfif>
+">
 <cfif showDegreesAwards>
     <cfloop from="1" to="#arrayLen(userDegrees)#" index="local.di">
         <cfset local.dg = userDegrees[local.di]>
@@ -1383,19 +1400,21 @@
                 <input type='hidden' data-degree-field='year' data-degree-idx='#(local.di-1)#' value='#EncodeForHTMLAttribute(local.dg.DEGREEYEAR ?: "")#'>
         ">
     </cfloop>
-    <cfset content &= "
+</cfif>
+<cfset content &= "
                 </div>
-                <input type='hidden' id='degreeCount' value='#arrayLen(userDegrees)#'>
+                <input type='hidden' id='degreeCount' value='#(showDegreesAwards ? arrayLen(userDegrees) : 0)#'>
             </div>
-    ">
+">
 
-    <!--- Awards as cards --->
-    <cfset awardOptions = 'Gold Key,Summa cum laude,Magna cum laude,BSK Gold,BSK Black & Gold,AOSA Honors,NOSA Honors,Other'>
-    <cfset content &= "
-            <div class='mb-4 mt-3'>
+<!--- Always render awardsContainer --->
+<cfset content &= "
+            <div id='bioAwardsSection' class='mb-4 mt-3'#(NOT showDegreesAwards ? ' style=''display:none''' : '')#>
                 <label class='form-label fw-semibold'>Awards &amp; Honors</label>
                 <div id='awardsContainer'>
-    ">
+">
+<cfif showDegreesAwards>
+    <cfset awardOptions = 'Gold Key,Summa cum laude,Magna cum laude,BSK Gold,BSK Black & Gold,AOSA Honors,NOSA Honors,Other'>
     <cfloop from="1" to="#arrayLen(spAwards)#" index="ai">
         <cfset aw = spAwards[ai]>
         <cfset awName = trim(aw.AWARDNAME)>
@@ -1423,16 +1442,17 @@
                 <input type='hidden' data-award-field='type' data-award-idx='#(ai-1)#' value='#EncodeForHTMLAttribute(aw.AWARDTYPE ?: "")#'>
         ">
     </cfloop>
-    <cfset content &= "
-                </div>
-                <input type='hidden' id='awardCount' value='#arrayLen(spAwards)#'>
-            </div>
-    ">
 </cfif>
+<cfset content &= "
+                </div>
+                <input type='hidden' id='awardCount' value='#(showDegreesAwards ? arrayLen(spAwards) : 0)#'>
+            </div>
+">
 
 <!--- ── Faculty section (bio editor) ── --->
 <cfif showFacultyProfile>
     <cfset content &= "
+            <div id='bioFacultySection'>
             <hr>
             <h6 class='fw-bold mb-3'>Faculty</h6>
             <input type='hidden' name='processBio' value='1'>
@@ -1440,6 +1460,7 @@
                 <label class='form-label fw-bold'>Bio / About Me</label>
                 <div id='bio-editor' class='users-edit-bio-editor'>#bioContent#</div>
                 <input type='hidden' name='bioContent' id='bioContentHidden' value='#EncodeForHTMLAttribute(bioContent)#'>
+            </div>
             </div>
     ">
 </cfif>
