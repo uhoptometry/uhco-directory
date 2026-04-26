@@ -34,6 +34,13 @@ component extends="dao.BaseDAO" output="false" singleton {
                         WHERE  ufa.UserID = u.UserID
                           AND  uf.FlagName = 'Clinical-Attending'
                     )
+                 AND  NOT EXISTS (
+                       SELECT 1
+                       FROM   UserFlagAssignments ufaTest
+                           INNER JOIN UserFlags ufTest ON ufaTest.FlagID = ufTest.FlagID
+                       WHERE  ufaTest.UserID = u.UserID
+                         AND  ufTest.FlagName = 'TEST_USER'
+                      )
              ORDER BY COALESCE(pa.LastName, u.LastName), COALESCE(pa.FirstName, u.FirstName)",
             {},
             { datasource=variables.datasource, timeout=30, fetchSize=500 }
@@ -78,6 +85,13 @@ component extends="dao.BaseDAO" output="false" singleton {
                         WHERE  ufa.UserID = u.UserID
                           AND  uf.FlagName = 'Alumni'
                     )
+                             AND  NOT EXISTS (
+                                                SELECT 1
+                                                FROM   UserFlagAssignments ufaTest
+                                                             INNER JOIN UserFlags ufTest ON ufaTest.FlagID = ufTest.FlagID
+                                                WHERE  ufaTest.UserID = u.UserID
+                                                    AND  ufTest.FlagName = 'TEST_USER'
+                                        )
                          ORDER BY COALESCE(pa.LastName, u.LastName), COALESCE(pa.FirstName, u.FirstName)",
             {
                 gradYear = { value=arguments.gradYear, cfsqltype="cf_sql_integer" },
@@ -122,7 +136,14 @@ component extends="dao.BaseDAO" output="false" singleton {
                                INNER JOIN UserFlags uf ON ufa.FlagID = uf.FlagID
                         WHERE  ufa.UserID = u.UserID
                           AND  uf.FlagName = 'Alumni'
-                    )",
+                      )
+                 AND  NOT EXISTS (
+                       SELECT 1
+                       FROM   UserFlagAssignments ufaTest
+                           INNER JOIN UserFlags ufTest ON ufaTest.FlagID = ufTest.FlagID
+                       WHERE  ufaTest.UserID = u.UserID
+                         AND  ufTest.FlagName = 'TEST_USER'
+                      )",
             { userID = { value=arguments.userID, cfsqltype="cf_sql_integer" } },
             { datasource=variables.datasource, timeout=30, fetchSize=10 }
         );
@@ -158,6 +179,13 @@ component extends="dao.BaseDAO" output="false" singleton {
                         WHERE  ufa.UserID = u.UserID
                           AND  uf.FlagName = 'Deans'
                     )
+                 AND  NOT EXISTS (
+                       SELECT 1
+                       FROM   UserFlagAssignments ufaTest
+                           INNER JOIN UserFlags ufTest ON ufaTest.FlagID = ufTest.FlagID
+                       WHERE  ufaTest.UserID = u.UserID
+                         AND  ufTest.FlagName = 'TEST_USER'
+                      )
              ORDER BY COALESCE(pa.LastName, u.LastName), COALESCE(pa.FirstName, u.FirstName)",
             {},
             { datasource=variables.datasource, timeout=30, fetchSize=500 }

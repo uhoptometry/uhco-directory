@@ -39,6 +39,8 @@
 <cfset directoryService = createObject("component", "cfc.directory_service").init()>
 <cfset flagsService     = createObject("component", "cfc.flags_service").init()>
 <cfset orgsService      = createObject("component", "cfc.organizations_service").init()>
+<cfset usersService     = createObject("component", "cfc.users_service").init()>
+<cfset appConfigService = createObject("component", "cfc.appConfig_service").init()>
 <cfset aliasesDAO       = createObject("component", "dao.aliases_DAO").init()>
 <cfset helpers          = createObject("component", "cfc.helpers")>
 <cfif needsAcademic>
@@ -78,6 +80,21 @@
 <cfset allFlags       = allFlagsResult.data>
 <cfset allUserFlagMap = flagsService.getAllUserFlagMap()>
 <cfset allUserOrgMap  = orgsService.getAllUserOrgMap()>
+<cfset canViewTestUsers = application.authService.hasRole("SUPER_ADMIN")>
+<cfset testModeEnabledValue = trim(appConfigService.getValue("test_mode.enabled", "0"))>
+<cfset testModeEnabled = usersService.isTestModeEnabled() OR (listFindNoCase("1,true,yes,on", testModeEnabledValue) GT 0)>
+<cfset isSuperAdminImpersonation = structKeyExists(request, "isImpersonating") AND request.isImpersonating() AND structKeyExists(request, "isActualSuperAdmin") AND request.isActualSuperAdmin()>
+<cfset showTestUsersForAdmin = canViewTestUsers OR testModeEnabled OR isSuperAdminImpersonation>
+<cfset hideTestUsersForAdmin = NOT showTestUsersForAdmin>
+<cfset testUserFlagID = "">
+<cfset testUserFlagName = "TEST_USER">
+<cfloop from="1" to="#arrayLen(allFlags)#" index="iFlag">
+    <cfif compareNoCase(trim(allFlags[iFlag].FLAGNAME ?: ""), "TEST_USER") EQ 0>
+        <cfset testUserFlagID = toString(allFlags[iFlag].FLAGID)>
+        <cfset testUserFlagName = trim(allFlags[iFlag].FLAGNAME ?: "TEST_USER")>
+        <cfbreak>
+    </cfif>
+</cfloop>
 <cfif needsAcademic>
     <cfset allAcademicMap = academicService.getAllAcademicInfoMap()>
 </cfif>
@@ -86,6 +103,42 @@
 </cfif>
 <cfset emailsService  = createObject("component", "cfc.emails_service").init()>
 <cfset allUserEmailMap = emailsService.getAllEmailsMap()>
+
+<cfif hideTestUsersForAdmin>
+    <cfset visibleUsers = []>
+    <cfloop from="1" to="#arrayLen(allUsers)#" index="iUser">
+        <cfset listUser = allUsers[iUser]>
+        <cfset listUserFlags = structKeyExists(allUserFlagMap, toString(listUser.USERID)) ? allUserFlagMap[toString(listUser.USERID)] : []>
+        <cfset isTestUser = false>
+        <cfloop from="1" to="#arrayLen(listUserFlags)#" index="listFlagIdx">
+            <cfif compareNoCase(trim(listUserFlags[listFlagIdx].FLAGNAME ?: ""), "TEST_USER") EQ 0>
+                <cfset isTestUser = true>
+                <cfbreak>
+            </cfif>
+        </cfloop>
+        <cfif NOT isTestUser>
+            <cfset arrayAppend(visibleUsers, listUser)>
+        </cfif>
+    </cfloop>
+    <cfset allUsers = visibleUsers>
+</cfif>
+
+<cfset hasVisibleTestUsers = false>
+<cfloop from="1" to="#arrayLen(allUsers)#" index="visibleUserIndex">
+    <cfset visibleUserFlags = structKeyExists(allUserFlagMap, toString(allUsers[visibleUserIndex].USERID)) ? allUserFlagMap[toString(allUsers[visibleUserIndex].USERID)] : []>
+    <cfloop from="1" to="#arrayLen(visibleUserFlags)#" index="visibleFlagIndex">
+        <cfif compareNoCase(trim(visibleUserFlags[visibleFlagIndex].FLAGNAME ?: ""), "TEST_USER") EQ 0>
+            <cfset hasVisibleTestUsers = true>
+            <cfbreak>
+        </cfif>
+    </cfloop>
+    <cfif hasVisibleTestUsers>
+        <cfbreak>
+    </cfif>
+</cfloop>
+<cfif hasVisibleTestUsers>
+    <cfset showTestUsersForAdmin = true>
+</cfif>
 
 <cfif structKeyExists(currentAdminUser, "adminUserID") AND val(currentAdminUser.adminUserID) GT 0 AND structKeyExists(variables, "webThumbMap") AND isStruct(webThumbMap)>
     <cfset currentUserImageSrc = trim(webThumbMap[toString(val(currentAdminUser.adminUserID))] ?: "")>
@@ -177,6 +230,9 @@
 </cfif>
 <cfset selectedOrgFilterCount = arrayLen(selectedOrgFilterIDs) + (includeNoOrgFilter ? 1 : 0)>
 <cfset orgFilterHasSelection = selectedOrgFilterCount GT 0>
+<cfif hideTestUsersForAdmin AND len(testUserFlagID) AND selectedFlagFilter EQ testUserFlagID>
+    <cfset selectedFlagFilter = "">
+</cfif>
 <cfset requestedFilterPanel = structKeyExists(url, "filterPanel") ? lcase(trim(url.filterPanel)) : "">
 <cfset activeFilterPanel = "">
 <cfif requestedFilterPanel EQ "flags">
@@ -438,6 +494,10 @@
 <!--- Precompute clear-filters link --->
 <cfset hasActiveFilters = (selectedFlagFilter NEQ "" OR selectedOrgFilter NEQ "" OR selectedGradYear NEQ "" OR selectedLetter NEQ "" OR len(searchTerm))>
 <cfset clearLink = "?list=" & listType & "&sortCol=" & sortColumn & "&sortDir=" & sortDirection & "&perPage=" & perPage>
+<cfset testUsersLink = "">
+<cfif showTestUsersForAdmin AND len(testUserFlagID)>
+    <cfset testUsersLink = "?list=all&filterFlag=" & urlEncodedFormat(testUserFlagID) & "&sortCol=" & sortColumn & "&sortDir=" & sortDirection & "&perPage=" & perPage & "&page=1&filterPanel=flags">
+</cfif>
 <cfset selectedFlagLabel = "">
 <cfif selectedFlagFilter EQ "NOFLAGS">
     <cfset selectedFlagLabel = "No Flags">
@@ -645,6 +705,7 @@
             <button type='button' class='btn btn-sm users-list-filter-panel-toggle #(activeFilterPanel EQ "flags" ? "btn-primary text-white" : "btn-secondary text-dark")#' data-filter-panel-trigger='flags' aria-expanded='#(activeFilterPanel EQ "flags" ? "true" : "false")#' aria-controls='usersListFilterPanel'>
                 <i class='bi bi-flag me-1'></i>Flags#(flagFilterCount GT 0 ? " <span class='badge text-bg-light ms-1'>" & flagFilterCount & "</span>" : "")#
             </button>
+            #(len(testUsersLink) ? "<a href='" & testUsersLink & "' class='btn btn-sm " & ((listType EQ "all" AND selectedFlagFilter EQ testUserFlagID) ? "btn-primary text-white" : "btn-secondary text-dark") & " users-list-test-users-button'><i class='bi bi-person-badge me-1'></i>Test Users</a>" : "")#
             #(showGradFilter ? "<button type='button' class='btn btn-sm users-list-filter-panel-toggle " & (activeFilterPanel EQ "grad" ? "btn-primary text-white" : "btn-secondary text-dark") & "' data-filter-panel-trigger='grad' aria-expanded='" & (activeFilterPanel EQ "grad" ? "true" : "false") & "' aria-controls='usersListFilterPanel'><i class='bi bi-mortarboard me-1'></i>Grad Year" & (gradFilterCount GT 0 ? " <span class='badge text-bg-light ms-1'>" & gradFilterCount & "</span>" : "") & "</button>" : "")#
             #(showOrgFilter ? "<button type='button' class='btn btn-sm users-list-filter-panel-toggle " & (activeFilterPanel EQ "orgs" ? "btn-primary text-white" : "btn-secondary text-dark") & "' data-filter-panel-trigger='orgs' aria-expanded='" & (activeFilterPanel EQ "orgs" ? "true" : "false") & "' aria-controls='usersListFilterPanel'><i class='bi bi-diagram-3 me-1'></i>Organizations" & (selectedOrgFilterCount GT 0 ? " <span class='badge text-bg-light ms-1'>" & selectedOrgFilterCount & "</span>" : "") & "</button>" : "")#
             <label for='perPageSelect' class='mb-0 users-list-filter-label'>Per Page:</label>
@@ -668,9 +729,16 @@
                             <option value='NOFLAGS'#(selectedFlagFilter == 'NOFLAGS' ? ' selected' : '')#>No Flags</option>
 ">
 
+<cfif showTestUsersForAdmin AND len(testUserFlagID)>
+    <cfset content &= "<option value='#testUserFlagID#'" & (selectedFlagFilter == testUserFlagID ? " selected" : "") & ">#testUserFlagName#</option>">
+</cfif>
+
 <!--- Flag dropdown options --->
 <cfloop from="1" to="#arrayLen(allFlags)#" index="i">
     <cfset flag = allFlags[i]>
+    <cfif compareNoCase(trim(flag.FLAGNAME ?: ""), "TEST_USER") EQ 0>
+        <cfcontinue>
+    </cfif>
     <cfset content &= "<option value='#flag.FLAGID#'" & (selectedFlagFilter == toString(flag.FLAGID) ? " selected" : "") & ">#flag.FLAGNAME#</option>">
 </cfloop>
 

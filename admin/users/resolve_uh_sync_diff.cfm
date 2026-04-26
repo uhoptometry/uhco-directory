@@ -28,6 +28,37 @@
 <cfparam name="form.returnTo"   default="">
 <cfparam name="form.userID"     default="0">
 
+<cfif NOT request.hasPermission("users.edit")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+    <cfabort>
+</cfif>
+
+<cfset usersService = createObject("component", "cfc.users_service").init()>
+<cfset canViewTestUsers = application.authService.hasRole("SUPER_ADMIN")>
+<cfset testModeEnabled = usersService.isTestModeEnabled()>
+<cfset hideTestUsersForAdmin = (NOT canViewTestUsers) AND (NOT testModeEnabled)>
+
+<cffunction name="isBlockedTestUserForAdmin" access="private" returntype="boolean" output="false">
+    <cfargument name="targetUserID" type="numeric" required="true">
+    <cfset var localFlagsService = "">
+    <cfset var targetUserFlags = []>
+    <cfset var targetFlag = {}>
+
+    <cfif NOT hideTestUsersForAdmin>
+        <cfreturn false>
+    </cfif>
+
+    <cfset localFlagsService = createObject("component", "cfc.flags_service").init()>
+    <cfset targetUserFlags = localFlagsService.getUserFlags(arguments.targetUserID).data>
+    <cfloop array="#targetUserFlags#" index="targetFlag">
+        <cfif compareNoCase(trim(targetFlag.FLAGNAME ?: ""), "TEST_USER") EQ 0>
+            <cfreturn true>
+        </cfif>
+    </cfloop>
+
+    <cfreturn false>
+</cffunction>
+
 <!--- Only allow POST --->
 <cfif cgi.REQUEST_METHOD NEQ "POST">
     <cflocation url="#request.webRoot#/admin/reporting/uh_sync_report.cfm" addtoken="false">
@@ -74,7 +105,11 @@
 
     <cfif resolution EQ "synced">
         <!--- Apply the API value to the local user field --->
-        <cfset usersService    = createObject("component", "cfc.users_service").init()>
+        <cfif isBlockedTestUserForAdmin(val(diffRow.USERID))>
+            <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+            <cfabort>
+        </cfif>
+
         <cfset currentUserResult = usersService.getUser(val(diffRow.USERID))>
 
         <cfif NOT (structKeyExists(currentUserResult, "success") AND currentUserResult.success)>
@@ -177,10 +212,19 @@
     </cfif>
 
     <cfif resolution EQ "deleted">
+        <cfif NOT request.hasPermission("users.delete")>
+            <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+            <cfabort>
+        </cfif>
+
         <!--- Delete user from local DB using userID from form (double-check matches gone record) --->
         <cfset targetUserID = isNumeric(form.userID) ? val(form.userID) : val(goneRow.USERID)>
         <cfif targetUserID GT 0>
-            <cfset usersService  = createObject("component", "cfc.users_service").init()>
+            <cfif isBlockedTestUserForAdmin(targetUserID)>
+                <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+                <cfabort>
+            </cfif>
+
             <cfset deleteResult  = usersService.deleteUser(targetUserID)>
             <cfif NOT (structKeyExists(deleteResult, "success") AND deleteResult.success)>
                 <cflocation url="#returnTo##sep#err=#urlEncodedFormat('Could not delete user: ' & (deleteResult.message ?: 'Unknown error.'))#" addtoken="false">

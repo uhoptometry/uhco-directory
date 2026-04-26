@@ -1,8 +1,11 @@
 component output="false" singleton {
 
+    variables.maxTestUserCount = 10;
+
     
     public any function init() {
         variables.UsersDAO = createObject("component", "dao.users_DAO").init();
+        variables.AppConfigService = createObject("component", "cfc.appConfig_service").init();
         return this;
     }
 
@@ -128,6 +131,107 @@ component output="false" singleton {
         };
     }
 
+    public boolean function isTestModeEnabled() {
+        return _configValueToBoolean( variables.AppConfigService.getValue( "test_mode.enabled", "0" ) );
+    }
+
+    public void function setTestModeEnabled( required boolean enabled ) {
+        variables.AppConfigService.setValue( "test_mode.enabled", arguments.enabled ? "1" : "0" );
+    }
+
+    public struct function generateTestUsers( numeric count = 0 ) {
+        var generationCount = variables.maxTestUserCount;
+        var staleMonths = val( variables.AppConfigService.getValue( "dashboard.stale_months", "6" ) );
+        var createdUsers = [];
+        var totalTestUsers = 0;
+        var existingTestUsers = variables.UsersDAO.getTestUserCount();
+
+        if ( existingTestUsers GT 0 ) {
+            return {
+                success = false,
+                message = "Delete the existing TEST_USER records before generating a new batch. Current total: #existingTestUsers#.",
+                totalTestUsers = existingTestUsers
+            };
+        }
+
+        if ( staleMonths LT 1 ) {
+            staleMonths = 6;
+        }
+
+        createdUsers = variables.UsersDAO.generateSyntheticTestUsers(
+            count = generationCount,
+            staleMonths = staleMonths
+        );
+        totalTestUsers = variables.UsersDAO.getTestUserCount();
+
+        return {
+            success = true,
+            message = "Generated #arrayLen(createdUsers)# test users. Total TEST_USER records: #totalTestUsers#.",
+            data = createdUsers,
+            totalTestUsers = totalTestUsers
+        };
+    }
+
+    public numeric function getTestUserCount() {
+        return variables.UsersDAO.getTestUserCount();
+    }
+
+    public numeric function getTestUserLimit() {
+        return variables.maxTestUserCount;
+    }
+
+    public struct function deleteAllTestUsers() {
+        return deleteUsersByFlagName( "TEST_USER" );
+    }
+
+    public struct function resetTestUsers() {
+        var staleMonths = val( variables.AppConfigService.getValue( "dashboard.stale_months", "6" ) );
+        var existingTestUsers = variables.UsersDAO.getTestUserCount();
+
+        if ( staleMonths LT 1 ) {
+            staleMonths = 6;
+        }
+
+        if ( existingTestUsers NEQ variables.maxTestUserCount ) {
+            return {
+                success = false,
+                message = "Exactly #variables.maxTestUserCount# TEST_USER records are required before reset. Current total: #existingTestUsers#.",
+                totalTestUsers = existingTestUsers
+            };
+        }
+
+        return variables.UsersDAO.resetTestUsers(
+            staleMonths = staleMonths,
+            maxUsers = variables.maxTestUserCount
+        );
+    }
+
+    public struct function deleteUsersByFlagName( required string flagName ) {
+        var normalizedFlagName = trim( arguments.flagName ?: "" );
+        var targetUserIDs = [];
+        var deletedCount = 0;
+
+        if ( !len( normalizedFlagName ) ) {
+            return { success=false, message="Flag name is required.", deletedCount=0, matchedCount=0 };
+        }
+
+        targetUserIDs = variables.UsersDAO.getUserIDsByFlagName( normalizedFlagName );
+
+        for ( var targetUserID in targetUserIDs ) {
+            if ( val( targetUserID ) GT 0 ) {
+                variables.UsersDAO.deleteUser( val( targetUserID ) );
+                deletedCount++;
+            }
+        }
+
+        return {
+            success = true,
+            message = "Deleted #deletedCount# users with flag #normalizedFlagName#.",
+            deletedCount = deletedCount,
+            matchedCount = arrayLen( targetUserIDs )
+        };
+    }
+
     
     public array function listUsers() {
         return variables.UsersDAO.getAllUsers();
@@ -153,6 +257,11 @@ component output="false" singleton {
             maxRows      = arguments.maxRows,
             startRow     = arguments.startRow
         );
+    }
+
+    private boolean function _configValueToBoolean( required string value ) {
+        var normalizedValue = lCase( trim( arguments.value ?: "" ) );
+        return listFindNoCase( "1,true,yes,on", normalizedValue ) GT 0;
     }
 
 }

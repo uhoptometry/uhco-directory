@@ -8,6 +8,10 @@
 <cfparam name="url.issueCode" default="">
 <cfparam name="url.returnTo"  default="">
 
+<cfif NOT request.hasPermission("users.edit")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
 <!--- Validate userID --->
 <cfif NOT (isNumeric(url.userID) AND val(url.userID) GT 0)>
     <cfset content = "<h1>Quick Sync</h1><div class='alert alert-danger'>Invalid user ID.</div><a href='/admin/users/index.cfm' class='btn btn-secondary'>Back to Users</a>">
@@ -15,6 +19,23 @@
     <cfabort>
 </cfif>
 <cfset targetUserID = val(url.userID)>
+<cfset usersService = createObject("component", "cfc.users_service").init()>
+<cfset canViewTestUsers = application.authService.hasRole("SUPER_ADMIN")>
+<cfset testModeEnabled = usersService.isTestModeEnabled()>
+<cfif (NOT canViewTestUsers) AND (NOT testModeEnabled)>
+    <cfset flagsService = createObject("component", "cfc.flags_service").init()>
+    <cfset targetUserFlags = flagsService.getUserFlags(targetUserID).data>
+    <cfset isTestUser = false>
+    <cfloop array="#targetUserFlags#" index="targetFlag">
+        <cfif compareNoCase(trim(targetFlag.FLAGNAME ?: ""), "TEST_USER") EQ 0>
+            <cfset isTestUser = true>
+            <cfbreak>
+        </cfif>
+    </cfloop>
+    <cfif isTestUser>
+        <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+    </cfif>
+</cfif>
 
 <!--- Validate returnTo: only allow root-relative paths to prevent open redirect --->
 <cfset returnTo = "/admin/users/view.cfm?userID=#targetUserID#">

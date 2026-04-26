@@ -3,9 +3,31 @@
     Saves data quality report exclusions for a single user.
     Expects POST: UserID, returnTo, dqInclude (multi-value checkbox list)
 --->
+<cfif NOT request.hasPermission("users.edit")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
 <cfparam name="form.UserID"      type="integer">
 <cfparam name="form.returnTo"    default="/admin/users/index.cfm">
 <cfparam name="form.dqInclude"   default="">
+
+<cfset usersService = createObject("component", "cfc.users_service").init()>
+<cfset canViewTestUsers = application.authService.hasRole("SUPER_ADMIN")>
+<cfset testModeEnabled = usersService.isTestModeEnabled()>
+<cfif (NOT canViewTestUsers) AND (NOT testModeEnabled)>
+    <cfset flagsService = createObject("component", "cfc.flags_service").init()>
+    <cfset targetUserFlags = flagsService.getUserFlags(val(form.UserID)).data>
+    <cfset isTestUser = false>
+    <cfloop array="#targetUserFlags#" index="targetFlag">
+        <cfif compareNoCase(trim(targetFlag.FLAGNAME ?: ""), "TEST_USER") EQ 0>
+            <cfset isTestUser = true>
+            <cfbreak>
+        </cfif>
+    </cfloop>
+    <cfif isTestUser>
+        <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+    </cfif>
+</cfif>
 
 <cfset allCodes = [
     "missing_uh_api_id",

@@ -48,11 +48,18 @@
 <cfset usersDAO_dash = createObject("component", "dao.users_DAO").init()>
 <cfset variantsDAO_dash = createObject("component", "dao.UserImageVariantDAO").init()>
 <cfset appConfigService_dash = createObject("component", "cfc.appConfig_service").init()>
+<cfset usersService_dash = createObject("component", "cfc.users_service").init()>
 
 <cfset canUsersView = request.hasPermission("users.view")>
 <cfset canUsersEdit = request.hasPermission("users.edit")>
 <cfset canMediaEdit = request.hasPermission("media.edit")>
 <cfset canMediaPublish = request.hasPermission("media.publish")>
+<cfset canViewTestUsers_dash = application.authService.hasRole("SUPER_ADMIN")>
+<cfset testModeEnabledValue_dash = trim(appConfigService_dash.getValue("test_mode.enabled", "0"))>
+<cfset testModeEnabled_dash = usersService_dash.isTestModeEnabled() OR (listFindNoCase("1,true,yes,on", testModeEnabledValue_dash) GT 0)>
+<cfset isSuperAdminImpersonation_dash = structKeyExists(request, "isImpersonating") AND request.isImpersonating() AND structKeyExists(request, "isActualSuperAdmin") AND request.isActualSuperAdmin()>
+<cfset showTestUsersForAdmin_dash = canViewTestUsers_dash OR testModeEnabled_dash OR isSuperAdminImpersonation_dash>
+<cfset hideTestUsersForAdmin_dash = NOT showTestUsersForAdmin_dash>
 
 <cfset dashboardPageSize = val(appConfigService_dash.getValue("dashboard.list_page_size", "10"))>
 <cfif dashboardPageSize LT 1><cfset dashboardPageSize = 10></cfif>
@@ -67,13 +74,14 @@
 <cfset suPage = (isNumeric(url.suPage ?: "") AND val(url.suPage) GT 0) ? val(url.suPage) : 1>
 <cfset uvPage = (isNumeric(url.uvPage ?: "") AND val(url.uvPage) GT 0) ? val(url.uvPage) : 1>
 <cfset smPage = (isNumeric(url.smPage ?: "") AND val(url.smPage) GT 0) ? val(url.smPage) : 1>
+<cfset dashboardReturnTo = "/admin/dashboard.cfm?suPage=" & suPage & "&uvPage=" & uvPage & "&smPage=" & smPage>
 
 <cfset staleUsersPageData = { data = [], totalCount = 0, pageSize = dashboardPageSize, pageNumber = suPage }>
 <cfset staleMediaPageData = { data = [], totalCount = 0, pageSize = dashboardPageSize, pageNumber = smPage }>
 <cfset unpublishedPageData = { data = [], totalCount = 0, pageSize = dashboardPageSize, pageNumber = uvPage }>
 
 <cftry>
-    <cfset staleUsersPageData = usersDAO_dash.getStaleUsersForDashboardPage(pageSize=dashboardPageSize, pageNumber=suPage, staleMonths=staleThresholdMonths)>
+    <cfset staleUsersPageData = usersDAO_dash.getStaleUsersForDashboardPage(pageSize=dashboardPageSize, pageNumber=suPage, staleMonths=staleThresholdMonths, excludeTestUsers=hideTestUsersForAdmin_dash)>
 <cfcatch></cfcatch>
 </cftry>
 
@@ -102,7 +110,7 @@
 <cfif suPage GT staleUsersTotalPages>
     <cfset suPage = staleUsersTotalPages>
     <cftry>
-        <cfset staleUsersPageData = usersDAO_dash.getStaleUsersForDashboardPage(pageSize=dashboardPageSize, pageNumber=suPage, staleMonths=staleThresholdMonths)>
+        <cfset staleUsersPageData = usersDAO_dash.getStaleUsersForDashboardPage(pageSize=dashboardPageSize, pageNumber=suPage, staleMonths=staleThresholdMonths, excludeTestUsers=hideTestUsersForAdmin_dash)>
         <cfset staleUsers = staleUsersPageData.data ?: []>
     <cfcatch></cfcatch>
     </cftry>
@@ -137,7 +145,7 @@
             <cfset staleUsersActions &= " <a href='/admin/users/edit.cfm?userID=#val(su.USERID)#' class='btn btn-sm btn-outline-primary ms-1 py-0 px-1'>Edit</a>">
         </cfif>
         <cfif canUsersView>
-            <cfset staleUsersActions &= " <a href='/admin/users/index.cfm?search=#val(su.USERID)#' class='btn btn-sm btn-outline-secondary ms-1 py-0 px-1'>View</a>">
+            <cfset staleUsersActions &= " <a href='/admin/users/view.cfm?userID=#val(su.USERID)#&returnTo=#urlEncodedFormat(dashboardReturnTo)#' class='btn btn-sm btn-outline-secondary ms-1 py-0 px-1'>View</a>">
         </cfif>
         <cfset staleUsersListHtml &= "<li class='mb-1'><span class='fw-semibold'>#val(su.USERID)#</span> &mdash; #encodeForHTML(staleUserName)##staleUsersActions#</li>">
     </cfloop>
@@ -146,13 +154,15 @@
 
 <cfset staleUsersPagerHtml = "">
 <cfif staleUsersTotalCount GT dashboardPageSize>
-    <cfset staleUsersPagerHtml = "<div class='d-flex align-items-center justify-content-between mt-2 small text-muted'><span>Showing page #suPage# of #staleUsersTotalPages#</span><div class='btn-group btn-group-sm'>">
+    <cfset staleUsersPagerHtml = "<div class='mt-3 pt-2 border-top'><div class='small text-muted mb-2'>Showing page #suPage# of #staleUsersTotalPages#</div><div class='d-flex flex-wrap gap-2 align-items-center'>">
     <cfif suPage GT 1>
-        <cfset staleUsersPagerHtml &= "<a class='btn btn-outline-secondary' href='/admin/dashboard.cfm?suPage=#(suPage - 1)#&uvPage=#uvPage#&smPage=#smPage#'>&laquo; Prev</a>">
+        <cfset staleUsersPagerHtml &= "<a class='btn btn-sm btn-outline-secondary' href='/admin/dashboard.cfm?suPage=#(suPage - 1)#&uvPage=#uvPage#&smPage=#smPage#'>&laquo; Previous Page</a>">
     </cfif>
-    <cfset staleUsersPagerHtml &= "<span class='btn btn-outline-secondary disabled'>#suPage#</span>">
+    <cfloop from="1" to="#staleUsersTotalPages#" index="pagerPage">
+        <cfset staleUsersPagerHtml &= "<a class='btn btn-sm #pagerPage EQ suPage ? "btn-primary disabled" : "btn-outline-secondary"#' href='/admin/dashboard.cfm?suPage=#pagerPage#&uvPage=#uvPage#&smPage=#smPage#'>#pagerPage#</a>">
+    </cfloop>
     <cfif suPage LT staleUsersTotalPages>
-        <cfset staleUsersPagerHtml &= "<a class='btn btn-outline-secondary' href='/admin/dashboard.cfm?suPage=#(suPage + 1)#&uvPage=#uvPage#&smPage=#smPage#'>Next &raquo;</a>">
+        <cfset staleUsersPagerHtml &= "<a class='btn btn-sm btn-outline-secondary' href='/admin/dashboard.cfm?suPage=#(suPage + 1)#&uvPage=#uvPage#&smPage=#smPage#'>Next Page &raquo;</a>">
     </cfif>
     <cfset staleUsersPagerHtml &= "</div></div>">
 </cfif>
@@ -170,7 +180,7 @@
             <cfset staleMediaActions &= " <a href='/admin/user-media/sources.cfm?userid=#val(sm.USERID)#' class='btn btn-sm btn-outline-primary ms-1 py-0 px-1'>Media</a>">
         </cfif>
         <cfif canUsersView>
-            <cfset staleMediaActions &= " <a href='/admin/users/index.cfm?search=#val(sm.USERID)#' class='btn btn-sm btn-outline-secondary ms-1 py-0 px-1'>View</a>">
+            <cfset staleMediaActions &= " <a href='/admin/users/view.cfm?userID=#val(sm.USERID)#&returnTo=#urlEncodedFormat(dashboardReturnTo)#' class='btn btn-sm btn-outline-secondary ms-1 py-0 px-1'>View</a>">
         </cfif>
         <cfset staleMediaListHtml &= "<li class='mb-1'><span class='fw-semibold'>#val(sm.USERID)#</span> &mdash; #encodeForHTML(staleMediaName)##staleMediaActions#</li>">
     </cfloop>
@@ -260,22 +270,22 @@
                         <div class='w-100 d-flex flex-wrap align-items-center justify-content-between gap-3 mt-3 border-top pt-3'>
                             <div class='border m-auto p-2 flex-card'>
                                 <h5>Stale Records</h5>
-                                <p class='mb-0'>Records that haven't been updated in over #staleThresholdLabel#.</p>
+                                <p class='mb-0'>Records that haven't been updated in over #staleThresholdLabel#. Users shown here have been identified for review by automated processes.</p>
                                 <div class='mt-2 py-2 border-top'>#staleUsersListHtml##staleUsersPagerHtml#</div>
                             </div>
                             <div class='border m-auto p-2 flex-card'>
                                 <h5>Problem Records</h5>
-                                <p class='mb-0'>Records with potential issues flagged by the system or users.</p>
+                                <p class='mb-0'>Records with potential issues flagged by the system or users. Users shown here have been identified for review by administrators.</p>
                                 <div class='mt-2 py-2 border-top'>-</div>
                             </div>
                             <div class='border m-auto p-2 flex-card'>
                                 <h5>UH API Sync Changes</h5>
-                                <p class='mb-0'>Changes detected during the last UH Sync.</p>
+                                <p class='mb-0'>Changes detected during the last scheduled UH Sync. Users shown here have been identified for review by automated processes.</p>
                                 <div class='mt-2 py-2 border-top'>-</div>
                             </div>
                             <div class='border m-auto p-2 flex-card'>
                                 <h5>User Review Queue</h5>
-                                <p class='mb-0'>Submitted profile updates submitted waiting for approval.</p>
+                                <p class='mb-0'>Submitted profile updates submitted waiting for approval. Users shown here have submitted a request for review.</p>
                                 <div class='mt-2 py-2 border-top'>-</div>
                             </div>
                         </div>
@@ -314,7 +324,7 @@
                     <div class='card-body d-flex flex-wrap align-items-center justify-content-between gap-3'>
                         <div>
                             <h5 class='card-title dashboard-card-title'><i class='bi bi-flag-fill sidebar-icon'></i><span>Flags</span></h5>
-                            <p class='card-text dashboard-card-text'>Create and manage display flags.</p>
+                            <p class='card-text dashboard-card-text'>Create and manage user-specific display flags.</p>
                         </div>
                         <div class='dashboard-actions'>
                             <a href='/admin/flags/index.cfm' class='btn btn-sm btn-primary stretched-link'><i class='bi bi-gear-fill sidebar-icon me-2'></i>Manage Flags</a>

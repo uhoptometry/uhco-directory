@@ -40,6 +40,25 @@
 
 <cfset targetUserID = val(form.userID)>
 <cfset newActive    = val(form.active)>
+<cfset usersService = createObject("component", "cfc.users_service").init()>
+<cfset canViewTestUsers = application.authService.hasRole("SUPER_ADMIN")>
+
+<cfset testModeEnabled = usersService.isTestModeEnabled()>
+<cfif (NOT canViewTestUsers) AND (NOT testModeEnabled)>
+    <cfset flagsService = createObject("component", "cfc.flags_service").init()>
+    <cfset targetUserFlags = flagsService.getUserFlags(targetUserID).data>
+    <cfset isTestUser = false>
+    <cfloop array="#targetUserFlags#" index="targetFlag">
+        <cfif compareNoCase(trim(targetFlag.FLAGNAME ?: ""), "TEST_USER") EQ 0>
+            <cfset isTestUser = true>
+            <cfbreak>
+        </cfif>
+    </cfloop>
+    <cfif isTestUser>
+        <cfoutput>{"success":false,"message":"Unauthorized."}</cfoutput>
+        <cfabort>
+    </cfif>
+</cfif>
 
 <cftry>
     <cfset usersDAO = createObject("component", "dao.users_DAO").init()>

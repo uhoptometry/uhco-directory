@@ -6,6 +6,10 @@
 <cfparam name="form.stagingID" default="0">
 <cfparam name="form.userID" default="0">
 
+<cfif NOT request.hasPermission("users.edit")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
 <cfset datasource = request.datasource>
 <cfset reasonDbOnly = "User in local Users table but not in API">
 <cfset reasonApiOnly = "User in API but not in local Users table">
@@ -22,6 +26,10 @@
 <cfset pageMessageClass = "alert-info">
 
 <cfset usersService = createObject("component", "cfc.users_service").init()>
+<cfset canViewTestUsers = application.authService.hasRole("SUPER_ADMIN")>
+<cfset testModeEnabled = usersService.isTestModeEnabled()>
+<cfset hideTestUsersForAdmin = (NOT canViewTestUsers) AND (NOT testModeEnabled)>
+<cfset flagsService = createObject("component", "cfc.flags_service").init()>
 <cfset localUsersForActions = usersService.listUsers()>
 <cfset userByApiId = {}>
 <cfset userByName = {}>
@@ -83,10 +91,28 @@
 </cfif>
 
 <cfif form.deleteFromStaging EQ "1" AND isNumeric(form.stagingID) AND val(form.stagingID) GT 0>
+    <cfif NOT request.hasPermission("users.delete")>
+        <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+    </cfif>
+
     <cfset targetUserID = isNumeric(form.userID) ? val(form.userID) : 0>
     <cfset deletedUser = false>
 
     <cfif targetUserID GT 0>
+        <cfif hideTestUsersForAdmin>
+            <cfset targetUserFlags = flagsService.getUserFlags(targetUserID).data>
+            <cfset isTestUser = false>
+            <cfloop array="#targetUserFlags#" index="targetFlag">
+                <cfif compareNoCase(trim(targetFlag.FLAGNAME ?: ""), "TEST_USER") EQ 0>
+                    <cfset isTestUser = true>
+                    <cfbreak>
+                </cfif>
+            </cfloop>
+            <cfif isTestUser>
+                <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+            </cfif>
+        </cfif>
+
         <cfset deleteUserResult = usersService.deleteUser(targetUserID)>
         <cfif structKeyExists(deleteUserResult, "success") AND deleteUserResult.success>
             <cfset deletedUser = true>

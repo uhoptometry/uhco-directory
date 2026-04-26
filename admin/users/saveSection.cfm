@@ -14,6 +14,27 @@
 
 <cfset userID = val(form.userID)>
 <cfset section = lCase(trim(form.section))>
+<cfset usersService = createObject("component", "cfc.users_service").init()>
+<cfset appConfigService = createObject("component", "cfc.appConfig_service").init()>
+<cfset canViewTestUsers = application.authService.hasRole("SUPER_ADMIN")>
+<cfset testModeEnabledValue = trim(appConfigService.getValue("test_mode.enabled", "0"))>
+<cfset testModeEnabled = usersService.isTestModeEnabled() OR (listFindNoCase("1,true,yes,on", testModeEnabledValue) GT 0)>
+<cfset isSuperAdminImpersonation = structKeyExists(request, "isImpersonating") AND request.isImpersonating() AND structKeyExists(request, "isActualSuperAdmin") AND request.isActualSuperAdmin()>
+<cfset showTestUsersForAdmin = canViewTestUsers OR testModeEnabled OR isSuperAdminImpersonation>
+<cfif NOT showTestUsersForAdmin>
+    <cfset flagsService = createObject("component", "cfc.flags_service").init()>
+    <cfset targetUserFlags = flagsService.getUserFlags(userID).data>
+    <cfset isTestUser = false>
+    <cfloop array="#targetUserFlags#" index="targetFlag">
+        <cfif compareNoCase(trim(targetFlag.FLAGNAME ?: ""), "TEST_USER") EQ 0>
+            <cfset isTestUser = true>
+            <cfbreak>
+        </cfif>
+    </cfloop>
+    <cfif isTestUser>
+        <cfoutput>{"success":false,"message":"Unauthorized."}</cfoutput><cfabort>
+    </cfif>
+</cfif>
 
 <cffunction name="getFieldValue" access="private" returntype="string" output="false">
     <cfargument name="value" required="true">

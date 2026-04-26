@@ -131,6 +131,22 @@ body {
   background: brand.$app-bg;
 }
 
+.btn-outline-secondary {
+  --bs-btn-color: var(--slate);
+  --bs-btn-border-color: var(--med-gray);
+  --bs-btn-hover-color: var(--slate);
+  --bs-btn-hover-bg: var(--cloud-white);
+  --bs-btn-hover-border-color: var(--grey);
+  --bs-btn-focus-shadow-rgb: 218, 218, 218;
+  --bs-btn-active-color: var(--slate);
+  --bs-btn-active-bg: var(--med-gray);
+  --bs-btn-active-border-color: var(--grey);
+  --bs-btn-disabled-color: var(--grey);
+  --bs-btn-disabled-bg: transparent;
+  --bs-btn-disabled-border-color: var(--med-gray);
+  background-color: var(--off-white);
+}
+
 code {
   color: brand.$code-inline-fg;
   background: brand.$code-inline-bg;

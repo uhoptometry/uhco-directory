@@ -28,6 +28,9 @@
         <cfset excludeFlags = listAppend(excludeFlags, trim(pf))>
     </cfif>
 </cfloop>
+<cfif NOT listFindNoCase(excludeFlags, "TEST_USER")>
+    <cfset excludeFlags = listAppend(excludeFlags, "TEST_USER")>
+</cfif>
 
 <!--- Build excludeOrgs: Academic Programs children are protected unless Current-Student is unlocked --->
 <cfset excludeOrgs = "">

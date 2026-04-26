@@ -12,5 +12,17 @@
     <cfset auth.sendError(404, "User not found")>
 </cfif>
 
+<cfset isTestUser = false>
+<cfloop array="#profile.flags ?: []#" index="flagRow">
+    <cfif compareNoCase(trim(flagRow.FLAGNAME ?: ""), "TEST_USER") EQ 0>
+        <cfset isTestUser = true>
+        <cfbreak>
+    </cfif>
+</cfloop>
+
+<cfif isTestUser>
+    <cfset auth.sendError(404, "User not found")>
+</cfif>
+
 <cfset auth.sendResponse(profile)>
 <cfabort>

@@ -9,9 +9,28 @@
 <cfset directoryService = createObject("component", "cfc.directory_service").init()>
 <cfset flagsService = createObject("component", "cfc.flags_service").init()>
 <cfset organizationsService = createObject("component", "cfc.organizations_service").init()>
-<cfset user = directoryService.getFullProfile( url.userID ).user>
-<cfset userFlags = directoryService.getFullProfile( url.userID ).flags>
-<cfset userOrganizations = directoryService.getFullProfile( url.userID ).organizations>
+<cfset usersService = createObject("component", "cfc.users_service").init()>
+<cfset appConfigService = createObject("component", "cfc.appConfig_service").init()>
+<cfset canViewTestUsers = application.authService.hasRole("SUPER_ADMIN")>
+<cfset testModeEnabledValue = trim(appConfigService.getValue("test_mode.enabled", "0"))>
+<cfset testModeEnabled = usersService.isTestModeEnabled() OR (listFindNoCase("1,true,yes,on", testModeEnabledValue) GT 0)>
+<cfset isSuperAdminImpersonation = structKeyExists(request, "isImpersonating") AND request.isImpersonating() AND structKeyExists(request, "isActualSuperAdmin") AND request.isActualSuperAdmin()>
+<cfset showTestUsersForAdmin = canViewTestUsers OR testModeEnabled OR isSuperAdminImpersonation>
+<cfset hideTestUsersForAdmin = NOT showTestUsersForAdmin>
+<cfset profile = directoryService.getFullProfile( url.userID )>
+<cfset user = profile.user>
+<cfset userFlags = profile.flags>
+<cfset userOrganizations = profile.organizations>
+<cfset isTestUser = false>
+<cfloop from="1" to="#arrayLen(userFlags)#" index="flagIndex">
+    <cfif compareNoCase(trim(userFlags[flagIndex].FLAGNAME ?: ""), "TEST_USER") EQ 0>
+        <cfset isTestUser = true>
+        <cfbreak>
+    </cfif>
+</cfloop>
+<cfif hideTestUsersForAdmin AND isTestUser>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
 <cfset allFlagsResult = flagsService.getAllFlags()>
 <cfset allFlags = allFlagsResult.data />
 <cfset allOrganizationsResult = organizationsService.getAllOrgs()>

@@ -75,7 +75,12 @@ component extends="dao.BaseDAO" output="false" singleton {
                                 ELSE ''
                             END
                         ) = :cnAt
-                  )
+                _insertSyntheticTestUserAlias(
+                    userID = targetUserID,
+                    firstName = candidate.firstName,
+                    middleName = candidate.middleName,
+                    lastName = candidate.lastName
+                );
             )
                         ORDER BY u.UserID
                         ",
@@ -121,8 +126,26 @@ component extends="dao.BaseDAO" output="false" singleton {
      */
     public array function getStaleUsersForDashboard(
         numeric maxRows = 8,
-        numeric staleMonths = 6
+        numeric staleMonths = 6,
+        boolean excludeTestUsers = false
     ) {
+        var testUserExclusionSql = "";
+        var params = {
+            staleMonths = { value=val(arguments.staleMonths), cfsqltype="cf_sql_integer" },
+            maxRows     = { value=val(arguments.maxRows),     cfsqltype="cf_sql_integer" }
+        };
+
+        if ( arguments.excludeTestUsers ) {
+            testUserExclusionSql = "
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM UserFlagAssignments ufaTest
+                      INNER JOIN UserFlags ufTest ON ufaTest.FlagID = ufTest.FlagID
+                      WHERE ufaTest.UserID = u.UserID
+                        AND ufTest.FlagName = 'TEST_USER'
+                  )";
+        }
+
         var qry = executeQueryWithRetry(
             "
             WITH ranked AS (
@@ -147,6 +170,7 @@ component extends="dao.BaseDAO" output="false" singleton {
                         ua.AliasID
                 ) pa
                 WHERE ISNULL(u.Active, 1) = 1
+                                    #testUserExclusionSql#
                   AND ISNULL(u.UpdatedAt, '1900-01-01') < DATEADD(month, -:staleMonths, GETDATE())
             )
             SELECT UserID,
@@ -161,10 +185,7 @@ component extends="dao.BaseDAO" output="false" singleton {
             WHERE rn <= :maxRows
             ORDER BY rn
             ",
-            {
-                staleMonths = { value=val(arguments.staleMonths), cfsqltype="cf_sql_integer" },
-                maxRows     = { value=val(arguments.maxRows),     cfsqltype="cf_sql_integer" }
-            },
+            params,
             { datasource=variables.datasource, timeout=60, fetchSize=100 }
         );
 
@@ -179,22 +200,42 @@ component extends="dao.BaseDAO" output="false" singleton {
     public struct function getStaleUsersForDashboardPage(
         numeric pageSize = 10,
         numeric pageNumber = 1,
-        numeric staleMonths = 6
+        numeric staleMonths = 6,
+        boolean excludeTestUsers = false
     ) {
         var size = max(1, min(100, int(val(arguments.pageSize ?: 10))));
         var page = max(1, int(val(arguments.pageNumber ?: 1)));
         var offsetRows = (page - 1) * size;
+        var testUserExclusionSql = "";
+        var countParams = {
+            staleMonths = { value=val(arguments.staleMonths), cfsqltype="cf_sql_integer" }
+        };
+        var dataParams = {
+            staleMonths = { value=val(arguments.staleMonths), cfsqltype="cf_sql_integer" },
+            offsetRows  = { value=offsetRows,                 cfsqltype="cf_sql_integer" },
+            pageSize    = { value=size,                       cfsqltype="cf_sql_integer" }
+        };
+
+        if ( arguments.excludeTestUsers ) {
+            testUserExclusionSql = "
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM UserFlagAssignments ufaTest
+                  INNER JOIN UserFlags ufTest ON ufaTest.FlagID = ufTest.FlagID
+                  WHERE ufaTest.UserID = u.UserID
+                    AND ufTest.FlagName = 'TEST_USER'
+              )";
+        }
 
         var countQry = executeQueryWithRetry(
             "
             SELECT COUNT(*) AS TotalCount
             FROM Users u
             WHERE ISNULL(u.Active, 1) = 1
+              #testUserExclusionSql#
               AND ISNULL(u.UpdatedAt, '1900-01-01') < DATEADD(month, -:staleMonths, GETDATE())
             ",
-            {
-                staleMonths = { value=val(arguments.staleMonths), cfsqltype="cf_sql_integer" }
-            },
+            countParams,
             { datasource=variables.datasource, timeout=60 }
         );
 
@@ -220,15 +261,12 @@ component extends="dao.BaseDAO" output="false" singleton {
                     ua.AliasID
             ) pa
             WHERE ISNULL(u.Active, 1) = 1
+                            #testUserExclusionSql#
               AND ISNULL(u.UpdatedAt, '1900-01-01') < DATEADD(month, -:staleMonths, GETDATE())
             ORDER BY ISNULL(u.UpdatedAt, '1900-01-01') ASC, u.UserID ASC
             OFFSET :offsetRows ROWS FETCH NEXT :pageSize ROWS ONLY
             ",
-            {
-                staleMonths = { value=val(arguments.staleMonths), cfsqltype="cf_sql_integer" },
-                offsetRows  = { value=offsetRows,                 cfsqltype="cf_sql_integer" },
-                pageSize    = { value=size,                       cfsqltype="cf_sql_integer" }
-            },
+                        dataParams,
             { datasource=variables.datasource, timeout=60, fetchSize=200 }
         );
 
@@ -371,6 +409,490 @@ component extends="dao.BaseDAO" output="false" singleton {
         _applyPreferredNameToRows( dataRows );
 
         return { data: dataRows, totalCount: total };
+    }
+
+    public array function generateSyntheticTestUsers(
+        required numeric count,
+        required numeric staleMonths
+    ) {
+        var targetCount = max( 1, val( arguments.count ) );
+        var staleThresholdMonths = max( 1, val( arguments.staleMonths ) );
+        var reservedNamePairs = _getNormalizedReservedUserNamePairs();
+        var createdUsers = [];
+        var candidateNumber = 1;
+        var suffixIndex = 0;
+        var attempts = 0;
+        var maxAttempts = targetCount * 200;
+        var candidate = {};
+        var pairKey = "";
+        var newUserID = 0;
+        var testFlagID = _getFlagIDByName( "TEST_USER" );
+
+        if ( testFlagID LTE 0 ) {
+            throw( message = "The TEST_USER flag must exist before generating test users." );
+        }
+
+        while ( arrayLen( createdUsers ) LT targetCount ) {
+            attempts++;
+            if ( attempts GT maxAttempts ) {
+                throw( message = "Unable to find enough unique synthetic test-user names." );
+            }
+
+            candidate = _buildSyntheticTestUserCandidate( candidateNumber, suffixIndex );
+            pairKey = _buildNormalizedNamePairKey( candidate.firstName, candidate.lastName );
+
+            if ( structKeyExists( reservedNamePairs, pairKey ) ) {
+                suffixIndex++;
+                continue;
+            }
+
+            newUserID = _insertSyntheticTestUser(
+                firstName = candidate.firstName,
+                middleName = candidate.middleName,
+                lastName = candidate.lastName,
+                staleMonths = staleThresholdMonths,
+                testFlagID = testFlagID
+            );
+
+            if ( newUserID LTE 0 ) {
+                suffixIndex++;
+                continue;
+            }
+
+            reservedNamePairs[ pairKey ] = true;
+            arrayAppend( createdUsers, {
+                USERID = newUserID,
+                FIRSTNAME = candidate.firstName,
+                MIDDLENAME = candidate.middleName,
+                LASTNAME = candidate.lastName,
+                FULLNAME = trim( candidate.firstName & " " & candidate.middleName & " " & candidate.lastName )
+            } );
+
+            candidateNumber++;
+            suffixIndex = 0;
+        }
+
+        return createdUsers;
+    }
+
+    public numeric function getTestUserCount() {
+        var qry = executeQueryWithRetry(
+            "
+            SELECT COUNT(*) AS TotalCount
+            FROM Users u
+            WHERE EXISTS (
+                SELECT 1
+                FROM UserFlagAssignments ufa
+                INNER JOIN UserFlags uf ON ufa.FlagID = uf.FlagID
+                WHERE ufa.UserID = u.UserID
+                  AND uf.FlagName = 'TEST_USER'
+            )
+            ",
+            {},
+            { datasource=variables.datasource, timeout=30, fetchSize=1 }
+        );
+
+        return val( qry.TotalCount ?: 0 );
+    }
+
+    public array function getUserIDsByFlagName( required string flagName ) {
+        var qry = executeQueryWithRetry(
+            "
+            SELECT DISTINCT ufa.UserID
+            FROM UserFlagAssignments ufa
+            INNER JOIN UserFlags uf ON ufa.FlagID = uf.FlagID
+            WHERE uf.FlagName = :flagName
+            ORDER BY ufa.UserID
+            ",
+            {
+                flagName = { value=trim( arguments.flagName ), cfsqltype="cf_sql_varchar" }
+            },
+            { datasource=variables.datasource, timeout=30, fetchSize=1000 }
+        );
+        var ids = [];
+
+        for ( var row in qry ) {
+            arrayAppend( ids, val( row.UserID ?: 0 ) );
+        }
+
+        return ids;
+    }
+
+    public struct function resetTestUsers(
+        required numeric staleMonths,
+        numeric maxUsers = 10
+    ) {
+        var staleThresholdMonths = max( 1, val( arguments.staleMonths ) );
+        var targetCount = max( 1, val( arguments.maxUsers ) );
+        var targetUserIDs = getUserIDsByFlagName( "TEST_USER" );
+        var testFlagID = _getFlagIDByName( "TEST_USER" );
+        var candidate = {};
+        var targetUserID = 0;
+        var index = 0;
+
+        if ( testFlagID LTE 0 ) {
+            throw( message = "The TEST_USER flag must exist before resetting test users." );
+        }
+
+        if ( arrayLen( targetUserIDs ) NEQ targetCount ) {
+            return {
+                success = false,
+                message = "Exactly #targetCount# TEST_USER records are required before reset. Found #arrayLen( targetUserIDs )#.",
+                resetCount = 0
+            };
+        }
+
+        transaction {
+            for ( index = 1; index <= arrayLen( targetUserIDs ); index++ ) {
+                targetUserID = val( targetUserIDs[ index ] );
+                candidate = _buildSyntheticTestUserCandidate( index, 0 );
+
+                _purgeUserRelatedData(
+                    userID = targetUserID,
+                    preserveTestUserFlag = true,
+                    testFlagID = testFlagID
+                );
+
+                executeQueryWithRetry(
+                    "
+                    UPDATE Users
+                    SET FirstName = :firstName,
+                        MiddleName = :middleName,
+                        LastName = :lastName,
+                        Pronouns = '',
+                        EmailPrimary = '',
+                        Phone = '',
+                        UH_API_ID = '',
+                        Title1 = '',
+                        Title2 = '',
+                        Title3 = '',
+                        Room = '',
+                        Building = '',
+                        Prefix = '',
+                        Suffix = '',
+                        Degrees = '',
+                        Campus = '',
+                        Division = '',
+                        DivisionName = '',
+                        Department = '',
+                        DepartmentName = '',
+                        Office_Mailing_Address = '',
+                        Mailcode = '',
+                        DOB = NULL,
+                        Gender = NULL,
+                        Active = 1,
+                        UpdatedAt = DATEADD(month, -:staleMonths, GETDATE())
+                    WHERE UserID = :id
+                    ",
+                    {
+                        id = { value=targetUserID, cfsqltype="cf_sql_integer" },
+                        firstName = { value=trim( candidate.firstName ), cfsqltype="cf_sql_nvarchar" },
+                        middleName = { value=trim( candidate.middleName ), cfsqltype="cf_sql_nvarchar" },
+                        lastName = { value=trim( candidate.lastName ), cfsqltype="cf_sql_nvarchar" },
+                        staleMonths = { value=staleThresholdMonths, cfsqltype="cf_sql_integer" }
+                    },
+                    { datasource=variables.datasource, timeout=30 }
+                );
+
+                _insertSyntheticTestUserAlias(
+                    userID = targetUserID,
+                    firstName = candidate.firstName,
+                    middleName = candidate.middleName,
+                    lastName = candidate.lastName
+                );
+            }
+        }
+
+        return {
+            success = true,
+            message = "Reset #arrayLen( targetUserIDs )# TEST_USER records to their initial stale state.",
+            resetCount = arrayLen( targetUserIDs )
+        };
+    }
+
+    private struct function _getNormalizedReservedUserNamePairs() {
+        var qry = executeQueryWithRetry(
+            "
+            SELECT DISTINCT
+                   LOWER(LTRIM(RTRIM(ISNULL(u.FirstName, '')))) AS FirstNameKey,
+                   LOWER(LTRIM(RTRIM(ISNULL(u.LastName, '')))) AS LastNameKey
+            FROM Users u
+            ",
+            {},
+            { datasource=variables.datasource, timeout=60, fetchSize=1000 }
+        );
+        var result = {};
+        var row = {};
+
+        for ( row in qry ) {
+            result[ _buildNormalizedNamePairKey( row.FirstNameKey ?: "", row.LastNameKey ?: "" ) ] = true;
+        }
+
+        return result;
+    }
+
+    private struct function _buildSyntheticTestUserCandidate(
+        required numeric baseNumber,
+        numeric suffixIndex = 0
+    ) {
+        var firstNames = [
+            "Andrew", "Maya", "Jordan", "Elena", "Marcus", "Nina", "Caleb", "Ariana", "Nathan", "Claire",
+            "Evan", "Sofia", "Julian", "Leah", "Miles", "Audrey", "Connor", "Naomi", "Isaac", "Vivian",
+            "Daniel", "Camila", "Owen", "Jasmine", "Samuel", "Lucy", "Adrian", "Elise", "Henry", "Mia",
+            "Theo", "Ruby", "Gavin", "Zoe", "Landon", "Eva", "Bennett", "Ivy", "Rowan", "Anna"
+        ];
+        var lastNames = [
+            "Smith", "Johnson", "Parker", "Bennett", "Hayes", "Coleman", "Brooks", "Reed", "Murphy", "Foster",
+            "Bailey", "Cooper", "Sullivan", "Watson", "Price", "Russell", "Ward", "Perry", "Powell", "Long",
+            "Graham", "James", "West", "Bryant", "Stone", "Hunter", "Hicks", "Weaver", "Mason", "Jordan",
+            "Harper", "Bishop", "Warren", "Wells", "Porter", "Hudson", "Spencer", "Carroll", "Fields", "Knight"
+        ];
+        var firstNameCount = arrayLen( firstNames );
+        var lastNameCount = arrayLen( lastNames );
+        var ordinal = max( 1, val( arguments.baseNumber ) + val( arguments.suffixIndex ?: 0 ) );
+        var zeroBasedOrdinal = ordinal - 1;
+        var firstIndex = ( zeroBasedOrdinal MOD firstNameCount ) + 1;
+        var lastIndex = ( ( zeroBasedOrdinal * 7 ) MOD lastNameCount ) + 1;
+        var cycleSuffix = _numberToAlphaSuffix( fix( zeroBasedOrdinal / firstNameCount ) );
+        var resolvedLastName = lastNames[ lastIndex ];
+
+        if ( len( cycleSuffix ) ) {
+            resolvedLastName &= " " & cycleSuffix;
+        }
+
+        return {
+            firstName = firstNames[ firstIndex ],
+            middleName = "Test",
+            lastName = resolvedLastName
+        };
+    }
+
+    private string function _numberToAlphaSuffix( required numeric value ) {
+        var indexValue = val( arguments.value );
+        var result = "";
+        var currentValue = 0;
+        var remainder = 0;
+
+        if ( indexValue LTE 0 ) {
+            return "";
+        }
+
+        currentValue = indexValue;
+        while ( currentValue GT 0 ) {
+            currentValue--;
+            remainder = currentValue MOD 26;
+            result = chr( 65 + remainder ) & result;
+            currentValue = fix( currentValue / 26 );
+        }
+
+        return result;
+    }
+
+    private string function _buildNormalizedNamePairKey(
+        required string firstName,
+        required string lastName
+    ) {
+        return lCase( trim( arguments.firstName ) ) & "|" & lCase( trim( arguments.lastName ) );
+    }
+
+        private boolean function _userNamePairExists(
+        required string firstName,
+        required string lastName
+    ) {
+        var qry = executeQueryWithRetry(
+            "
+            SELECT TOP 1 1 AS ExistsFlag
+            FROM Users u
+            WHERE LOWER(LTRIM(RTRIM(ISNULL(u.FirstName, '')))) = :firstName
+              AND LOWER(LTRIM(RTRIM(ISNULL(u.LastName, '')))) = :lastName
+            ",
+            {
+                firstName = { value=lCase( trim( arguments.firstName ) ), cfsqltype="cf_sql_nvarchar" },
+                lastName = { value=lCase( trim( arguments.lastName ) ), cfsqltype="cf_sql_nvarchar" }
+            },
+            { datasource=variables.datasource, timeout=30, fetchSize=1 }
+        );
+
+        return qry.recordCount GT 0;
+    }
+
+    private numeric function _insertSyntheticTestUser(
+        required string firstName,
+        required string middleName,
+        required string lastName,
+        required numeric staleMonths,
+        required numeric testFlagID
+    ) {
+        var newUserID = 0;
+        var insertResult = "";
+
+        if ( _userNamePairExists( arguments.firstName, arguments.lastName ) ) {
+            return 0;
+        }
+
+        transaction {
+            if ( _userNamePairExists( arguments.firstName, arguments.lastName ) ) {
+                transaction action="rollback";
+                return 0;
+            }
+
+            insertResult = executeQueryWithRetry(
+                "
+                INSERT INTO Users (
+                    FirstName, MiddleName, LastName,
+                    Pronouns,
+                    EmailPrimary,
+                    Phone, UH_API_ID,
+                    Title1, Title2, Title3,
+                    Room, Building,
+                    Prefix, Suffix, Degrees,
+                    Campus, Division, DivisionName, Department, DepartmentName,
+                    Office_Mailing_Address, Mailcode,
+                    DOB, Gender,
+                    Active, CreatedAt, UpdatedAt
+                )
+                VALUES (
+                    :FirstName, :MiddleName, :LastName,
+                    '',
+                    '',
+                    '', '',
+                    '', '', '',
+                    '', '',
+                    '', '', '',
+                    '', '', '', '', '',
+                    '', '',
+                    NULL, NULL,
+                    1,
+                    DATEADD(month, -:staleMonths, GETDATE()),
+                    DATEADD(month, -:staleMonths, GETDATE())
+                );
+                SELECT SCOPE_IDENTITY() AS newID;
+                ",
+                {
+                    FirstName = { value=trim( arguments.firstName ), cfsqltype="cf_sql_nvarchar" },
+                    MiddleName = { value=trim( arguments.middleName ), cfsqltype="cf_sql_nvarchar" },
+                    LastName = { value=trim( arguments.lastName ), cfsqltype="cf_sql_nvarchar" },
+                    staleMonths = { value=val( arguments.staleMonths ), cfsqltype="cf_sql_integer" }
+                },
+                { datasource=variables.datasource, timeout=30, fetchSize=10 }
+            );
+
+            newUserID = val( insertResult.newID ?: 0 );
+            if ( newUserID LTE 0 ) {
+                throw( message = "Synthetic test user insert did not return a UserID." );
+            }
+
+            executeQueryWithRetry(
+                "
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM UserFlagAssignments
+                    WHERE UserID = :userID
+                      AND FlagID = :flagID
+                )
+                BEGIN
+                    INSERT INTO UserFlagAssignments (UserID, FlagID)
+                    VALUES (:userID, :flagID)
+                END
+                ",
+                {
+                    userID = { value=newUserID, cfsqltype="cf_sql_integer" },
+                    flagID = { value=arguments.testFlagID, cfsqltype="cf_sql_integer" }
+                },
+                { datasource=variables.datasource, timeout=30 }
+            );
+
+            _insertSyntheticTestUserAlias(
+                userID = newUserID,
+                firstName = arguments.firstName,
+                middleName = arguments.middleName,
+                lastName = arguments.lastName
+            );
+        }
+
+        return newUserID;
+    }
+
+    private void function _insertSyntheticTestUserAlias(
+        required numeric userID,
+        required string firstName,
+        required string middleName,
+        required string lastName
+    ) {
+        var trimmedFirstName = trim( arguments.firstName );
+        var trimmedMiddleName = trim( arguments.middleName );
+        var trimmedLastName = trim( arguments.lastName );
+        var displayParts = [];
+        var displayName = "";
+
+        if ( len( trimmedFirstName ) ) {
+            arrayAppend( displayParts, trimmedFirstName );
+        }
+        if ( len( trimmedMiddleName ) ) {
+            arrayAppend( displayParts, trimmedMiddleName );
+        }
+        if ( len( trimmedLastName ) ) {
+            arrayAppend( displayParts, trimmedLastName );
+        }
+
+        displayName = arrayToList( displayParts, " " );
+
+        executeQueryWithRetry(
+            "
+            INSERT INTO UserAliases (
+                UserID,
+                FirstName,
+                MiddleName,
+                LastName,
+                DisplayName,
+                AliasType,
+                SourceSystem,
+                IsActive,
+                IsPrimary,
+                SortOrder
+            )
+            VALUES (
+                :userID,
+                :firstName,
+                :middleName,
+                :lastName,
+                :displayName,
+                'SOURCE_VARIANT',
+                'TEST MODE',
+                1,
+                1,
+                0
+            )
+            ",
+            {
+                userID = { value=arguments.userID, cfsqltype="cf_sql_integer" },
+                firstName = { value=trimmedFirstName, cfsqltype="cf_sql_nvarchar", null=( len( trimmedFirstName ) EQ 0 ) },
+                middleName = { value=trimmedMiddleName, cfsqltype="cf_sql_nvarchar", null=( len( trimmedMiddleName ) EQ 0 ) },
+                lastName = { value=trimmedLastName, cfsqltype="cf_sql_nvarchar", null=( len( trimmedLastName ) EQ 0 ) },
+                displayName = { value=displayName, cfsqltype="cf_sql_nvarchar" }
+            },
+            { datasource=variables.datasource, timeout=30 }
+        );
+    }
+
+    private numeric function _getFlagIDByName( required string flagName ) {
+        var qry = executeQueryWithRetry(
+            "
+            SELECT TOP 1 FlagID
+            FROM UserFlags
+            WHERE FlagName = :flagName
+            ",
+            {
+                flagName = { value=trim( arguments.flagName ), cfsqltype="cf_sql_varchar" }
+            },
+            { datasource=variables.datasource, timeout=30, fetchSize=1 }
+        );
+
+        if ( qry.recordCount EQ 0 ) {
+            return 0;
+        }
+
+        return val( qry.FlagID ?: 0 );
     }
 
     private void function _applyPreferredNameToRows( required array rows ) {
@@ -545,22 +1067,12 @@ component extends="dao.BaseDAO" output="false" singleton {
     }
 
     public void function deleteUser( required numeric userID ) {
-        var idParam = { id = { value=userID, cfsqltype="cf_sql_integer" } };
-        var opts    = { datasource=variables.datasource, timeout=30, fetchSize=10 };
-
-        // Delete all child-table rows first (FK constraints on Users.UserID)
-        executeQueryWithRetry( "DELETE FROM UserFlagAssignments  WHERE UserID = :id", idParam, opts );
-        executeQueryWithRetry( "DELETE FROM UserOrganizations    WHERE UserID = :id", idParam, opts );
-        executeQueryWithRetry( "DELETE FROM UserAccessAssignments WHERE UserID = :id", idParam, opts );
-        executeQueryWithRetry( "DELETE FROM UserAddresses        WHERE UserID = :id", idParam, opts );
-        executeQueryWithRetry( "DELETE FROM UserAcademicInfo     WHERE UserID = :id", idParam, opts );
-        executeQueryWithRetry( "DELETE FROM UserImages           WHERE UserID = :id", idParam, opts );
-        executeQueryWithRetry( "DELETE FROM UserExternalIDs      WHERE UserID = :id", idParam, opts );
-        executeQueryWithRetry( "DELETE FROM UserDegrees          WHERE UserID = :id", idParam, opts );
-        executeQueryWithRetry( "DELETE FROM UserEmails           WHERE UserID = :id", idParam, opts );
-        executeQueryWithRetry( "DELETE FROM UserBio              WHERE UserID = :id", idParam, opts );
-
-        executeQueryWithRetry( "DELETE FROM Users WHERE UserID = :id", idParam, opts );
+        _purgeUserRelatedData( userID = arguments.userID );
+        executeQueryWithRetry(
+            "DELETE FROM Users WHERE UserID = :id",
+            { id = { value=arguments.userID, cfsqltype="cf_sql_integer" } },
+            { datasource=variables.datasource, timeout=30, fetchSize=10 }
+        );
     }
 
     public void function updateDegreesField( required numeric userID, required string degrees ) {
@@ -583,6 +1095,68 @@ component extends="dao.BaseDAO" output="false" singleton {
             },
             { datasource=variables.datasource, timeout=30 }
         );
+    }
+
+    private void function _purgeUserRelatedData(
+        required numeric userID,
+        boolean preserveTestUserFlag = false,
+        numeric testFlagID = 0
+    ) {
+        var idParam = { id = { value=arguments.userID, cfsqltype="cf_sql_integer" } };
+        var opts = { datasource=variables.datasource, timeout=30, fetchSize=10 };
+
+        executeQueryWithRetry( "DELETE FROM UserImages WHERE UserID = :id", idParam, opts );
+        executeQueryWithRetry(
+            "DELETE FROM UserImageVariants WHERE UserImageSourceID IN (SELECT UserImageSourceID FROM UserImageSources WHERE UserID = :id)",
+            idParam,
+            opts
+        );
+        executeQueryWithRetry( "DELETE FROM UserImageSources WHERE UserID = :id", idParam, opts );
+        executeQueryWithRetry( "DELETE FROM UserOrganizations WHERE UserID = :id", idParam, opts );
+        executeQueryWithRetry( "DELETE FROM UserAccessAssignments WHERE UserID = :id", idParam, opts );
+        executeQueryWithRetry( "DELETE FROM UserAddresses WHERE UserID = :id", idParam, opts );
+        executeQueryWithRetry( "DELETE FROM UserAcademicInfo WHERE UserID = :id", idParam, opts );
+        executeQueryWithRetry( "DELETE FROM UserExternalIDs WHERE UserID = :id", idParam, opts );
+        executeQueryWithRetry( "DELETE FROM UserDegrees WHERE UserID = :id", idParam, opts );
+        executeQueryWithRetry( "DELETE FROM UserEmails WHERE UserID = :id", idParam, opts );
+        executeQueryWithRetry( "DELETE FROM UserPhone WHERE UserID = :id", idParam, opts );
+        executeQueryWithRetry( "DELETE FROM UserAliases WHERE UserID = :id", idParam, opts );
+        executeQueryWithRetry( "DELETE FROM UserBio WHERE UserID = :id", idParam, opts );
+        executeQueryWithRetry( "DELETE FROM UserAwards WHERE UserID = :id", idParam, opts );
+        executeQueryWithRetry( "DELETE FROM UserStudentProfile WHERE UserID = :id", idParam, opts );
+        executeQueryWithRetry( "DELETE FROM UserReviewSubmissions WHERE UserID = :id", idParam, opts );
+
+        if ( arguments.preserveTestUserFlag AND arguments.testFlagID GT 0 ) {
+            executeQueryWithRetry(
+                "DELETE FROM UserFlagAssignments WHERE UserID = :id AND FlagID <> :flagID",
+                {
+                    id = { value=arguments.userID, cfsqltype="cf_sql_integer" },
+                    flagID = { value=arguments.testFlagID, cfsqltype="cf_sql_integer" }
+                },
+                opts
+            );
+            executeQueryWithRetry(
+                "
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM UserFlagAssignments
+                    WHERE UserID = :id
+                      AND FlagID = :flagID
+                )
+                BEGIN
+                    INSERT INTO UserFlagAssignments (UserID, FlagID)
+                    VALUES (:id, :flagID)
+                END
+                ",
+                {
+                    id = { value=arguments.userID, cfsqltype="cf_sql_integer" },
+                    flagID = { value=arguments.testFlagID, cfsqltype="cf_sql_integer" }
+                },
+                opts
+            );
+        } else {
+            executeQueryWithRetry( "DELETE FROM UserFlagAssignments WHERE UserID = :id", idParam, opts );
+        }
     }
 
 }
