@@ -459,6 +459,12 @@ component output="false" singleton {
                 case "HOMETOWNSTATE":
                     arguments.row["HOMETOWNSTATE"] = studentProfile.HOMETOWNSTATE ?: "";
                     break;
+                case "HOMETOWNFULL":
+                    arguments.row["HOMETOWNFULL"] = _buildHometownFull(
+                        studentProfile.HOMETOWNCITY ?: "",
+                        studentProfile.HOMETOWNSTATE ?: ""
+                    );
+                    break;
                 case "DEGREES":
                     arguments.row["DEGREES"] = arguments.profile.degrees ?: [];
                     break;
@@ -491,12 +497,21 @@ component output="false" singleton {
         required string expectedValue,
         required string returnField
     ) {
+        var fallbackValue = "";
+
         for ( var record in arguments.records ) {
             if ( compareNoCase(trim(record[arguments.typeField] ?: ""), trim(arguments.expectedValue)) EQ 0 ) {
-                return record[arguments.returnField] ?: "";
+                if ( val(record.ISPRIMARY ?: 0) EQ 1 ) {
+                    return record[arguments.returnField] ?: "";
+                }
+
+                if ( !len(fallbackValue) ) {
+                    fallbackValue = record[arguments.returnField] ?: "";
+                }
             }
         }
-        return "";
+
+        return fallbackValue;
     }
 
     private struct function _getFirstMatchingStruct(
@@ -504,12 +519,21 @@ component output="false" singleton {
         required string typeField,
         required string expectedValue
     ) {
+        var fallback = {};
+
         for ( var record in arguments.records ) {
             if ( compareNoCase(trim(record[arguments.typeField] ?: ""), trim(arguments.expectedValue)) EQ 0 ) {
-                return record;
+                if ( val(record.ISPRIMARY ?: 0) EQ 1 ) {
+                    return record;
+                }
+
+                if ( structIsEmpty(fallback) ) {
+                    fallback = record;
+                }
             }
         }
-        return {};
+
+        return fallback;
     }
 
     private array function _getGeneralFieldOptions() {
@@ -548,9 +572,21 @@ component output="false" singleton {
             { value = "BIO", label = "All Bio Data" },
             { value = "HOMETOWNCITY", label = "Hometown City" },
             { value = "HOMETOWNSTATE", label = "Hometown State" },
+            { value = "HOMETOWNFULL", label = "Hometown Full (City, State)" },
             { value = "DEGREES", label = "Degrees" },
             { value = "AWARDS", label = "Awards" }
         ];
+    }
+
+    private string function _buildHometownFull( string hometownCity = "", string hometownState = "" ) {
+        var city = trim(arguments.hometownCity ?: "");
+        var state = trim(arguments.hometownState ?: "");
+
+        if ( len(city) AND len(state) ) {
+            return city & ", " & state;
+        }
+
+        return len(city) ? city : state;
     }
 
     private array function _getEmailTypeOptions() {

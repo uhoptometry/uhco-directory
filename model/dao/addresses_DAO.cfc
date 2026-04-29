@@ -6,7 +6,10 @@ component extends="dao.BaseDAO" output="false" singleton {
 
     public array function getAddresses( required numeric userID ) {
         var qry = executeQueryWithRetry(
-            "SELECT * FROM UserAddresses WHERE UserID = :id ORDER BY AddressType",
+            "SELECT *
+             FROM UserAddresses
+             WHERE UserID = :id
+             ORDER BY ISNULL(IsPrimary, 0) DESC, AddressType, AddressID",
             { id={ value=userID, cfsqltype="cf_sql_integer" } },
             { datasource=variables.datasource, timeout=30, fetchSize=100 }
         );

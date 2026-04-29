@@ -20,9 +20,9 @@ component extends="dao.BaseDAO" output="false" singleton {
                         SELECT TOP 1 ua.FirstName, ua.MiddleName, ua.LastName
                         FROM UserAliases ua
                         WHERE ua.UserID = u.UserID
+                          AND ISNULL(ua.IsActive, 1) = 1
                         ORDER BY
                             CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
-                            CASE WHEN ISNULL(ua.IsActive, 0) = 1 THEN 0 ELSE 1 END,
                             ISNULL(ua.SortOrder, 2147483647),
                             ua.AliasID
                     ) pa
@@ -68,9 +68,9 @@ component extends="dao.BaseDAO" output="false" singleton {
                         SELECT TOP 1 ua.FirstName, ua.MiddleName, ua.LastName
                         FROM UserAliases ua
                         WHERE ua.UserID = u.UserID
+                          AND ISNULL(ua.IsActive, 1) = 1
                         ORDER BY
                             CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
-                            CASE WHEN ISNULL(ua.IsActive, 0) = 1 THEN 0 ELSE 1 END,
                             ISNULL(ua.SortOrder, 2147483647),
                             ua.AliasID
                     ) pa
@@ -122,9 +122,9 @@ component extends="dao.BaseDAO" output="false" singleton {
                         SELECT TOP 1 ua.FirstName, ua.MiddleName, ua.LastName
                         FROM UserAliases ua
                         WHERE ua.UserID = u.UserID
+                          AND ISNULL(ua.IsActive, 1) = 1
                         ORDER BY
                             CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
-                            CASE WHEN ISNULL(ua.IsActive, 0) = 1 THEN 0 ELSE 1 END,
                             ISNULL(ua.SortOrder, 2147483647),
                             ua.AliasID
                     ) pa
@@ -165,9 +165,9 @@ component extends="dao.BaseDAO" output="false" singleton {
                         SELECT TOP 1 ua.FirstName, ua.MiddleName, ua.LastName
                         FROM UserAliases ua
                         WHERE ua.UserID = u.UserID
+                          AND ISNULL(ua.IsActive, 1) = 1
                         ORDER BY
                             CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
-                            CASE WHEN ISNULL(ua.IsActive, 0) = 1 THEN 0 ELSE 1 END,
                             ISNULL(ua.SortOrder, 2147483647),
                             ua.AliasID
                     ) pa

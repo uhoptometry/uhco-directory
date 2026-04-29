@@ -6,7 +6,10 @@ component extends="dao.BaseDAO" output="false" singleton {
 
     public array function getEmails( required numeric userID ) {
         var qry = executeQueryWithRetry(
-            "SELECT * FROM UserEmails WHERE UserID = :id ORDER BY SortOrder, EmailID",
+            "SELECT *
+             FROM UserEmails
+             WHERE UserID = :id
+             ORDER BY ISNULL(IsPrimary, 0) DESC, SortOrder, EmailID",
             { id={ value=userID, cfsqltype="cf_sql_integer" } },
             { datasource=variables.datasource, timeout=30, fetchSize=100 }
         );

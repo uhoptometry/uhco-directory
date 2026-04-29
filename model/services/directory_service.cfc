@@ -44,7 +44,26 @@ component output="false" singleton {
         profile.awards      = variables.studentProfile_service.getAwards( userID ).data;
         profile.bio         = variables.bio_service.getBio( userID ).data;
 
+        if ( !isStruct(profile.studentProfile) ) {
+            profile.studentProfile = {};
+        }
+        profile.studentProfile["HometownFull"] = _buildHometownFull(
+            profile.studentProfile.HOMETOWNCITY ?: "",
+            profile.studentProfile.HOMETOWNSTATE ?: ""
+        );
+
         return profile;
+    }
+
+    private string function _buildHometownFull( string hometownCity = "", string hometownState = "" ) {
+        var city = trim(arguments.hometownCity ?: "");
+        var state = trim(arguments.hometownState ?: "");
+
+        if ( len(city) AND len(state) ) {
+            return city & ", " & state;
+        }
+
+        return len(city) ? city : state;
     }
 
     

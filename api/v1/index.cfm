@@ -104,7 +104,8 @@
                 "GET /api/v1/quickpulls/attending",
                 "GET /api/v1/quickpulls/gradclass?year={year}",
                 "GET /api/v1/quickpulls/graduate?id={userID}",
-                "GET /api/v1/quickpulls/deans"
+                "GET /api/v1/quickpulls/deans",
+                "GET /api/v1/quickpulls/myuhco?id={externalID}"
             ]
         })>
         <cfabort>
