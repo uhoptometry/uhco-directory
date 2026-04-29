@@ -64,6 +64,19 @@
         runNowLink     = "/admin/settings/scheduled-tasks/tasks/run_uh_sync_report_task.cfm"
     },
     {
+        key            = "UHCO_DuplicateUsersReport",
+        label          = "Duplicate Users Report",
+        icon           = "bi-people",
+        color          = "danger",
+        description    = "Scans all user-related tables for likely duplicate identities and stores scored candidate pairs.",
+        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_duplicate_users_report_task.cfm?triggeredBy=scheduled&format=json#scheduleTaskTokenParam#",
+        startTime      = "05:00 AM",
+        frequency      = "monthly",
+        timeout        = 600,
+        dashboardLink  = "/admin/reporting/duplicate_users_report.cfm",
+        runNowLink     = "/admin/settings/scheduled-tasks/tasks/run_duplicate_users_report_task.cfm"
+    },
+    {
         key            = "UHCO_HometownProfileSync",
         label          = "Hometown Profile Sync",
         icon           = "bi-geo-alt",
@@ -133,6 +146,7 @@
 <!--- ── Load latest run info from each DAO ───────────────────────────────── --->
 <cfset dqDAO   = createObject("component", "dao.dataQuality_DAO").init()>
 <cfset uhDAO   = createObject("component", "dao.uhSync_DAO").init()>
+<cfset duplicateDAO = createObject("component", "dao.duplicateUsers_DAO").init()>
 <cfset gmDAO   = createObject("component", "dao.gradMigration_DAO").init()>
 <cfset beDAO   = createObject("component", "dao.bulkExclusions_DAO").init()>
 <cfset latestRuns = {}>
@@ -144,6 +158,10 @@
 <cftry>
     <cfset latestRuns["UHCO_UHSyncReport"] = uhDAO.getLatestRun()>
 <cfcatch><cfset latestRuns["UHCO_UHSyncReport"] = {}></cfcatch>
+</cftry>
+<cftry>
+    <cfset latestRuns["UHCO_DuplicateUsersReport"] = duplicateDAO.getLatestRun()>
+<cfcatch><cfset latestRuns["UHCO_DuplicateUsersReport"] = {}></cfcatch>
 </cftry>
 <cftry>
     <cfset latestRuns["UHCO_GradMigration"] = gmDAO.getLatestRun()>

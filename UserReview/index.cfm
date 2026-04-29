@@ -1,9 +1,11 @@
-<cfif NOT application.userReviewAuthService.isLoggedIn()>
+<cfset userReviewAuth = structKeyExists(request, "userReviewAuth") ? request.userReviewAuth : createObject("component", "cfc.UserReviewAuthService").init()>
+
+<cfif NOT userReviewAuth.isLoggedIn()>
     <cflocation url="/UserReview/login.cfm" addtoken="false">
     <cfabort>
 </cfif>
 
-<cfset currentUser = application.userReviewAuthService.getSessionUser()>
+<cfset currentUser = userReviewAuth.getSessionUser()>
 <cfset userReviewService = createObject("component", "cfc.userReview_service").init()>
 <cfset eligibility = userReviewService.getEligibilityResult(currentUser.userID)>
 <cfset settings = userReviewService.getSettings()>

@@ -86,9 +86,25 @@ component output="false" singleton {
                 // Check if this is a connection-related error.
                 // ColdFusion puts the generic "Error Executing Database Query" in e.message;
                 // the actual JDBC/SQL error text lives in e.detail — check both.
-                var sqlState = e.sqlstate ?: "";
-                var message  = e.message  ?: "";
-                var detail   = e.detail   ?: "";
+                var sqlState = "";
+                var message  = "";
+                var detail   = "";
+
+                if (isStruct(e)) {
+                    if (structKeyExists(e, "sqlstate") AND isSimpleValue(e.sqlstate)) {
+                        sqlState = trim(e.sqlstate);
+                    } else if (structKeyExists(e, "SQLSTATE") AND isSimpleValue(e["SQLSTATE"])) {
+                        sqlState = trim(e["SQLSTATE"]);
+                    }
+
+                    if (structKeyExists(e, "message") AND isSimpleValue(e.message)) {
+                        message = trim(e.message);
+                    }
+
+                    if (structKeyExists(e, "detail") AND isSimpleValue(e.detail)) {
+                        detail = trim(e.detail);
+                    }
+                }
                 
                 // SQLSTATE codes for communication errors:
                 // 08S01 = Communication link failure

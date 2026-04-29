@@ -37,9 +37,9 @@ component extends="dao.BaseDAO" output="false" singleton {
     public struct function getUserByCougarnet( required string cougarnetID ) {
         var normalizedID = lCase(trim(arguments.cougarnetID));
         var qry = executeQueryWithRetry(
-                        "
-                        SELECT TOP 1 u.*
-                        FROM Users u
+            "
+            SELECT TOP 1 u.*
+            FROM Users u
             WHERE EXISTS (
                 SELECT 1
                 FROM UserExternalIDs uei
@@ -75,15 +75,10 @@ component extends="dao.BaseDAO" output="false" singleton {
                                 ELSE ''
                             END
                         ) = :cnAt
-                _insertSyntheticTestUserAlias(
-                    userID = targetUserID,
-                    firstName = candidate.firstName,
-                    middleName = candidate.middleName,
-                    lastName = candidate.lastName
-                );
+                  )
             )
-                        ORDER BY u.UserID
-                        ",
+            ORDER BY u.UserID
+            ",
             {
                 cn = { value=normalizedID, cfsqltype="cf_sql_nvarchar" },
                 cnAt = { value=normalizedID, cfsqltype="cf_sql_nvarchar" },
@@ -378,11 +373,36 @@ component extends="dao.BaseDAO" output="false" singleton {
         dataParams["rows"]   = { value=arguments.maxRows,      cfsqltype="cf_sql_integer" };
 
         var dataQry = executeQueryWithRetry(
-            "SELECT u.*, thumb.ImageURL AS WebThumbURL,
+            "SELECT u.*, uai.CurrentGradYear AS CurrentGradYear, prog.Program AS Program, thumb.ImageURL AS WebThumbURL,
                     COALESCE(pa.FirstName, '')  AS PreferredFirstName,
                     COALESCE(pa.MiddleName, '') AS PreferredMiddleName,
                     COALESCE(pa.LastName, '')   AS PreferredLastName
              FROM Users u
+             OUTER APPLY (
+                 SELECT TOP 1 ai.CurrentGradYear
+                 FROM UserAcademicInfo ai
+                 WHERE ai.UserID = u.UserID
+             ) uai
+             OUTER APPLY (
+                 SELECT TOP 1 o.OrgName AS Program
+                 FROM UserOrganizations uo
+                 INNER JOIN Organizations o ON uo.OrgID = o.OrgID
+                 WHERE uo.UserID = u.UserID
+                   AND o.OrgName IN ('OD Program', 'MS Program', 'PhD Program')
+                   AND EXISTS (
+                       SELECT 1
+                       FROM UserFlagAssignments ufa
+                       INNER JOIN UserFlags uf ON ufa.FlagID = uf.FlagID
+                       WHERE ufa.UserID = u.UserID
+                         AND uf.FlagName IN ('Current-Student', 'Alumni')
+                   )
+                 ORDER BY CASE o.OrgName
+                     WHEN 'OD Program' THEN 1
+                     WHEN 'MS Program' THEN 2
+                     WHEN 'PhD Program' THEN 3
+                     ELSE 99
+                 END
+             ) prog
              OUTER APPLY (
                  SELECT TOP 1 img.ImageURL
                  FROM UserImages img

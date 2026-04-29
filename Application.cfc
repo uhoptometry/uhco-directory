@@ -54,8 +54,16 @@ component output="false" {
             onApplicationStart();
         }
 
-        // Safety: ensure onApplicationStart() has run
-        if (!structKeyExists(application, "datasources")) {
+        // Safety: ensure onApplicationStart() has run (and services are available)
+        if (
+            !structKeyExists(application, "datasources")
+            OR !isStruct(application.datasources)
+            OR !structKeyExists(application.datasources, "admin")
+            OR !structKeyExists(application, "authService")
+            OR !isObject(application.authService)
+            OR !structKeyExists(application, "userReviewAuthService")
+            OR !isObject(application.userReviewAuthService)
+        ) {
             onApplicationStart();
         }
 
@@ -75,12 +83,12 @@ component output="false" {
 
             var isUserReviewPublicPage = arrayFind(publicUserReviewPages, path);
 
-            if (NOT isUserReviewPublicPage AND NOT application.userReviewAuthService.isLoggedIn()) {
+            if (NOT isUserReviewPublicPage AND NOT request.userReviewAuth.isLoggedIn()) {
                 location(application.webRoot & "/UserReview/login.cfm", false);
             }
 
-            if (application.userReviewAuthService.isLoggedIn()) {
-                request.userReviewUser = application.userReviewAuthService.getSessionUser();
+            if (request.userReviewAuth.isLoggedIn()) {
+                request.userReviewUser = request.userReviewAuth.getSessionUser();
             }
         } else {
             request.context    = "admin";

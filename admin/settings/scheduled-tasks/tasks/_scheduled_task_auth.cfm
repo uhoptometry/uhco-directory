@@ -10,7 +10,7 @@
     <cfset _wantsJson = structKeyExists(url, "format") AND lCase(trim(url.format ?: "")) EQ "json">
 
     <cfif NOT len(_expectedToken) OR _providedToken NEQ _expectedToken>
-        <cfheader statuscode="403" statustext="Forbidden">
+        <cfheader statuscode="403">
         <cfif _wantsJson>
             <cfcontent type="application/json; charset=utf-8" reset="true"><cfoutput>#serializeJSON({ success=false, error="Invalid scheduled task token." })#</cfoutput>
         <cfelse>

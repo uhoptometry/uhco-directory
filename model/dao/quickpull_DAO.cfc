@@ -281,4 +281,31 @@ component extends="dao.BaseDAO" output="false" singleton {
         return result;
     }
 
+    /**
+     * Look up a user by external ID value (UH_API_ID, COUGARNET, or PEOPLESOFT).
+     * Returns UserID if found, 0 if not found.
+     */
+    public numeric function getUserIDByExternalID(
+        required string externalValue,
+        required string systemName
+    ) {
+        var qry = executeQueryWithRetry(
+            "SELECT TOP 1 uei.UserID
+             FROM   UserExternalIDs uei
+                    INNER JOIN ExternalSystems es ON uei.SystemID = es.SystemID
+             WHERE  es.SystemName = :systemName
+               AND  LOWER(TRIM(uei.ExternalValue)) = LOWER(TRIM(:externalValue))",
+            {
+                systemName = { value=arguments.systemName, cfsqltype="cf_sql_varchar" },
+                externalValue = { value=arguments.externalValue, cfsqltype="cf_sql_varchar" }
+            },
+            { datasource=variables.datasource, timeout=30, fetchSize=1 }
+        );
+
+        if ( qry.recordCount > 0 ) {
+            return val(qry.UserID);
+        }
+        return 0;
+    }
+
 }

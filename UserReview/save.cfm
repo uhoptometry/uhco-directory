@@ -3,14 +3,16 @@
     <cfabort>
 </cfif>
 
-<cfif NOT application.userReviewAuthService.isLoggedIn()>
+<cfset userReviewAuth = structKeyExists(request, "userReviewAuth") ? request.userReviewAuth : createObject("component", "cfc.UserReviewAuthService").init()>
+
+<cfif NOT userReviewAuth.isLoggedIn()>
     <cflocation url="/UserReview/login.cfm" addtoken="false">
     <cfabort>
 </cfif>
 
 <cfset userReviewService = createObject("component", "cfc.userReview_service").init()>
 <cfset result = userReviewService.saveSubmission(
-    actor = application.userReviewAuthService.getSessionUser(),
+    actor = userReviewAuth.getSessionUser(),
     formScope = form
 )>
 

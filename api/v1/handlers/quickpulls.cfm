@@ -80,6 +80,30 @@
         <cfabort>
     </cfcase>
 
+    <!--- ── MyUHCO ────────────────────────────────────────────────── --->
+    <cfcase value="myuhco">
+        <!--- Require secret that unlocks Alumni/Current-Student --->
+        <cfset unlockedFlags = auth.checkSecret()>
+        <cfset hasAlumniAccess = arrayFindNoCase(unlockedFlags, "Alumni") GT 0>
+        <cfset hasStudentAccess = arrayFindNoCase(unlockedFlags, "Current-Student") GT 0>
+        <cfset isAuthorized = hasAlumniAccess OR hasStudentAccess>
+
+        <!--- Require ?id= parameter (external ID value) --->
+        <cfif NOT len(trim(url.id ?: "")) OR NOT len(url.id)>
+            <cfset auth.sendError(400, "Missing required parameter: id (external ID value)")>
+        </cfif>
+        <cfset externalID = trim(url.id)>
+
+        <cfset data = qpService.getMyUHCO(externalID, isAuthorized)>
+
+        <cfif structIsEmpty(data)>
+            <cfset auth.sendError(404, "User not found or not authorized")>
+        </cfif>
+
+        <cfset auth.sendResponse(data)>
+        <cfabort>
+    </cfcase>
+
     <!--- ── Unknown type ──────────────────────────────────────────── --->
     <cfdefaultcase>
         <cfset auth.sendError(404, "Unknown quickpull type: #EncodeForHTML(qpType)#")>

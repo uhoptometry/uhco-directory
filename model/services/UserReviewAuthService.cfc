@@ -73,6 +73,7 @@ component output="false" singleton {
             };
             return result;
         } catch (any cfcatch) {
+            _logAuthError("authenticate", cfcatch, trim(arguments.username));
             if (cfcatch.message CONTAINS "error code 49") {
                 if (cfcatch.message CONTAINS "52e") {
                     result.message = "Invalid credentials.";
@@ -127,6 +128,46 @@ component output="false" singleton {
         };
 
         return result;
+    }
+
+    private void function _logAuthError(
+        required string context,
+        required any err,
+        string username = ""
+    ) {
+        var parts = [];
+        var lineInfo = "";
+
+        arrayAppend(parts, "UserReviewAuthService error");
+        arrayAppend(parts, "context=" & arguments.context);
+        if (len(trim(arguments.username ?: ""))) {
+            arrayAppend(parts, "username=" & trim(arguments.username));
+        }
+
+        if (isStruct(arguments.err)) {
+            if (structKeyExists(arguments.err, "type")) {
+                arrayAppend(parts, "type=" & toString(arguments.err.type));
+            }
+            if (structKeyExists(arguments.err, "message")) {
+                arrayAppend(parts, "message=" & toString(arguments.err.message));
+            }
+            if (structKeyExists(arguments.err, "detail") AND len(trim(arguments.err.detail ?: ""))) {
+                arrayAppend(parts, "detail=" & trim(arguments.err.detail));
+            }
+            if (structKeyExists(arguments.err, "sqlstate") AND len(trim(arguments.err.sqlstate ?: ""))) {
+                arrayAppend(parts, "sqlstate=" & trim(arguments.err.sqlstate));
+            }
+            if (structKeyExists(arguments.err, "tagContext") AND isArray(arguments.err.tagContext) AND arrayLen(arguments.err.tagContext)) {
+                lineInfo = (arguments.err.tagContext[1].template ?: "") & ":" & (arguments.err.tagContext[1].line ?: "");
+                arrayAppend(parts, "tag=" & lineInfo);
+            }
+        }
+
+        cflog(
+            file = "uhco_ident_userreview_auth",
+            type = "error",
+            text = arrayToList(parts, " | ")
+        );
     }
 
     public void function createSession(required struct user) {

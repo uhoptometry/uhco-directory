@@ -41,6 +41,13 @@ component output="false" singleton {
                 endpoint = "/api/v1/quickpulls/deans",
                 description = "Dean roster quickpull.",
                 baseFields = ["USERID", "FIRSTNAME", "MIDDLENAME", "LASTNAME", "TITLE1", "FULLNAME", "KIOSKNONGRIDIMAGE"]
+            },
+            {
+                key = "myuhco",
+                label = "MyUHCO",
+                endpoint = "/api/v1/quickpulls/myuhco",
+                description = "MyUHCO portal profile lookup by external ID (UH_API_ID, COUGARNET, or PEOPLESOFT).",
+                baseFields = ["USERID", "FIRSTNAME", "MIDDLENAME", "LASTNAME", "DEGREES", "FULLNAME", "FLAGS", "ORGANIZATIONS", "CURRENTGRADYEAR", "WEBPROFILEIMAGE", "WEBTHUMBIMAGE"]
             }
         ];
     }
@@ -213,6 +220,75 @@ component output="false" singleton {
         }
 
         return _appendConfiguredFieldsToRows( users, "deans" );
+    }
+
+    /**
+     * MyUHCO portal profile lookup by external ID.
+     * Tries to match the externalValue against UH_API_ID, COUGARNET, or PEOPLESOFT.
+     * Returns a single user struct with degrees, flags, orgs, images, and configured fields.
+     * Returns empty struct if user not found, or if Alumni/Current-Student but not authorized.
+     */
+    public struct function getMyUHCO(
+        required string externalValue,
+        required boolean isAuthorized
+    ) {
+        var userID = 0;
+        var systems = ["UH_API_ID", "COUGARNET", "PEOPLESOFT"];
+        
+        // Try to find user by external ID across all three systems
+        for (var system in systems) {
+            userID = variables.dao.getUserIDByExternalID(trim(arguments.externalValue), system);
+            if (userID > 0) break;
+        }
+
+        if (userID <= 0) return {};
+
+        // Get the base user record
+        var profile = variables.directoryService.getFullProfile(userID);
+        if (structIsEmpty(profile)) return {};
+
+        var user = duplicate(profile.user);
+        user.USERID = userID;
+        user.FULLNAME = buildFullName(user);
+        user.DEGREES = profile.degrees ?: [];
+        user.FLAGS = profile.flags ?: [];
+        user.ORGANIZATIONS = profile.organizations ?: [];
+
+        // Check if user has Alumni or Current-Student flags
+        var hasAlumniOrStudent = false;
+        for (var flag in user.FLAGS) {
+            if (arrayFindNoCase(["Alumni", "Current-Student"], flag.FLAGNAME ?: "") > 0) {
+                hasAlumniOrStudent = true;
+                break;
+            }
+        }
+
+        // If restricted flags present, require authorization
+        if (hasAlumniOrStudent AND NOT arguments.isAuthorized) {
+            return {};
+        }
+
+        // Get CurrentGradYear if user is Alumni or Current-Student
+        if (hasAlumniOrStudent) {
+            var academic = profile.academic ?: {};
+            user.CURRENTGRADYEAR = academic.CURRENTGRADYEAR ?: "";
+        } else {
+            user.CURRENTGRADYEAR = "";
+        }
+
+        // Get web profile/thumb images
+        var ids = [userID];
+        var webProfileMap = variables.dao.getImageMapByVariant("WEB_PROFILE", ids);
+        var webThumbMap = variables.dao.getImageMapByVariant("WEB_THUMB", ids);
+        var key = toString(userID);
+
+        user.WEBPROFILEIMAGE = structKeyExists(webProfileMap, key) ? webProfileMap[key] : "";
+        user.WEBTHUMBIMAGE = structKeyExists(webThumbMap, key) ? webThumbMap[key] : "";
+
+        // Apply configured additional fields
+        _applyConfiguredFieldsToRow(user, userID, "myuhco", {});
+
+        return user;
     }
 
     private array function _appendConfiguredFieldsToRows( required array rows, required string quickpullType ) {

@@ -1,4 +1,6 @@
-<cfif application.userReviewAuthService.isLoggedIn()>
+<cfset userReviewAuth = structKeyExists(request, "userReviewAuth") ? request.userReviewAuth : createObject("component", "cfc.UserReviewAuthService").init()>
+
+<cfif userReviewAuth.isLoggedIn()>
     <cflocation url="/UserReview/index.cfm" addtoken="false">
     <cfabort>
 </cfif>

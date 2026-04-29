@@ -8,8 +8,14 @@
 <cfset filterFlag  = trim(url.flag   ?: "")>
 <cfset filterOrg   = trim(url.org    ?: "")>
 <cfset filterClass = isNumeric(url.class ?: "") ? toString(int(val(url.class ?: ""))) : "">
+<cfset filterGradYear = isNumeric(url.gradyear ?: "") ? toString(int(val(url.gradyear ?: ""))) : "">
 <cfset limit       = isNumeric(url.limit  ?: "") ? min(val(url.limit),  500) : 50>
 <cfset offset      = isNumeric(url.offset ?: "") ? max(val(url.offset), 0)   : 0>
+
+<!--- Allow gradyear= only when filtering Alumni or Current-Student --->
+<cfif len(filterGradYear) AND listFindNoCase("Alumni,Current-Student", filterFlag)>
+    <cfset filterClass = filterGradYear>
+</cfif>
 
 <!---
     Secret-gating: check for a valid secret and collect which flags it unlocks.

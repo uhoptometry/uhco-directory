@@ -2,6 +2,7 @@
 <cfparam name="form.password" default="">
 <cfparam name="form.cougarnetID" default="">
 <cfparam name="form.externalAuthToken" default="">
+<cfset userReviewAuth = structKeyExists(request, "userReviewAuth") ? request.userReviewAuth : createObject("component", "cfc.UserReviewAuthService").init()>
 
 <cfif cgi.request_method NEQ "POST">
     <cflocation url="/UserReview/login.cfm" addtoken="false">
@@ -9,7 +10,7 @@
 </cfif>
 
 <cfif len(trim(form.externalAuthToken)) AND len(trim(form.cougarnetID))>
-    <cfset authResult = application.userReviewAuthService.authenticateExternal(
+    <cfset authResult = userReviewAuth.authenticateExternal(
         cougarnetID = form.cougarnetID,
         token = form.externalAuthToken
     )>
@@ -19,14 +20,14 @@
         <cfabort>
     </cfif>
 
-    <cfset authResult = application.userReviewAuthService.authenticate(
+    <cfset authResult = userReviewAuth.authenticate(
         username = form.username,
         password = form.password
     )>
 </cfif>
 
 <cfif authResult.success>
-    <cfset application.userReviewAuthService.createSession(authResult.user)>
+    <cfset userReviewAuth.createSession(authResult.user)>
     <cflocation url="/UserReview/index.cfm" addtoken="false">
 <cfelse>
     <cflocation url="/UserReview/login.cfm?error=#urlEncodedFormat(authResult.message)#" addtoken="false">

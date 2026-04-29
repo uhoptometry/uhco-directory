@@ -44,6 +44,53 @@
     <cfset uhSyncBorderCls    = uhSyncHasPending ? "border-warning" : "border-success">
 </cfif>
 
+<!--- ── Duplicate Users last run (super-admin only) ── --->
+<cfset canRunDuplicateReport = application.authService.hasRole("SUPER_ADMIN")>
+<cfset duplicateLastRun = {}>
+<cfset duplicatePendingCount = 0>
+<cfset duplicateBadgeCls = "bg-secondary text-dark">
+<cfset duplicateBadgeTxt = "Never run">
+<cfset duplicateSubtitle = "No duplicate scan has been run yet.">
+<cfset duplicateBorderCls = "">
+
+<cfif canRunDuplicateReport>
+    <cftry>
+        <cfset duplicateDAO_dash = createObject("component", "dao.duplicateUsers_DAO").init()>
+        <cfset duplicateLastRun = duplicateDAO_dash.getLatestRun()>
+        <cfset duplicatePendingCount = duplicateDAO_dash.getLatestPendingPairCount()>
+        <cfif NOT structIsEmpty(duplicateLastRun)>
+            <cfset duplicateBadgeCls = duplicatePendingCount GT 0 ? "bg-danger" : "bg-success">
+            <cfset duplicateBadgeTxt = duplicatePendingCount GT 0 ? duplicatePendingCount & " pending" : "No pending pairs">
+            <cfset duplicateSubtitle = "Last run: " & dateTimeFormat(duplicateLastRun.RUNAT, "mmm d, yyyy HH:nn") & " UTC — " & val(duplicateLastRun.TOTALPAIRS ?: 0) & " pair(s)">
+            <cfset duplicateBorderCls = duplicatePendingCount GT 0 ? "border-danger" : "border-success">
+        </cfif>
+    <cfcatch></cfcatch>
+    </cftry>
+</cfif>
+
+<cfset duplicateUsersCardHtml = "">
+<cfif canRunDuplicateReport>
+    <cfset duplicateUsersCardHtml = "
+    <div class='col-12'>
+        <div class='card shadow-sm dashboard-card dashboard-status-card #duplicateBorderCls#'>
+            <div class='card-body d-flex flex-wrap align-items-center justify-content-between gap-3'>
+                <div class='dashboard-status-copy'>
+                    <h5 class='card-title dashboard-card-title mb-0'>
+                        <i class='bi bi-people me-2'></i>Duplicate Users Report
+                        <span class='badge #duplicateBadgeCls# fs-6'>#duplicateBadgeTxt#</span>
+                    </h5>
+                    <small class='text-muted'>#duplicateSubtitle#</small>
+                </div>
+                <div class='dashboard-actions'>
+                    <a href='/admin/reporting/duplicate_users_report.cfm' class='btn btn-sm btn-primary'><i class='bi bi-file-earmark-text-fill me-2'></i>View Report</a>
+                    <a href='/admin/reporting/run_duplicate_users_report.cfm?scan=quick&mode=alumni_vs_faculty' class='btn btn-sm btn-outline-secondary'><i class='bi bi-play-fill me-2'></i>Run Now</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    ">
+</cfif>
+
 <!--- ── Dashboard summary lists: stale users, unpublished variants, stale media ── --->
 <cfset usersDAO_dash = createObject("component", "dao.users_DAO").init()>
 <cfset variantsDAO_dash = createObject("component", "dao.UserImageVariantDAO").init()>
@@ -415,6 +462,7 @@
                     </div>
                 </div>
             </div>
+            #duplicateUsersCardHtml#
         </div>
     </div>
 </div>

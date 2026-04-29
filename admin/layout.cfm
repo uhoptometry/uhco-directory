@@ -79,6 +79,13 @@
                     <i class='bi bi-person-vcard me-1'></i><span class="sidebar-label">Search UH LDAP</span>
                 </a>
             </li>
+            <cfif application.authService.hasRole("SUPER_ADMIN")>
+            <li class="nav-item">
+                <a href='/admin/reporting/duplicate_users_report.cfm' class='nav-link'>
+                    <i class='bi bi-people me-1'></i><span class="sidebar-label">Duplicate Users</span>
+                </a>
+            </li>
+            </cfif>
         </ul>
             <cfif request.hasPermission("settings.view") OR request.hasAnyPermission([
                 "settings.app_config.manage",
