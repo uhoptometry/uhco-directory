@@ -333,12 +333,29 @@
                        class='btn btn-sm btn-success'>
                         <i class='bi bi-crop'></i> Crop &amp; Generate
                     </a>
+                    <a href='/admin/user-media/resize.cfm?userid=#userID#&sourceid=#sourceID#&imageVariantTypeID=#encodeForHTMLAttribute(v.IMAGEVARIANTTYPEID)#&transferOnly=1'
+                       class='btn btn-sm btn-outline-success ms-1'
+                       title='Transfer source image without crop or resize'>
+                        <i class='bi bi-arrow-left-right'></i> Transfer
+                    </a>
+                ">
+            <cfelseif vtAllowResize>
+                <cfset content &= "
+                    <a href='/admin/user-media/resize.cfm?userid=#userID#&sourceid=#sourceID#&imageVariantTypeID=#encodeForHTMLAttribute(v.IMAGEVARIANTTYPEID)#'
+                       class='btn btn-sm btn-success'>
+                        <i class='bi bi-gear'></i> Resize
+                    </a>
+                    <a href='/admin/user-media/resize.cfm?userid=#userID#&sourceid=#sourceID#&imageVariantTypeID=#encodeForHTMLAttribute(v.IMAGEVARIANTTYPEID)#&transferOnly=1'
+                       class='btn btn-sm btn-outline-success ms-1'
+                       title='Transfer source image without resize'>
+                        <i class='bi bi-arrow-left-right'></i> Transfer
+                    </a>
                 ">
             <cfelse>
                 <cfset content &= "
                     <a href='/admin/user-media/resize.cfm?userid=#userID#&sourceid=#sourceID#&imageVariantTypeID=#encodeForHTMLAttribute(v.IMAGEVARIANTTYPEID)#'
                        class='btn btn-sm btn-success'>
-                        <i class='bi bi-gear'></i> #vtAllowResize ? 'Resize' : 'Transfer'#
+                        <i class='bi bi-arrow-left-right'></i> Transfer
                     </a>
                 ">
             </cfif>

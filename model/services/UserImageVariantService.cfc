@@ -416,6 +416,7 @@ component output="false" singleton {
         required numeric userID,
         required numeric imageVariantTypeID,
         required numeric userImageSourceID,
+        boolean forceTransferOnly = false,
         struct frameData = {},
         struct cropData = {}
     ) {
@@ -470,8 +471,13 @@ component output="false" singleton {
             }
         }
 
-        var safeCode  = reReplace(variantType.CODE, "[^a-zA-Z0-9_\-]", "_", "ALL");
-        var mode      = lCase( trim( variantType.MODE ?: "resize_only" ) );
+        var effectiveVariantType = duplicate(variantType);
+        var safeCode  = reReplace(effectiveVariantType.CODE, "[^a-zA-Z0-9_\-]", "_", "ALL");
+        var mode      = lCase( trim( effectiveVariantType.MODE ?: "resize_only" ) );
+        if ( arguments.forceTransferOnly AND mode NEQ "passthrough" ) {
+            mode = "passthrough";
+            effectiveVariantType.MODE = "passthrough";
+        }
         var sourceExt = lCase( listLast(source.DROPBOXPATH ?: "", ".") );
         var extension = "";
 
@@ -518,7 +524,7 @@ component output="false" singleton {
         // Attempt generation — all filesystem/image logic is inside this call.
         try {
             _generateVariantImage(
-                variantType = variantType,
+                variantType = effectiveVariantType,
                 source      = source,
                 outputPath  = outputPath,
                 frameData   = normalizedFrameData,

@@ -365,8 +365,6 @@
                         </a>
                         <button type='button' class='btn btn-sm btn-remove users-list-action-button users-list-action-button-delete'
                                 title='Delete Variant Type'
-                                data-bs-toggle='tooltip'
-                                data-bs-title='Delete Variant Type'
                                 aria-label='Delete Variant Type'
                                 data-bs-toggle='modal'
                                 data-bs-target='##deleteModal'

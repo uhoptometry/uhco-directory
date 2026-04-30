@@ -52,7 +52,12 @@
 <cfset targetWidth   = isNumeric(variant.WIDTHPX ?: "") ? int(val(variant.WIDTHPX)) : 0>
 <cfset targetHeight  = isNumeric(variant.HEIGHTPX ?: "") ? int(val(variant.HEIGHTPX)) : 0>
 <cfset allowResize   = lCase(trim(variant.MODE ?: "resize_only")) NEQ "passthrough">
-<cfset isPassThrough = NOT allowResize>
+<cfset transferOnlyRequested = (
+    (structKeyExists(url, "transferOnly") AND val(url.transferOnly ?: 0) EQ 1)
+    OR (structKeyExists(form, "transferOnly") AND val(form.transferOnly ?: 0) EQ 1)
+)>
+<cfset transferOnlyMode = transferOnlyRequested AND allowResize>
+<cfset isPassThrough = (NOT allowResize) OR transferOnlyMode>
 
 <!--- Build a human-readable dimensions string --->
 <cfif isPassThrough>
@@ -82,7 +87,8 @@
         <cfset result = variantService.generateVariant(
             userID             = userID,
             imageVariantTypeID = imageVariantTypeID,
-            userImageSourceID  = sourceID
+            userImageSourceID  = sourceID,
+            forceTransferOnly  = transferOnlyMode
         )>
 
         <cfset actionMessage      = result.message>
@@ -238,6 +244,9 @@
         <div class='d-flex gap-2 flex-wrap'>
             <form method='post' class='d-inline'>
                 <input type='hidden' name='action' value='generate'>
+                <cfif transferOnlyMode>
+                    <input type='hidden' name='transferOnly' value='1'>
+                </cfif>
                 <button type='submit' class='btn btn-success'>
                     <i class='bi bi-arrow-clockwise me-1'></i> #(hasGeneratedFile ? 'Regenerate' : (isPassThrough ? 'Transfer' : 'Generate'))#
                 </button>
