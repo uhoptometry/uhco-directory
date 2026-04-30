@@ -2,6 +2,9 @@
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
+<cfinclude template="/admin/settings/section-status-config.cfm">
+<cfset sectionStatus = getSettingsSectionStatus("app-config")>
+
 <cfset appConfigService = createObject("component", "cfc.appConfig_service").init()>
 <cfset mediaConfigService = createObject("component", "cfc.mediaConfig_service").init()>
 <cfset usersService = createObject("component", "cfc.users_service").init()>
@@ -140,6 +143,9 @@
         <h1 class="mb-1"><i class="bi bi-sliders me-2"></i>Application Settings</h1>
         <p class="text-muted mb-0">Generic application configuration stored in AppConfig. Start here for environment-specific values that will expand over time.</p>
     </div>
+    <cfif len(sectionStatus)>
+        <span class='badge bg-warning text-dark float-end'>Currently in: #sectionStatus#</span>
+    </cfif>
 </div>
 
 <cfif len(actionMessage)>

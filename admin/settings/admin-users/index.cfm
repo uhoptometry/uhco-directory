@@ -8,6 +8,9 @@
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
+<cfinclude template="/admin/settings/section-status-config.cfm">
+<cfset sectionStatus = getSettingsSectionStatus("admin-users")>
+
 <!--- ── Load service & data ── --->
 <cfset authSvc   = createObject("component", "cfc.adminAuth_service").init()>
 <cfset users     = authSvc.getAllUsers()>
@@ -69,6 +72,11 @@
 
 <h1 class="mb-1"><i class="bi bi-shield-lock me-2"></i>Admin Users, Roles &amp; Permissions</h1>
 <p class="text-muted">Manage who can access the admin panel, their role assignments, and any direct permission overrides.</p>
+<cfif len(sectionStatus)>
+    <div class="mb-3">
+        <span class="badge bg-warning text-dark">Currently in: #sectionStatus#</span>
+    </div>
+</cfif>
 
 <!--- Status messages --->
 <cfif len(msgParam)>

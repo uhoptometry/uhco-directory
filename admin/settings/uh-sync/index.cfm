@@ -7,6 +7,9 @@
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
+<cfinclude template="/admin/settings/section-status-config.cfm">
+<cfset sectionStatus = getSettingsSectionStatus("uh-sync")>
+
 <!--- Load latest run info --->
 <cfset uhSyncDAO  = createObject("component", "dao.uhSync_DAO").init()>
 <cfset recentRuns = []>
@@ -36,9 +39,17 @@
         <li class="breadcrumb-item active">UH Sync</li>
     </ol>
 </nav>
-
-<h1 class="mb-1"><i class="bi bi-arrow-left-right me-2"></i>UH Sync</h1>
-<p class="text-muted">Compare local directory data against the UH API. View field-level changes and membership additions/removals.</p>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="mb-1"><i class="bi bi-arrow-left-right me-2"></i>UH Sync</h1>
+        <p class="text-muted">Compare local directory data against the UH API. View field-level changes and membership additions/removals.</p>
+    </div>
+    <cfif len(sectionStatus)>
+        <div class="mb-3">
+            <span class="badge bg-warning text-dark">Currently in: #sectionStatus#</span>
+        </div>
+    </cfif>
+</div>
 
 <cfif NOT dbOk>
     <div class="alert alert-warning mt-3">

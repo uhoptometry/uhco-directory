@@ -3,6 +3,9 @@
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
+<cfinclude template="/admin/settings/section-status-config.cfm">
+<cfset sectionStatus = getSettingsSectionStatus("media-config")>
+
 <!--- ── Load summary stats ───────────────────────────────────────────────── --->
 <cfset patternDAO = createObject("component", "dao.FileNamePatternDAO").init()>
 <cfset variantDAO = createObject("component", "dao.UserImageVariantDAO").init()>
@@ -71,6 +74,9 @@
         <h1 class="mb-1"><i class="bi bi-image me-2"></i>User Media Config</h1>
         <p class="text-muted mb-0">Manage filename patterns and image variant type definitions.</p>
     </div>
+    <cfif len(sectionStatus)>
+        <span class='badge bg-warning text-dark float-end'>Currently in: #sectionStatus#</span>
+    </cfif>
 </div>
 
 <div class="row g-4">

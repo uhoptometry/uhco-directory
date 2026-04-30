@@ -7,6 +7,9 @@
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
+<cfinclude template="/admin/settings/section-status-config.cfm">
+<cfset sectionStatus = getSettingsSectionStatus("admin-roles")>
+
 <cfset authSvc  = createObject("component", "cfc.adminAuth_service").init()>
 <cfset roles    = authSvc.getAllRoles()>
 <cfset allPermissions = authSvc.getAllPermissions()>
@@ -53,6 +56,11 @@
 
 <h1 class="mb-1"><i class="bi bi-key me-2"></i>Admin Roles</h1>
 <p class="text-muted">Create and manage roles plus the default permission bundles assigned to each role.</p>
+<cfif len(sectionStatus)>
+    <div class="mb-3">
+        <span class="badge bg-warning text-dark">Currently in: #sectionStatus#</span>
+    </div>
+</cfif>
 
 <cfif len(msgParam)>
     <div class="alert alert-success alert-dismissible fade show mt-3">

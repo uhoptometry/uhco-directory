@@ -7,6 +7,9 @@
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
+<cfinclude template="/admin/settings/section-status-config.cfm">
+<cfset sectionStatus = getSettingsSectionStatus("workflows")>
+
 <cfset content = "">
 <cfsavecontent variable="content">
 <cfoutput>
@@ -23,7 +26,9 @@
 <h1 class="mb-1"><i class="bi bi-diagram-3-fill me-2"></i>Workflows</h1>
 <p class="text-muted">Manage automated workflows and processing pipelines.</p>
 </div>
-<span class='badge settings-status-badge settings-status-badge--soon float-end'>Coming Soon</span>
+<cfif len(sectionStatus)>
+<span class='badge bg-warning text-dark float-end'>Currently in: #sectionStatus#</span>
+</cfif>
 </div>
 <div class="card shadow-sm settings-shell settings-reference-card mt-3">
     <div class="card-header">

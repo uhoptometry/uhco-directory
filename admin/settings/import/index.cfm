@@ -7,6 +7,9 @@
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
+<cfinclude template="/admin/settings/section-status-config.cfm">
+<cfset sectionStatus = getSettingsSectionStatus("import")>
+
 <cfset importSvc = createObject("component", "cfc.import_service").init()>
 <cfset templates = importSvc.getTemplates()>
 <cfset recentRuns = importSvc.getRecentRuns(maxRows = 20)>
@@ -39,7 +42,9 @@ for (tpl in templates) {
 <h1 class="mb-1"><i class="bi bi-upload me-2"></i>Import Data</h1>
 <p class="text-muted mb-4">Select an import template, upload a CSV file, preview, and process.</p>
 </div>
-<span class='badge bg-warning text-dark float-end'>Currently in: Alpha</span>
+<cfif len(sectionStatus)>
+<span class='badge bg-warning text-dark float-end'>Currently in: #sectionStatus#</span>
+</cfif>
 </div>
 <!--- ── Template Cards ── --->
 <h5 class="mb-3">Choose Import Template</h5>

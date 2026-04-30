@@ -2,6 +2,9 @@
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
+<cfinclude template="/admin/settings/section-status-config.cfm">
+<cfset sectionStatus = getSettingsSectionStatus("user-review")>
+
 <cfset userReviewService = createObject("component", "cfc.userReview_service").init()>
 <cfset settings = userReviewService.getSettings()>
 <cfset submissions = userReviewService.listSubmissions()>
@@ -27,6 +30,9 @@
         <h1 class="mb-1"><i class="bi bi-person-lines-fill me-2"></i>User Review</h1>
         <p class="text-muted mb-0">Configure self-service profile review and process staged submissions.</p>
     </div>
+    <cfif len(sectionStatus)>
+        <span class='badge bg-warning text-dark float-end'>Currently in: #sectionStatus#</span>
+    </cfif>
 </div>
 
 <cfif len(actionMessage)>

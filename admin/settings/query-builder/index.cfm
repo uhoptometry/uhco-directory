@@ -7,6 +7,9 @@
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
+<cfinclude template="/admin/settings/section-status-config.cfm">
+<cfset sectionStatus = getSettingsSectionStatus("query-builder")>
+
 <!--- ── Load table list ── --->
 <cfset qbService = createObject("component", "cfc.queryBuilder_service").init()>
 <cfset tables = []>
@@ -88,7 +91,9 @@
         <h1 class="mb-1"><i class="bi bi-database me-2"></i>Query Builder</h1>
         <p class="text-muted mb-0">Build read-only SELECT queries visually. Results capped at 10,000 rows. Exportable to CSV (Planned: XML, Excel)</p>
     </div>
-    <span class='badge bg-warning text-dark float-end'>Currently in: Alpha</span>
+    <cfif len(sectionStatus)>
+        <span class='badge bg-warning text-dark float-end'>Currently in: #sectionStatus#</span>
+    </cfif>
 </div>
 
 <cfif len(tableError)>

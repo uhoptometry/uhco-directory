@@ -27,6 +27,8 @@
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
+<cfinclude template="/admin/settings/section-status-config.cfm">
+
 <cfset content = "">
 <cfsavecontent variable="content">
 <cfoutput>
@@ -44,7 +46,7 @@
                 <div class="card h-100 border-0 shadow-sm settings-hub-card">
                     <div class="card-body text-center py-4">
                         <i class="bi bi-sliders display-4 mb-3 settings-hub-icon"></i>
-                        <h5 class="card-title text-dark">Application Settings</h5>
+                        <h5 class="card-title text-dark">Application Settings<cfif len(getSettingsSectionStatus("app-config"))> <span class="badge settings-status-badge settings-status-badge--#lCase(getSettingsSectionStatus("app-config"))#">#getSettingsSectionStatus("app-config")#</span></cfif></h5>
                         <p class="card-text text-muted small">Shared key-value configuration such as published media URLs</p>
                     </div>
                 </div>
@@ -56,7 +58,7 @@
                 <div class="card h-100 border-0 shadow-sm settings-hub-card">
                     <div class="card-body text-center py-4">
                         <i class="bi bi-sliders display-4 mb-3 settings-hub-icon"></i>
-                        <h5 class="card-title text-dark">Admin Permissions</h5>
+                        <h5 class="card-title text-dark">Admin Permissions<cfif len(getSettingsSectionStatus("admin-permissions"))> <span class="badge settings-status-badge settings-status-badge--#lCase(getSettingsSectionStatus("admin-permissions"))#">#getSettingsSectionStatus("admin-permissions")#</span></cfif></h5>
                         <p class="card-text text-muted small">Create, edit, and retire permission definitions</p>
                     </div>
                 </div>
@@ -70,7 +72,7 @@
             <div class="card h-100 border-0 shadow-sm settings-hub-card">
                 <div class="card-body text-center py-4">
                     <i class="bi bi-shield-lock display-4 mb-3 settings-hub-icon"></i>
-                    <h5 class="card-title text-dark">Admin Users &amp; Roles</h5>
+                    <h5 class="card-title text-dark">Admin Users &amp; Roles<cfif len(getSettingsSectionStatus("admin-users"))> <span class="badge settings-status-badge settings-status-badge--#lCase(getSettingsSectionStatus("admin-users"))#">#getSettingsSectionStatus("admin-users")#</span></cfif></h5>
                     <p class="card-text text-muted small">Manage admin accounts and role assignments</p>
                 </div>
             </div>
@@ -83,7 +85,7 @@
                 <div class="card h-100 border-0 shadow-sm settings-hub-card">
                     <div class="card-body text-center py-4">
                         <i class="bi bi-person-lines-fill display-4 mb-3 settings-hub-icon"></i>
-                        <h5 class="card-title text-dark">User Review</h5>
+                        <h5 class="card-title text-dark">User Review<cfif len(getSettingsSectionStatus("user-review"))> <span class="badge settings-status-badge settings-status-badge--#lCase(getSettingsSectionStatus("user-review"))#">#getSettingsSectionStatus("user-review")#</span></cfif></h5>
                         <p class="card-text text-muted small">Configure self-service profile review and process submissions</p>
                     </div>
                 </div>
@@ -97,7 +99,7 @@
             <div class="card h-100 border-0 shadow-sm settings-hub-card">
                 <div class="card-body text-center py-4">
                     <i class="bi bi-image display-4 mb-3 settings-hub-icon"></i>
-                    <h5 class="card-title text-dark">User Media Config</h5>
+                    <h5 class="card-title text-dark">User Media Config<cfif len(getSettingsSectionStatus("media-config"))> <span class="badge settings-status-badge settings-status-badge--#lCase(getSettingsSectionStatus("media-config"))#">#getSettingsSectionStatus("media-config")#</span></cfif></h5>
                     <p class="card-text text-muted small">Filename patterns and image variant types</p>
                 </div>
             </div>
@@ -110,7 +112,7 @@
             <div class="card h-100 border-0 shadow-sm settings-hub-card">
                 <div class="card-body text-center py-4">
                     <i class="bi bi-braces display-4 mb-3 settings-hub-icon"></i>
-                    <h5 class="card-title text-dark">UHCO API</h5>
+                    <h5 class="card-title text-dark">UHCO API<cfif len(getSettingsSectionStatus("uhco-api"))> <span class="badge settings-status-badge settings-status-badge--#lCase(getSettingsSectionStatus("uhco-api"))#">#getSettingsSectionStatus("uhco-api")#</span></cfif></h5>
                     <p class="card-text text-muted small">Manage API tokens and secrets for external integrations</p>
                 </div>
             </div>
@@ -123,7 +125,7 @@
             <div class="card h-100 border-0 shadow-sm settings-hub-card">
                 <div class="card-body text-center py-4">
                     <i class="bi bi-mortarboard display-4 mb-3 settings-hub-icon"></i>
-                    <h5 class="card-title text-dark">Migrations</h5>
+                    <h5 class="card-title text-dark">Migrations<cfif len(getSettingsSectionStatus("migrations"))> <span class="badge settings-status-badge settings-status-badge--#lCase(getSettingsSectionStatus("migrations"))#">#getSettingsSectionStatus("migrations")#</span></cfif></h5>
                     <p class="card-text text-muted small">Graduation migration and future migration tools</p>
                 </div>
             </div>
@@ -136,7 +138,7 @@
             <div class="card h-100 border-0 shadow-sm settings-hub-card">
                 <div class="card-body text-center py-4">
                     <i class="bi bi-clock-history display-4 mb-3 settings-hub-icon"></i>
-                    <h5 class="card-title text-dark">Scheduled Tasks <span class="badge settings-status-badge settings-status-badge--beta">Beta</span></h5>
+                    <h5 class="card-title text-dark">Scheduled Tasks<cfif len(getSettingsSectionStatus("scheduled-tasks"))> <span class="badge settings-status-badge settings-status-badge--#lCase(getSettingsSectionStatus("scheduled-tasks"))#">#getSettingsSectionStatus("scheduled-tasks")#</span></cfif></h5>
                     <p class="card-text text-muted small">Enable, disable, and configure automated tasks</p>
                 </div>
             </div>
@@ -149,7 +151,7 @@
             <div class="card h-100 border-0 shadow-sm settings-hub-card">
                 <div class="card-body text-center py-4">
                     <i class="bi bi-upload display-4 mb-3 settings-hub-icon"></i>
-                    <h5 class="card-title text-dark">Import Data <span class="badge settings-status-badge settings-status-badge--beta">Beta</span></h5>
+                    <h5 class="card-title text-dark">Import Data<cfif len(getSettingsSectionStatus("import"))> <span class="badge settings-status-badge settings-status-badge--#lCase(getSettingsSectionStatus("import"))#">#getSettingsSectionStatus("import")#</span></cfif></h5>
                     <p class="card-text text-muted small">Import users, flags, organizations via CSV or Excel</p>
                 </div>
             </div>
@@ -162,7 +164,7 @@
             <div class="card h-100 border-0 shadow-sm settings-hub-card">
                 <div class="card-body text-center py-4">
                     <i class="bi bi-funnel display-4 mb-3 settings-hub-icon"></i>
-                    <h5 class="card-title text-dark">Bulk Exclusions <span class="badge settings-status-badge settings-status-badge--beta">Beta</span></h5>
+                    <h5 class="card-title text-dark">Bulk Exclusions<cfif len(getSettingsSectionStatus("bulk-exclusions"))> <span class="badge settings-status-badge settings-status-badge--#lCase(getSettingsSectionStatus("bulk-exclusions"))#">#getSettingsSectionStatus("bulk-exclusions")#</span></cfif></h5>
                     <p class="card-text text-muted small">Data quality exclusion rules by user type</p>
                 </div>
             </div>
@@ -177,7 +179,7 @@
             <div class="card h-100 border-0 shadow-sm settings-hub-card">
                 <div class="card-body text-center py-4">
                     <i class="bi bi-arrow-left-right display-4 mb-3 settings-hub-icon"></i>
-                    <h5 class="card-title text-dark">UH Sync <span class="badge settings-status-badge settings-status-badge--alpha">Alpha</span></h5>
+                    <h5 class="card-title text-dark">UH Sync<cfif len(getSettingsSectionStatus("uh-sync"))> <span class="badge settings-status-badge settings-status-badge--#lCase(getSettingsSectionStatus("uh-sync"))#">#getSettingsSectionStatus("uh-sync")#</span></cfif></h5>
                     <p class="card-text text-muted small">Field-level diffs and membership changes vs UH API</p>
                 </div>
             </div>
@@ -190,7 +192,7 @@
             <div class="card h-100 border-0 shadow-sm settings-hub-card">
                 <div class="card-body text-center py-4">
                     <i class="bi bi-database display-4 mb-3 settings-hub-icon"></i>
-                    <h5 class="card-title text-dark">Query Builder <span class="badge settings-status-badge settings-status-badge--alpha">Alpha</span></h5>
+                    <h5 class="card-title text-dark">Query Builder<cfif len(getSettingsSectionStatus("query-builder"))> <span class="badge settings-status-badge settings-status-badge--#lCase(getSettingsSectionStatus("query-builder"))#">#getSettingsSectionStatus("query-builder")#</span></cfif></h5>
                     <p class="card-text text-muted small">Visual query builder with export (CSV)</p>
                 </div>
             </div>

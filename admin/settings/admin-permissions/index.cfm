@@ -7,6 +7,9 @@
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
+<cfinclude template="/admin/settings/section-status-config.cfm">
+<cfset sectionStatus = getSettingsSectionStatus("admin-permissions")>
+
 <cfset authSvc = createObject("component", "cfc.adminAuth_service").init()>
 <cfset permissions = authSvc.getAllPermissions()>
 <cfset roles = authSvc.getAllRoles()>
@@ -52,6 +55,11 @@
 
 <h1 class="mb-1"><i class="bi bi-sliders me-2"></i>Admin Permissions</h1>
 <p class="text-muted">Create custom permissions, edit display metadata, and retire old permissions. System permission keys are used by page guards and cannot be deleted.</p>
+<cfif len(sectionStatus)>
+    <div class="mb-3">
+        <span class="badge bg-warning text-dark">Currently in: #sectionStatus#</span>
+    </div>
+</cfif>
 
 <cfif len(msgParam)>
     <div class="alert alert-success alert-dismissible fade show mt-3">

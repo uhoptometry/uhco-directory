@@ -7,6 +7,9 @@
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
+<cfinclude template="/admin/settings/section-status-config.cfm">
+<cfset sectionStatus = getSettingsSectionStatus("bulk-exclusions")>
+
 <cfset svc        = createObject("component", "cfc.bulkExclusions_service").init()>
 <cfset types      = svc.getTypes()>
 <cfset recentRuns = []>
@@ -35,8 +38,17 @@
     </ol>
 </nav>
 
-<h1 class="mb-1"><i class="bi bi-funnel-fill me-2"></i>Bulk Exclusions</h1>
-<p class="text-muted">Insert data quality exclusions in bulk by user type. Safe to re-run (idempotent).</p>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="mb-1"><i class="bi bi-funnel-fill me-2"></i>Bulk Exclusions</h1>
+        <p class="text-muted">Insert data quality exclusions in bulk by user type. Safe to re-run (idempotent).</p>
+    </div>
+    <cfif len(sectionStatus)>
+        <div class="mb-3">
+            <span class="badge bg-warning text-dark">Currently in: #sectionStatus#</span>
+        </div>
+    </cfif>
+</div>
 
 <!--- Status messages --->
 <cfif len(msgParam)>

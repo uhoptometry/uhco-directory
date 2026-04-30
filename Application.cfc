@@ -138,15 +138,22 @@ component output="false" {
     }
 
     private string function _getEnvironmentName() {
-        var host = lCase(trim(cgi.http_host ?: cgi.server_name ?: ""));
+        var rawHttpHost = trim(cgi.http_host ?: "");
+        var rawServerName = trim(cgi.server_name ?: "");
+        var localHosts = "127.0.0.1,localhost,uhco-identity.local";
 
-        if ( !len(host) ) {
+        var httpHost = lCase(listFirst(rawHttpHost, ":"));
+        var serverName = lCase(listFirst(rawServerName, ":"));
+
+        // IIS host header and server name can differ; treat either local alias as local.
+        if (
+            !len(httpHost)
+            AND !len(serverName)
+        ) {
             return "local";
         }
 
-        host = listFirst(host, ":");
-
-        if ( listFindNoCase("127.0.0.1,localhost", host) ) {
+        if ( listFindNoCase(localHosts, httpHost) OR listFindNoCase(localHosts, serverName) ) {
             return "local";
         }
 

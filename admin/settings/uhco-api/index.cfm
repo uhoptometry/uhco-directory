@@ -7,6 +7,9 @@
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
+<cfinclude template="/admin/settings/section-status-config.cfm">
+<cfset sectionStatus = getSettingsSectionStatus("uhco-api")>
+
 <cfset tokenService  = createObject("component", "cfc.token_service").init()>
 <cfset secretService = createObject("component", "cfc.secret_service").init()>
 <cfset tokens  = tokenService.getAllTokens()>
@@ -37,6 +40,11 @@
 
 <h1 class="mb-1"><i class="bi bi-braces me-2"></i>UHCO API</h1>
 <p class="text-muted mb-4">Manage API tokens and secrets for external integrations.</p>
+<cfif len(sectionStatus)>
+    <div class="mb-3">
+        <span class="badge bg-warning text-dark">Currently in: #sectionStatus#</span>
+    </div>
+</cfif>
 
 <cfif len(actionMessage)>
     <div class="alert alert-success">#encodeForHTML(actionMessage)#</div>

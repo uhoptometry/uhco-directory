@@ -3,6 +3,9 @@
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
+<cfinclude template="/admin/settings/section-status-config.cfm">
+<cfset sectionStatus = getSettingsSectionStatus("scheduled-tasks")>
+
 <cfset appConfigService = createObject("component", "cfc.appConfig_service").init()>
 <cfset scheduleTaskToken = trim(appConfigService.getValue("scheduled_tasks.shared_secret", ""))>
 <cfset scheduleTaskTokenParam = len(scheduleTaskToken) ? "&token=" & urlEncodedFormat(scheduleTaskToken) : "">
@@ -328,7 +331,9 @@
         <h1 class="mb-1"><i class="bi bi-clock-history me-2"></i>Scheduled Tasks</h1>
         <p class="text-muted mb-0">Enable, disable, and monitor all automated ColdFusion scheduled tasks.</p>
     </div>
-    <span class='badge #(request.isProduction ? "bg-danger" : "bg-success")# float-end'>Currently in: #encodeForHTML(ucase(left(request.environmentName, 1)) & mid(request.environmentName, 2, len(request.environmentName)))#</span>
+    <cfif len(sectionStatus)>
+        <span class='badge bg-warning text-dark float-end'>Currently in: #sectionStatus#</span>
+    </cfif>
 </div>
 
 <cfif len(actionMessage)>
