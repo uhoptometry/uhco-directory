@@ -2,9 +2,11 @@ component output="false" singleton {
 
     variables.sourceWebDir        = "/_temp_source/";
     variables.publishedWebDir     = "/_published_images/";
-    variables.allowedExtensions   = ["jpg", "jpeg", "png"];
-    variables.defaultSourceKey    = "alumni";
-    variables.defaultVariantCode  = "interactive_roster";
+    variables.allowedExtensions        = ["jpg", "jpeg", "png", "webp"];
+    variables.defaultSourceKey         = "alumni";
+    variables.defaultVariantCode       = "interactive_roster";
+    variables.zipMaxEntries            = 500;
+    variables.zipMaxUncompressedBytes  = 209715200; // 200 MB
 
     public any function init() {
         variables.UsersDAO     = createObject("component", "dao.users_DAO").init();
@@ -17,6 +19,8 @@ component output="false" singleton {
         variables.ImagesDAO    = createObject("component", "dao.images_DAO").init();
         variables.MediaConfigService = createObject("component", "cfc.mediaConfig_service").init();
         variables.SourceService = createObject("component", "cfc.UserImageSourceService").init();
+        // Phase 2: DropboxProvider wired here so _postTransferDropboxUpload() stub can be activated without structural changes.
+        variables.DropboxProvider = createObject("component", "cfc.DropboxProvider").init();
 
         var cfcDir = getDirectoryFromPath( getCurrentTemplatePath() );
         var jFile = createObject("java", "java.io.File");
@@ -32,18 +36,7 @@ component output="false" singleton {
     }
 
     public array function getTransferOnlyVariantTypes() {
-        var allowed = [];
-        var variantTypes = variables.VariantDAO.getVariantTypesAll();
-
-        for ( var variantType in variantTypes ) {
-            if ( lCase(trim(variantType.MODE ?: "resize_only")) NEQ "passthrough" ) {
-                continue;
-            }
-
-            arrayAppend(allowed, variantType);
-        }
-
-        return allowed;
+        return variables.VariantDAO.getVariantTypesAll();
     }
 
     public string function getDefaultSourceKey() {
@@ -312,6 +305,15 @@ component output="false" singleton {
             localPath          = ""
         );
 
+        // Phase 2 hook: fill in _postTransferDropboxUpload() body to enable post-transfer Dropbox upload.
+        _postTransferDropboxUpload(
+            sourceAbsolutePath = sourceAbsolutePath,
+            userID             = arguments.userID,
+            sourceKey          = cleanSourceKey,
+            variantCode        = variantType.CODE,
+            sourceID           = sourceResult.sourceID
+        );
+
         return {
             success      = true,
             message      = "Transferred and published #listLast(cleanSourcePath, '/\\')# for #preferredUserData.FIRSTNAME# #preferredUserData.LASTNAME#.",
@@ -476,6 +478,9 @@ component output="false" singleton {
         required struct variantType
     ) {
         var stem = lCase( reReplace(arguments.filename, "\.[^.]+$", "", "one") );
+        // Normalize separators: treat dashes and underscores as equivalent for user-token matching.
+        // Variant codes (e.g. kiosk_profile) use underscores, so normalizing to underscores preserves them.
+        var normalizedStem = replace(stem, "-", "_", "all");
         var candidates = [];
 
         for ( var profile in arguments.tokenProfiles ) {
@@ -484,7 +489,8 @@ component output="false" singleton {
             var longestToken = 0;
 
             for ( var token in profile.tokens ) {
-                if ( len(token) GTE 3 AND findNoCase(token, stem) ) {
+                var normalizedToken = replace(token, "-", "_", "all");
+                if ( len(normalizedToken) GTE 3 AND findNoCase(normalizedToken, normalizedStem) ) {
                     arrayAppend(matchedTokens, token);
                     score += len(token);
                     if ( len(token) GT longestToken ) {
@@ -819,7 +825,7 @@ component output="false" singleton {
             outputExtension = "jpg";
         }
 
-        if ( !listFindNoCase("jpg,png", outputExtension) ) {
+        if ( !listFindNoCase("jpg,png,webp", outputExtension) ) {
             outputExtension = lCase( listLast(arguments.sourcePath, ".") );
             if ( outputExtension EQ "jpeg" ) {
                 outputExtension = "jpg";
@@ -952,6 +958,408 @@ component output="false" singleton {
         }
 
         return resolved;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ZIP Upload Methods (Phase 1)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Clear an extracted upload folder under _temp_source/ and recreate it empty.
+     * Returns { success, message, extractPath }.
+     */
+    public struct function clearExtractFolder(
+        required string extractFolder
+    ) {
+        var cleanFolder   = reReplace( trim(arguments.extractFolder), "[^a-zA-Z0-9_\-]", "_", "all" );
+        var extractDirAbs = "";
+
+        if ( !len(cleanFolder) ) {
+            return { success=false, message="Extract folder name is required.", extractPath="" };
+        }
+
+        extractDirAbs = variables.sourceDirAbsolute & cleanFolder;
+
+        try {
+            if ( directoryExists(extractDirAbs) ) {
+                directoryDelete(extractDirAbs, true);
+            }
+            directoryCreate(extractDirAbs);
+        } catch (any e) {
+            return {
+                success    = false,
+                message    = "Failed to clear extract folder '#cleanFolder#': #e.message#",
+                extractPath = cleanFolder
+            };
+        }
+
+        return {
+            success    = true,
+            message    = "Cleared extract folder: #cleanFolder#",
+            extractPath = cleanFolder
+        };
+    }
+
+    /**
+     * Extract a ZIP file into a subfolder of _temp_source/.
+     * Enforces extension whitelist, path-traversal rejection, and ZIP-bomb limits.
+     * Returns { success, message, extractedCount, skippedCount, skippedFiles[], extractPath }.
+     */
+    public struct function processZipUpload(
+        required string zipAbsolutePath,
+        required string sourceKey,
+        required string extractFolder
+    ) {
+        var cleanSourceKey  = _normalizeSourceKey( arguments.sourceKey ?: "" );
+        var cleanFolder     = reReplace( trim(arguments.extractFolder), "[^a-zA-Z0-9_\-]", "_", "all" );
+        var extractDirAbs   = "";
+        var fileInputStream = "";
+        var bufferedStream  = "";
+        var zipInputStream  = "";
+        var entry           = "";
+        var entryName       = "";
+        var baseName        = "";
+        var entryExt        = "";
+        var sanitizedName   = "";
+        var destPath        = "";
+        var extractedCount  = 0;
+        var skippedCount    = 0;
+        var skippedFiles    = [];
+        var totalUncompressed = 0;
+        var entryCount      = 0;
+
+        if ( !len(cleanFolder) ) {
+            cleanFolder = "upload_" & dateFormat(now(), "yyyymmdd") & "_" & timeFormat(now(), "HHmmss");
+        }
+
+        if ( !len(cleanSourceKey) ) {
+            return { success=false, message="A valid source key is required.", extractedCount=0, skippedCount=0, skippedFiles=[], extractPath="" };
+        }
+
+        if ( !fileExists(arguments.zipAbsolutePath) ) {
+            return { success=false, message="ZIP file not found on server.", extractedCount=0, skippedCount=0, skippedFiles=[], extractPath="" };
+        }
+
+        // Start each upload with a clean folder so prior files do not affect current results.
+        var clearResult = clearExtractFolder(cleanFolder);
+        if ( !clearResult.success ) {
+            return { success=false, message=clearResult.message, extractedCount=0, skippedCount=0, skippedFiles=[], extractPath="" };
+        }
+        extractDirAbs = variables.sourceDirAbsolute & cleanFolder;
+
+        try {
+            fileInputStream = createObject("java", "java.io.FileInputStream").init( javaCast("string", arguments.zipAbsolutePath) );
+            bufferedStream  = createObject("java", "java.io.BufferedInputStream").init( fileInputStream );
+            zipInputStream  = createObject("java", "java.util.zip.ZipInputStream").init( bufferedStream );
+
+            var buffer      = createObject("java", "java.lang.reflect.Array").newInstance(
+                                createObject("java", "java.lang.Byte").TYPE,
+                                javaCast("int", 8192)
+                              );
+            var bytesRead   = 0;
+            var entryBytes  = 0;
+            var baos        = "";
+
+            entry = zipInputStream.getNextEntry();
+            while ( !isNull(entry) ) {
+
+                if ( entry.isDirectory() ) {
+                    zipInputStream.closeEntry();
+                    entry = zipInputStream.getNextEntry();
+                    continue;
+                }
+
+                entryCount++;
+                if ( entryCount GT variables.zipMaxEntries ) {
+                    return {
+                        success        = false,
+                        message        = "ZIP contains too many entries (#entryCount#). Maximum allowed is #variables.zipMaxEntries#.",
+                        extractedCount = extractedCount,
+                        skippedCount   = skippedCount,
+                        skippedFiles   = skippedFiles,
+                        extractPath    = ""
+                    };
+                }
+
+                entryName = entry.getName();
+
+                // Path traversal guard: reject entries with ".." or absolute paths.
+                if ( find("..", entryName) OR left(entryName, 1) EQ "/" OR left(entryName, 1) EQ "\" ) {
+                    skippedCount++;
+                    arrayAppend(skippedFiles, { name=entryName, reason="Path traversal rejected" });
+                    zipInputStream.closeEntry();
+                    entry = zipInputStream.getNextEntry();
+                    continue;
+                }
+
+                // Use only the base filename; strip any directory structure within the ZIP.
+                baseName = listLast( replace(entryName, "\", "/", "all"), "/" );
+                entryExt = lCase( listLast(baseName, ".") );
+
+                if ( !arrayFindNoCase(variables.allowedExtensions, entryExt) ) {
+                    skippedCount++;
+                    arrayAppend(skippedFiles, { name=baseName, reason="Extension not allowed (.#entryExt#)" });
+                    zipInputStream.closeEntry();
+                    entry = zipInputStream.getNextEntry();
+                    continue;
+                }
+
+                // Sanitize: allow alphanumeric, underscore, hyphen, dot only.
+                sanitizedName = reReplace( baseName, "[^a-zA-Z0-9_\-\.]", "_", "all" );
+                destPath      = extractDirAbs & "\" & sanitizedName;
+
+                // Stream entry bytes to destination file.
+                baos = createObject("java", "java.io.ByteArrayOutputStream").init();
+                entryBytes = 0;
+
+                bytesRead = zipInputStream.read(buffer);
+                while ( bytesRead NEQ -1 ) {
+                    baos.write(buffer, javaCast("int", 0), javaCast("int", bytesRead));
+                    entryBytes += bytesRead;
+                    totalUncompressed += bytesRead;
+
+                    if ( totalUncompressed GT variables.zipMaxUncompressedBytes ) {
+                        return {
+                            success        = false,
+                            message        = "ZIP uncompressed content exceeds the 200 MB limit.",
+                            extractedCount = extractedCount,
+                            skippedCount   = skippedCount,
+                            skippedFiles   = skippedFiles,
+                            extractPath    = ""
+                        };
+                    }
+
+                    bytesRead = zipInputStream.read(buffer);
+                }
+
+                fileWrite( destPath, baos.toByteArray() );
+                extractedCount++;
+
+                zipInputStream.closeEntry();
+                entry = zipInputStream.getNextEntry();
+            }
+
+        } catch (any e) {
+            return {
+                success        = false,
+                message        = "Failed to process ZIP: #e.message#",
+                extractedCount = extractedCount,
+                skippedCount   = skippedCount,
+                skippedFiles   = skippedFiles,
+                extractPath    = ""
+            };
+        } finally {
+            try { if ( isObject(zipInputStream) ) { zipInputStream.close(); } } catch (any ignore1) {}
+            try { if ( isObject(bufferedStream) ) { bufferedStream.close(); } } catch (any ignore2) {}
+            try { if ( isObject(fileInputStream) ) { fileInputStream.close(); } } catch (any ignore3) {}
+        }
+
+        return {
+            success        = true,
+            message        = "Extracted #extractedCount# image(s)#(skippedCount GT 0 ? '. Skipped #skippedCount# file(s).' : '.')#",
+            extractedCount = extractedCount,
+            skippedCount   = skippedCount,
+            skippedFiles   = skippedFiles,
+            extractPath    = cleanFolder
+        };
+    }
+
+    /**
+     * Match and transfer all extracted images in a subfolder of _temp_source/.
+     * If variantCode is empty, auto-detects the variant code from each filename stem.
+     * Returns { success, message, results[], transferredCount, matchedCount, ambiguousCount, noMatchCount, errorCount }.
+     */
+    public struct function matchAndTransferExtracted(
+        required string extractFolder,
+        required string sourceKey,
+        string variantCode = ""
+    ) {
+        var cleanSourceKey         = _normalizeSourceKey( arguments.sourceKey ?: "" );
+        var overrideCode           = trim(arguments.variantCode ?: "");
+        var extractDirAbs          = variables.sourceDirAbsolute & arguments.extractFolder;
+        var results                = [];
+        var transferredCount       = 0;
+        var matchedCount           = 0;
+        var ambiguousCount         = 0;
+        var noMatchCount           = 0;
+        var errorCount             = 0;
+        var tokenProfiles          = [];
+        var allActiveVariantCodes  = [];
+        var transferVariant        = {};
+        var resolvedVariantCode    = "";
+
+        if ( !len(cleanSourceKey) ) {
+            return { success=false, message="A valid source key is required.", results=[], transferredCount=0, matchedCount=0, ambiguousCount=0, noMatchCount=0, errorCount=0 };
+        }
+
+        if ( !directoryExists(extractDirAbs) ) {
+            return { success=false, message="Extract folder not found: #arguments.extractFolder#", results=[], transferredCount=0, matchedCount=0, ambiguousCount=0, noMatchCount=0, errorCount=0 };
+        }
+
+        // Build the list of all transfer-eligible variant codes for filename auto-detection.
+        for ( var vt in getTransferOnlyVariantTypes() ) {
+            if ( len(trim(vt.CODE ?: "")) ) {
+                arrayAppend(allActiveVariantCodes, trim(vt.CODE));
+            }
+        }
+
+        tokenProfiles = _buildUserTokenProfiles();
+
+        var entries = directoryList( extractDirAbs, false, "query" );
+
+        for ( var row in entries ) {
+            if ( lCase(row.type) NEQ "file" ) {
+                continue;
+            }
+
+            var fileExt = lCase( listLast(row.name, ".") );
+            if ( !arrayFindNoCase(variables.allowedExtensions, fileExt) ) {
+                continue;
+            }
+
+            // Resolve the variant for this file: use override if provided, otherwise auto-detect from filename.
+            // Detect against ALL active variants so non-passthrough codes produce a clear error rather than
+            // "no variant code detected".
+            resolvedVariantCode = len(overrideCode) ? overrideCode : _autoDetectVariantCodeFromFilename( row.name, allActiveVariantCodes );
+            transferVariant     = len(resolvedVariantCode) ? _resolveTargetVariantType(resolvedVariantCode) : {};
+
+            var sourcePath = variables.sourceWebDir & arguments.extractFolder & "/" & row.name;
+            var matchInfo  = _matchFileToUser( row.name, tokenProfiles, transferVariant );
+
+            if ( matchInfo.matchStatus EQ "ambiguous" ) {
+                ambiguousCount++;
+                arrayAppend(results, {
+                    filename        = row.name,
+                    matchStatus     = "ambiguous",
+                    userID          = 0,
+                    userDisplayName = "",
+                    variantCode     = resolvedVariantCode,
+                    transferred     = false,
+                    message         = matchInfo.candidateText
+                });
+                continue;
+            }
+
+            if ( matchInfo.matchStatus NEQ "matched" ) {
+                noMatchCount++;
+                arrayAppend(results, {
+                    filename        = row.name,
+                    matchStatus     = "none",
+                    userID          = 0,
+                    userDisplayName = "",
+                    variantCode     = resolvedVariantCode,
+                    transferred     = false,
+                    message         = matchInfo.candidateText
+                });
+                continue;
+            }
+
+            matchedCount++;
+
+            if ( structIsEmpty(transferVariant) ) {
+                errorCount++;
+                arrayAppend(results, {
+                    filename        = row.name,
+                    matchStatus     = "matched",
+                    userID          = matchInfo.userID,
+                    userDisplayName = matchInfo.userDisplayName,
+                    variantCode     = resolvedVariantCode,
+                    transferred     = false,
+                    message         = len(resolvedVariantCode)
+                                        ? "Variant '#resolvedVariantCode#' not found or is not a passthrough type."
+                                        : "No variant code detected in filename and no override selected."
+                });
+                continue;
+            }
+
+            var xferResult = transferImage(
+                userID      = matchInfo.userID,
+                sourcePath  = sourcePath,
+                sourceKey   = cleanSourceKey,
+                variantCode = transferVariant.CODE
+            );
+
+            if ( xferResult.success ) {
+                transferredCount++;
+            } else {
+                errorCount++;
+            }
+
+            arrayAppend(results, {
+                filename        = row.name,
+                matchStatus     = "matched",
+                userID          = matchInfo.userID,
+                userDisplayName = matchInfo.userDisplayName,
+                variantCode     = xferResult.success ? (xferResult.variantCode ?: transferVariant.CODE) : resolvedVariantCode,
+                transferred     = xferResult.success,
+                message         = xferResult.message ?: ""
+            });
+        }
+
+        return {
+            success          = true,
+            message          = "Processed #arrayLen(results)# file(s): #transferredCount# transferred, #ambiguousCount# ambiguous, #noMatchCount# no match, #errorCount# error(s).",
+            results          = results,
+            transferredCount = transferredCount,
+            matchedCount     = matchedCount,
+            ambiguousCount   = ambiguousCount,
+            noMatchCount     = noMatchCount,
+            errorCount       = errorCount
+        };
+    }
+
+    /**
+     * Scan the filename stem for any matching active passthrough variant code.
+     * Returns the longest matching code, or "" if none found.
+     */
+    private string function _autoDetectVariantCodeFromFilename(
+        required string filename,
+        required array variantCodes
+    ) {
+        var stemLower     = lCase( reReplace(arguments.filename, "\.[^.]+$", "", "one") );
+        var bestMatch     = "";
+        var bestLen       = 0;
+        var codeTrimmed   = "";
+        var codeLower     = "";
+
+        for ( var code in arguments.variantCodes ) {
+            codeTrimmed = trim(code ?: "");
+            codeLower   = lCase(codeTrimmed);
+
+            if ( len(codeLower) GTE 3 AND find(codeLower, stemLower) ) {
+                if ( len(codeLower) GT bestLen ) {
+                    bestLen   = len(codeLower);
+                    // Return canonical code from config, but match regardless of case in filename.
+                    bestMatch = codeTrimmed;
+                }
+            }
+        }
+
+        return bestMatch;
+    }
+
+    /**
+     * Phase 2 stub: upload the source file to Dropbox and record the Dropbox path on the source record.
+     *
+     * To activate Phase 2:
+     *   1. Add uploadFile(localAbsolutePath, dropboxDestPath) to DropboxProvider.cfc using the
+     *      Dropbox content API endpoint (files/upload, mode=overwrite).
+     *   2. Determine the Dropbox destination path (e.g. configured base folder + filename).
+     *   3. Call variables.DropboxProvider.uploadFile(arguments.sourceAbsolutePath, dropboxDestPath).
+     *   4. Call variables.SourceDAO.updateSource(arguments.sourceID, { DropboxPath=dropboxDestPath }).
+     *
+     * NOTE: DropboxPath must store the Dropbox-side path (not the local _temp_source/ path)
+     *       so _serve_dropbox_image.cfm can proxy it for future crop/manipulation.
+     */
+    private struct function _postTransferDropboxUpload(
+        required string  sourceAbsolutePath,
+        required numeric userID,
+        required string  sourceKey,
+        required string  variantCode,
+        required numeric sourceID
+    ) {
+        // Phase 2: replace this stub body with Dropbox upload logic.
+        return { attempted=false };
     }
 
 }

@@ -8,6 +8,8 @@
 <cfset variantOptions = bulkTransferService.getTransferOnlyVariantTypes()>
 <cfset defaultSourceKey = bulkTransferService.getDefaultSourceKey()>
 <cfset defaultVariantCode = bulkTransferService.getDefaultVariantCode()>
+<cfset patternDAO = createObject("component", "dao.FileNamePatternDAO").init()>
+<cfset activeNamingPatterns = patternDAO.getActivePatterns()>
 
 <cfset folderName = trim(
     structKeyExists(form, "folderName") ? (form.folderName ?: "") : (
@@ -36,8 +38,22 @@
 <cfset postTransferHtml = "">
 <cfset sourceKeyOptionsHtml = "">
 <cfset variantOptionsHtml = "">
+<cfset zipVariantOptionsHtml = "">
 <cfset showTransferredChecked = showTransferred ? "checked" : "">
 <cfset showAmbiguousChecked = showAmbiguous ? "checked" : "">
+<!--- ZIP upload state --->
+<cfset zipUploadMessage = "">
+<cfset zipUploadMessageClass = "alert-info">
+<cfset zipUploadResults = []>
+<cfset zipExtractedCount = 0>
+<cfset zipTransferredCount = 0>
+<cfset zipAmbiguousCount = 0>
+<cfset zipNoMatchCount = 0>
+<cfset zipErrorCount = 0>
+<cfset defaultExtractFolder = "uploaded">
+<cfset selectedExtractFolder = trim(structKeyExists(form, "extractFolder") ? (form.extractFolder ?: defaultExtractFolder) : defaultExtractFolder)>
+<!--- Active tab: driven by POST result or ?tab= param --->
+<cfset activeTab = structKeyExists(url, "tab") ? lCase(trim(url.tab)) : "search">
 
 <cfloop array="#sourceKeys#" index="sourceKeyOption">
     <cfset sourceKeyOptionsHtml &= "<option value='#encodeForHTMLAttribute(sourceKeyOption)#'" & (compareNoCase(sourceKeyOption, selectedSourceKey) EQ 0 ? " selected" : "") & ">#encodeForHTML(sourceKeyOption)#</option>">
@@ -51,15 +67,24 @@
     <cfset variantOptionsHtml &= "<option value='#encodeForHTMLAttribute(variantOption.CODE ?: "")#'" & (compareNoCase(variantOption.CODE ?: "", selectedVariantCode) EQ 0 ? " selected" : "") & ">#encodeForHTML(variantLabel)#</option>">
 </cfloop>
 
+<cfset zipVariantOptionsHtml = "<option value=''>&##x2014; Auto-detect from filename</option>">
+<cfloop array="#variantOptions#" index="variantOption">
+    <cfset variantLabel = trim((variantOption.DESCRIPTION ?: "") & (len(variantOption.CODE ?: "") ? " (" & (variantOption.CODE ?: "") & ")" : ""))>
+    <cfif NOT len(variantLabel)>
+        <cfset variantLabel = variantOption.CODE ?: "">
+    </cfif>
+    <cfset zipVariantOptionsHtml &= "<option value='#encodeForHTMLAttribute(variantOption.CODE ?: "")#'>#encodeForHTML(variantLabel)#</option>">
+</cfloop>
+
 <cfif cgi.request_method EQ "POST">
     <cfset action = trim(form.action ?: "")>
 
     <cfif action EQ "transfer">
         <cfif isNumeric(form.userID ?: "") AND val(form.userID) GT 0 AND len(trim(form.sourcePath ?: "")) AND len(selectedSourceKey) AND len(selectedVariantCode)>
             <cfset transferResult = bulkTransferService.transferImage(
-                userID     = val(form.userID),
-                sourcePath = trim(form.sourcePath),
-                sourceKey  = selectedSourceKey,
+                userID      = val(form.userID),
+                sourcePath  = trim(form.sourcePath),
+                sourceKey   = selectedSourceKey,
                 variantCode = selectedVariantCode
             )>
             <cfset actionMessage = transferResult.message>
@@ -78,22 +103,116 @@
             <cfset actionMessage = "Transfer request is missing a valid user, source path, source key, or variant.">
             <cfset actionMessageClass = "alert-danger">
         </cfif>
+
+    <cfelseif action EQ "uploadZip">
+        <cfset activeTab = "upload">
+        <cfif structKeyExists(form, "zipFile") AND len(trim(form.zipFile ?: ""))>
+            <cftry>
+                <cffile
+                    action="upload"
+                    fileField="zipFile"
+                    destination="#getTempDirectory()#"
+                    nameConflict="makeunique"
+                    result="uploadedZip"
+                >
+                <cfset uploadedZipPath = structKeyExists(uploadedZip, "serverFilePath")
+                    ? uploadedZip.serverFilePath
+                    : uploadedZip.serverDirectory & ((right(uploadedZip.serverDirectory, 1) EQ "\\" OR right(uploadedZip.serverDirectory, 1) EQ "/") ? "" : "\\") & uploadedZip.serverFile>
+                <cfset uploadedZipExt  = lCase(listLast(uploadedZip.serverFile, "."))>
+                <cfif uploadedZipExt NEQ "zip">
+                    <cfif fileExists(uploadedZipPath)>
+                        <cfset fileDelete(uploadedZipPath)>
+                    </cfif>
+                    <cfset zipUploadMessage = "Only .zip files are accepted. The uploaded file had extension: .#encodeForHTML(uploadedZipExt)#.">
+                    <cfset zipUploadMessageClass = "alert-danger">
+                <cfelse>
+                    <cfset zipExtractFolder = reReplace(trim(form.extractFolder ?: defaultExtractFolder), "[^a-zA-Z0-9_\-]", "_", "all")>
+                    <cfset selectedExtractFolder = zipExtractFolder>
+                    <cfif NOT len(zipExtractFolder)>
+                        <cfset zipExtractFolder = toString(defaultExtractFolder)>
+                        <cfset selectedExtractFolder = zipExtractFolder>
+                    </cfif>
+                    <cfset zipVariantOverride = trim(form.zipVariantCode ?: "")>
+                    <cfset extractResult = bulkTransferService.processZipUpload(
+                        zipAbsolutePath = uploadedZipPath,
+                        sourceKey       = selectedSourceKey,
+                        extractFolder   = zipExtractFolder
+                    )>
+                    <!--- Always clean up the temp ZIP after extraction attempt --->
+                    <cftry><cfif fileExists(uploadedZipPath)><cfset fileDelete(uploadedZipPath)></cfif><cfcatch></cfcatch></cftry>
+                    <cfif extractResult.success AND extractResult.extractedCount GT 0>
+                        <cfset matchResult = bulkTransferService.matchAndTransferExtracted(
+                            extractFolder = extractResult.extractPath,
+                            sourceKey     = selectedSourceKey,
+                            variantCode   = zipVariantOverride
+                        )>
+                        <cfset zipUploadResults    = matchResult.results>
+                        <cfset zipTransferredCount = matchResult.transferredCount>
+                        <cfset zipAmbiguousCount   = matchResult.ambiguousCount>
+                        <cfset zipNoMatchCount     = matchResult.noMatchCount>
+                        <cfset zipErrorCount       = matchResult.errorCount>
+                        <cfset zipExtractedCount   = extractResult.extractedCount>
+                        <cfset zipUploadMessage    = "Extracted #extractResult.extractedCount# image(s) to <code>/_temp_source/#encodeForHTML(extractResult.extractPath)#/</code>. " & matchResult.message>
+                        <cfset zipUploadMessageClass = (zipTransferredCount GT 0) ? "alert-success" : "alert-warning">
+                    <cfelseif extractResult.success>
+                        <cfset zipSkippedSummary = extractResult.skippedCount GT 0 ? " " & extractResult.skippedCount & " file(s) were skipped." : "">
+                        <cfset zipUploadMessage = "ZIP uploaded but contained no valid images after filtering.#zipSkippedSummary#">
+                        <cfset zipUploadMessageClass = "alert-warning">
+                    <cfelse>
+                        <cfset zipUploadMessage = extractResult.message>
+                        <cfset zipUploadMessageClass = "alert-danger">
+                    </cfif>
+                </cfif>
+            <cfcatch type="any">
+                <cftry><cfif isDefined("uploadedZipPath") AND fileExists(uploadedZipPath)><cfset fileDelete(uploadedZipPath)></cfif><cfcatch></cfcatch></cftry>
+                <cfset zipUploadMessage = "ZIP upload failed: #encodeForHTML(cfcatch.message)#">
+                <cfset zipUploadMessageClass = "alert-danger">
+            </cfcatch>
+            </cftry>
+        <cfelse>
+            <cfset zipUploadMessage = "No ZIP file was received. Please choose a .zip file and try again.">
+            <cfset zipUploadMessageClass = "alert-danger">
+        </cfif>
+    <cfelseif action EQ "clearZipHistory">
+        <cfset activeTab = "upload">
+        <cfset zipExtractFolder = reReplace(trim(form.extractFolder ?: defaultExtractFolder), "[^a-zA-Z0-9_\-]", "_", "all")>
+        <cfif NOT len(zipExtractFolder)>
+            <cfset zipExtractFolder = toString(defaultExtractFolder)>
+        </cfif>
+        <cfset selectedExtractFolder = zipExtractFolder>
+        <cfset clearResult = bulkTransferService.clearExtractFolder(zipExtractFolder)>
+        <cfset zipUploadMessage = clearResult.message>
+        <cfset zipUploadMessageClass = clearResult.success ? "alert-success" : "alert-danger">
+        <cfset zipUploadResults = []>
+        <cfset zipExtractedCount = 0>
+        <cfset zipTransferredCount = 0>
+        <cfset zipAmbiguousCount = 0>
+        <cfset zipNoMatchCount = 0>
+        <cfset zipErrorCount = 0>
     </cfif>
 </cfif>
 
 <cfif len(folderName)>
     <cfset searchResult = bulkTransferService.searchFolder(
-        folderName = folderName,
-        sourceKey = selectedSourceKey,
-        variantCode = selectedVariantCode,
+        folderName         = folderName,
+        sourceKey          = selectedSourceKey,
+        variantCode        = selectedVariantCode,
         includeTransferred = showTransferred,
-        includeAmbiguous = showAmbiguous,
-        limit = resultLimit
+        includeAmbiguous   = showAmbiguous,
+        limit              = resultLimit
     )>
     <cfset results = searchResult.data>
     <cfset searchMessage = searchResult.message>
     <cfset searchMessageClass = searchResult.success ? "alert-info" : "alert-danger">
 </cfif>
+
+<!--- ── Tab nav active classes ─────────────────────────────────────────────── --->
+<cfset searchTabActive   = (activeTab EQ "upload") ? "" : "active">
+<cfset uploadTabActive   = (activeTab EQ "upload") ? "active" : "">
+<cfset searchPaneActive  = (activeTab EQ "upload") ? "" : "show active">
+<cfset uploadPaneActive  = (activeTab EQ "upload") ? "show active" : "">
+<cfset searchTabSelected = (activeTab EQ "upload") ? "false" : "true">
+<cfset uploadTabSelected = (activeTab EQ "upload") ? "true" : "false">
 
 <cfset content = "
 <nav aria-label='breadcrumb' class='mb-3'>
@@ -109,6 +228,24 @@
         <p class='text-muted mb-0'>Search a subfolder under <code>/_temp_source/</code>, match filenames to users, and directly publish a transfer-only variant without cropping or resizing.</p>
     </div>
 </div>
+
+<ul class='nav nav-tabs' id='bulkTransferTabs' role='tablist'>
+    <li class='nav-item' role='presentation'>
+        <button class='nav-link #searchTabActive#' id='search-tab' data-bs-toggle='tab' data-bs-target='##search-pane' type='button' role='tab' aria-controls='search-pane' aria-selected='#searchTabSelected#'>
+            <i class='bi bi-search me-1'></i> Search Folder
+        </button>
+    </li>
+    <li class='nav-item' role='presentation'>
+        <button class='nav-link #uploadTabActive#' id='upload-tab' data-bs-toggle='tab' data-bs-target='##upload-pane' type='button' role='tab' aria-controls='upload-pane' aria-selected='#uploadTabSelected#'>
+            <i class='bi bi-file-zip me-1'></i> Upload ZIP
+        </button>
+    </li>
+</ul>
+
+<div class='tab-content border border-top-0 rounded-bottom p-3 mb-4' id='bulkTransferTabContent'>
+
+<!--- ─── Search Folder pane ──────────────────────────────────────────────── --->
+<div class='tab-pane fade #searchPaneActive#' id='search-pane' role='tabpanel' aria-labelledby='search-tab'>
 
 <div class='card mb-4'>
     <div class='card-body'>
@@ -277,5 +414,161 @@
 
     <cfset content &= "</div>">
 </cfif>
+
+<!--- Close search pane --->
+<cfset content &= "</div>">
+
+<!--- ─── Upload ZIP pane ──────────────────────────────────────────────────── --->
+<cfset content &= "<div class='tab-pane fade #uploadPaneActive#' id='upload-pane' role='tabpanel' aria-labelledby='upload-tab'>">
+
+<!--- Naming convention help panel --->
+<cfset namingHelpHtml = "<div class='alert alert-info mb-3' role='alert'>
+    <h6 class='alert-heading'><i class='bi bi-info-circle me-1'></i> Required Image Naming Convention</h6>
+    <p class='mb-2'>Each image inside the ZIP must be named so it can be matched to a user and assigned to a variant. The filename stem must include:</p>
+    <ul class='mb-2'>
+        <li>At least one <strong>user identifier</strong>: first name, last name, CougarNet ID, or PeopleSoft ID</li>
+        <li>A <strong>variant code</strong> matching an active passthrough variant (required when Auto-detect mode is selected)</li>
+    </ul>
+    <p class='mb-1'><strong>Accepted extensions:</strong> .jpg, .jpeg, .png, .webp</p>
+    <p class='mb-0'><strong>Examples:</strong>
+        <code>jsmith_1234567_KIOSK_PROFILE.jpg</code> &nbsp;|&nbsp;
+        <code>john_smith_KIOSK_ROSTER.png</code> &nbsp;|&nbsp;
+        <code>jsmith_m_KIOSK_PROFILE.webp</code>
+    </p>">
+
+<cfif arrayLen(activeNamingPatterns) GT 0>
+    <cfset namingHelpHtml &= "<p class='mt-2 mb-1'><strong>Active filename patterns:</strong></p><ul class='mb-0 small'>">
+    <cfloop array="#activeNamingPatterns#" index="np">
+        <cfset npDescriptionSuffix = len(trim(np.DESCRIPTION ?: "")) ? " &mdash; " & encodeForHTML(np.DESCRIPTION) : "">
+        <cfset namingHelpHtml &= "<li><code>#encodeForHTML(np.PATTERN ?: '')#</code>#npDescriptionSuffix#</li>">
+    </cfloop>
+    <cfset namingHelpHtml &= "</ul>">
+</cfif>
+
+<cfset namingHelpHtml &= "</div>">
+<cfset content &= namingHelpHtml>
+
+<!--- ZIP upload form --->
+<cfset content &= "
+<div class='card mb-4'>
+    <div class='card-body'>
+        <form method='post' enctype='multipart/form-data' class='row g-3 align-items-end'>
+            <div class='col-md-5 col-lg-4'>
+                <label for='zipFile' class='form-label'>ZIP File</label>
+                <input type='file' class='form-control' id='zipFile' name='zipFile' accept='.zip' required>
+                <div class='form-text'>Images inside the ZIP are extracted and matched to users. Max 200 MB uncompressed, 500 files.</div>
+            </div>
+            <div class='col-md-3 col-lg-2'>
+                <label for='zipSourceKey' class='form-label'>Source Key</label>
+                <select class='form-select' id='zipSourceKey' name='sourceKey' required>
+                    #sourceKeyOptionsHtml#
+                </select>
+            </div>
+            <div class='col-md-4 col-lg-3'>
+                <label for='zipVariantCode' class='form-label'>Variant</label>
+                <select class='form-select' id='zipVariantCode' name='zipVariantCode'>
+                    #zipVariantOptionsHtml#
+                </select>
+                <div class='form-text'>Auto-detect reads the variant code from each filename. A fixed selection overrides all files.</div>
+            </div>
+            <div class='col-md-3 col-lg-2'>
+                <label for='extractFolder' class='form-label'>Extract Folder</label>
+                <input type='text' class='form-control' id='extractFolder' name='extractFolder' value='#encodeForHTMLAttribute(toString(selectedExtractFolder))#' placeholder='e.g. #year(now())#' required>
+                <div class='form-text'>Subfolder created under <code>/_temp_source/</code> for extracted images.</div>
+            </div>
+            <div class='col-md-auto'>
+                <button type='submit' name='action' value='uploadZip' class='btn btn-primary'>
+                    <i class='bi bi-upload me-1'></i> Upload &amp; Transfer
+                </button>
+            </div>
+            <div class='col-md-auto'>
+                <button type='submit' name='action' value='clearZipHistory' class='btn btn-outline-danger' formnovalidate onclick=&quot;return confirm('Clear previous extracted files and ZIP results for this folder?')&quot;>
+                    <i class='bi bi-trash me-1'></i> Clear Upload History
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+">
+
+<!--- ZIP upload result message --->
+<cfif len(zipUploadMessage)>
+    <cfset content &= "<div class='alert #zipUploadMessageClass# alert-dismissible fade show' role='alert'>
+        #zipUploadMessage#
+        <button type='button' class='btn-close' data-bs-dismiss='alert' aria-label='Close'></button>
+    </div>">
+</cfif>
+
+<!--- ZIP results table --->
+<cfif arrayLen(zipUploadResults) GT 0>
+    <cfset zipSummaryBadgesHtml = "">
+    <cfif zipAmbiguousCount GT 0>
+        <cfset zipSummaryBadgesHtml &= "<span class='badge bg-warning text-dark'>#zipAmbiguousCount# ambiguous</span>">
+    </cfif>
+    <cfif zipNoMatchCount GT 0>
+        <cfset zipSummaryBadgesHtml &= "<span class='badge bg-secondary'>#zipNoMatchCount# no match</span>">
+    </cfif>
+    <cfif zipErrorCount GT 0>
+        <cfset zipSummaryBadgesHtml &= "<span class='badge bg-danger'>#zipErrorCount# error(s)</span>">
+    </cfif>
+    <cfset content &= "
+    <div class='card mb-3'>
+        <div class='card-header d-flex justify-content-between align-items-center'>
+            <span class='fw-semibold'><i class='bi bi-list-check me-1'></i> Transfer Results</span>
+            <span class='d-flex gap-2'>
+                <span class='badge bg-success'>#zipTransferredCount# transferred</span>
+                #zipSummaryBadgesHtml#
+            </span>
+        </div>
+        <div class='table-responsive'>
+            <table class='table table-hover align-middle mb-0'>
+                <thead class='table-dark'>
+                    <tr>
+                        <th>File</th>
+                        <th>Match</th>
+                        <th>Variant</th>
+                        <th>Result</th>
+                    </tr>
+                </thead>
+                <tbody>
+    ">
+
+    <cfloop array="#zipUploadResults#" index="zRow">
+        <cfif zRow.transferred>
+            <cfset zBadge = "<span class='badge bg-success'>Transferred</span>">
+        <cfelseif zRow.matchStatus EQ "ambiguous">
+            <cfset zBadge = "<span class='badge bg-warning text-dark'>Ambiguous</span>">
+        <cfelseif zRow.matchStatus EQ "matched">
+            <cfset zBadge = "<span class='badge bg-danger'>Error</span>">
+        <cfelse>
+            <cfset zBadge = "<span class='badge bg-secondary'>No Match</span>">
+        </cfif>
+
+        <cfset zUserCell = (zRow.userID GT 0)
+            ? "<span class='fw-semibold'>" & encodeForHTML(zRow.userDisplayName) & "</span><br><a href='" & request.webRoot & "/admin/user-media/sources.cfm?userid=" & zRow.userID & "' class='small'>Open User Media</a>"
+            : "<span class='text-muted small'>" & encodeForHTML(zRow.matchStatus EQ "ambiguous" ? "Multiple candidates" : "No user matched") & "</span>">
+        <cfset zMessageHtml = len(trim(zRow.message)) ? "<div class='text-muted small mt-1'>" & encodeForHTML(zRow.message) & "</div>" : "">
+
+        <cfset content &= "<tr>
+            <td><span class='fw-semibold'>#encodeForHTML(zRow.filename)#</span></td>
+            <td>#zUserCell#</td>
+            <td><code class='small'>#encodeForHTML(zRow.variantCode)#</code></td>
+            <td>#zBadge##zMessageHtml#</td>
+        </tr>">
+    </cfloop>
+
+    <cfset content &= "
+                </tbody>
+            </table>
+        </div>
+    </div>
+    ">
+</cfif>
+
+<!--- Close upload pane --->
+<cfset content &= "</div>">
+
+<!--- Close tab-content wrapper --->
+<cfset content &= "</div>">
 
 <cfinclude template="/admin/layout.cfm">
