@@ -27,6 +27,17 @@ component extends="dao.BaseDAO" output="false" singleton {
         return queryToArray(qry);
     }
 
+    public array function getSecretsByAppName( required string appName ) {
+        var qry = executeQueryWithRetry(
+            "SELECT SecretID, SecretName, AppName, IsActive
+             FROM APISecrets
+             WHERE AppName = :app",
+            { app={ value=arguments.appName, cfsqltype="cf_sql_nvarchar" } },
+            { datasource=variables.datasource, timeout=10 }
+        );
+        return queryToArray(qry);
+    }
+
     public numeric function createSecret(
         required string secretName,
         required string appName,

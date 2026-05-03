@@ -31,6 +31,17 @@ component extends="dao.BaseDAO" output="false" singleton {
         return queryToArray(qry);
     }
 
+    public array function getTokenByID( required numeric tokenID ) {
+        var qry = executeQueryWithRetry(
+            "SELECT TokenID, TokenName, AppName, Scopes, AllowedIPs, ExpiresAt, IsActive
+             FROM APITokens
+             WHERE TokenID = :id",
+            { id={ value=arguments.tokenID, cfsqltype="cf_sql_integer" } },
+            { datasource=variables.datasource, timeout=10 }
+        );
+        return queryToArray(qry);
+    }
+
     public numeric function createToken(
         required string tokenName,
         required string appName,

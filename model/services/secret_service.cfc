@@ -9,6 +9,10 @@ component output="false" singleton {
         return variables.dao.getAllSecrets();
     }
 
+    public array function getSecretsByAppName( required string appName ) {
+        return variables.dao.getSecretsByAppName( arguments.appName );
+    }
+
     /**
      * Validate an incoming raw secret value.
      * Returns { valid: bool, protectedFlags: array, reason: string }

@@ -88,6 +88,50 @@
                     <div>Query string tokens are visible in server logs. Use the <code>Authorization</code> header in production clients.</div>
                 </div>
 
+                <div class="card border-warning-subtle shadow-sm mt-4" id="auth-quick-generate">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0"><i class="bi bi-lightning-charge-fill me-2"></i>Quick Test Credential Generator</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-2">For quick API testing only: authenticate with Cougarnet (LDAP), then generate one token and one secret in a single request.</p>
+                        <p class="small text-muted mb-3">Restricted to only web services accounts. Each account is limited to one active quick-generated pair until revoked/deleted in Admin.</p>
+
+                        <form id="docsQuickAuthForm" class="row g-3" autocomplete="off">
+                            <div class="col-md-5">
+                                <label for="docsQuickAuthUsername" class="form-label">Cougarnet Username</label>
+                                <input type="text" class="form-control" id="docsQuickAuthUsername" name="username" required>
+                            </div>
+                            <div class="col-md-5">
+                                <label for="docsQuickAuthPassword" class="form-label">Password</label>
+                                <input type="password" class="form-control" id="docsQuickAuthPassword" name="password" required>
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end">
+                                <button type="submit" class="btn btn-primary w-100" id="docsQuickAuthSubmit"><i class="bi bi-key-fill me-1"></i>Authenticate and Generate</button>
+                            </div>
+                        </form>
+
+                        <div id="docsQuickAuthStatus" class="alert mt-3 d-none" role="alert"></div>
+
+                        <div id="docsQuickAuthResults" class="d-none mt-3">
+                            <div class="mb-3">
+                                <label for="docsQuickAuthToken" class="form-label">Generated Token (shown once)</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control font-monospace" id="docsQuickAuthToken" readonly>
+                                    <button type="button" class="btn btn-outline-secondary" data-copy-target="docsQuickAuthToken">Copy</button>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="docsQuickAuthSecret" class="form-label">Generated Secret (shown once)</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control font-monospace" id="docsQuickAuthSecret" readonly>
+                                    <button type="button" class="btn btn-outline-secondary" data-copy-target="docsQuickAuthSecret">Copy</button>
+                                </div>
+                            </div>
+                            <p class="small text-muted mb-0">Default secret unlocks: <code>Current-Student</code>, <code>Alumni</code>.</p>
+                        </div>
+                    </div>
+                </div>
+
                 <h5 class="mt-4">Token scopes</h5>
                 <table class="table table-sm table-bordered w-auto">
                     <thead class="table-light">
@@ -1046,6 +1090,7 @@ GET /api/v1/quickpulls/gradclass?year=2026&amp;program=PhD+Program&amp;secret=uh
 </div><!-- /container -->
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/assets/js/api-docs-quick-auth.js"></script>
 <script>
     // Highlight active sidebar link on scroll
     const headings = document.querySelectorAll("section[id], div[id^='ep-']");
