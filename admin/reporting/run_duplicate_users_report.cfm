@@ -13,7 +13,11 @@
 
 <cfset returnJson = structKeyExists(url, "format") AND lCase(trim(url.format ?: "")) EQ "json">
 <cfset scanMode = lCase(trim(url.scan ?: form.scan ?: ""))>
-<cfset includeDeepSignals = (lCase(triggeredBy) EQ "scheduled") OR (scanMode EQ "full")>
+<cfset stageMode = lCase(trim(url.stage ?: form.stage ?: ""))>
+<cfset includeDeepSignals = false>
+<cfif scanMode EQ "full">
+    <cfset stageMode = "all">
+</cfif>
 <cfset ruleMode = lCase(trim(url.mode ?: form.mode ?: ""))>
 
 <cfif lCase(triggeredBy) NEQ "scheduled" AND NOT application.authService.hasRole("SUPER_ADMIN")>
@@ -29,7 +33,8 @@
 <cfset result = duplicateSvc.runScan(
     triggeredBy=triggeredBy,
     includeDeepSignals=includeDeepSignals,
-    ruleMode=ruleMode
+    ruleMode=ruleMode,
+    scanStage=stageMode
 )>
 
 <cfif returnJson>

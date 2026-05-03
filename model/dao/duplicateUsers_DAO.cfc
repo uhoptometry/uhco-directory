@@ -62,6 +62,7 @@ component extends="dao.BaseDAO" output="false" singleton {
                 u.UserID,
                 MAX(CASE WHEN LOWER(ISNULL(uf.FlagName, '')) = 'alumni' THEN 1 ELSE 0 END) AS IsAlumni,
                 MAX(CASE WHEN LOWER(ISNULL(uf.FlagName, '')) IN ('faculty-fulltime', 'faculty-adjunct') THEN 1 ELSE 0 END) AS IsFaculty,
+                MAX(CASE WHEN LOWER(ISNULL(uf.FlagName, '')) IN ('staff', 'temporary-staff') THEN 1 ELSE 0 END) AS IsStaff,
                 MAX(CASE
                     WHEN uf.FlagID IS NULL THEN 0
                     WHEN LOWER(ISNULL(uf.FlagName, '')) IN ('alumni', 'faculty-fulltime', 'faculty-adjunct') THEN 0
@@ -83,6 +84,7 @@ component extends="dao.BaseDAO" output="false" singleton {
             result[toString(val(row.USERID ?: 0))] = {
                 isAlumni = val(row.ISALUMNI ?: 0) GT 0,
                 isFaculty = val(row.ISFACULTY ?: 0) GT 0,
+                isStaff = val(row.ISSTAFF ?: 0) GT 0,
                 hasOther = val(row.HASOTHER ?: 0) GT 0
             };
         }
@@ -245,6 +247,80 @@ component extends="dao.BaseDAO" output="false" singleton {
             SELECT DISTINCT UserID_A, UserID_B, SignalType, SignalValue
             FROM SignalRows
             ",
+            {},
+            { datasource=variables.datasource, timeout=120 }
+        );
+
+        return queryToArray(qry);
+    }
+
+    public array function findDuplicateSignalsForStage( required string stage ) {
+        var normalizedStage = lCase(trim(arguments.stage ?: ""));
+        var sql = "";
+
+        if (normalizedStage EQ "emails") {
+            sql = "
+                SELECT
+                    CASE WHEN e1.UserID < e2.UserID THEN e1.UserID ELSE e2.UserID END AS UserID_A,
+                    CASE WHEN e1.UserID < e2.UserID THEN e2.UserID ELSE e1.UserID END AS UserID_B,
+                    'emails_address' AS SignalType,
+                    LOWER(LTRIM(RTRIM(e1.EmailAddress))) AS SignalValue
+                FROM UserEmails e1
+                INNER JOIN UserEmails e2
+                    ON e1.UserID < e2.UserID
+                   AND LOWER(LTRIM(RTRIM(ISNULL(e1.EmailAddress, '')))) = LOWER(LTRIM(RTRIM(ISNULL(e2.EmailAddress, ''))))
+                WHERE NULLIF(LTRIM(RTRIM(ISNULL(e1.EmailAddress, ''))), '') IS NOT NULL
+            ";
+        } else if (normalizedStage EQ "phones") {
+            sql = "
+                SELECT
+                    CASE WHEN p1.UserID < p2.UserID THEN p1.UserID ELSE p2.UserID END AS UserID_A,
+                    CASE WHEN p1.UserID < p2.UserID THEN p2.UserID ELSE p1.UserID END AS UserID_B,
+                    'phones_number' AS SignalType,
+                    REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(p1.PhoneNumber, '(', ''), ')', ''), '-', ''), ' ', ''), '.', ''), '+', '') AS SignalValue
+                FROM UserPhone p1
+                INNER JOIN UserPhone p2
+                    ON p1.UserID < p2.UserID
+                   AND REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(ISNULL(p1.PhoneNumber, ''), '(', ''), ')', ''), '-', ''), ' ', ''), '.', ''), '+', '')
+                       = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(ISNULL(p2.PhoneNumber, ''), '(', ''), ')', ''), '-', ''), ' ', ''), '.', ''), '+', '')
+                WHERE NULLIF(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(ISNULL(p1.PhoneNumber, ''), '(', ''), ')', ''), '-', ''), ' ', ''), '.', ''), '+', ''), '') IS NOT NULL
+            ";
+        } else if (normalizedStage EQ "flags") {
+            sql = "
+                SELECT
+                    CASE WHEN f1.UserID < f2.UserID THEN f1.UserID ELSE f2.UserID END AS UserID_A,
+                    CASE WHEN f1.UserID < f2.UserID THEN f2.UserID ELSE f1.UserID END AS UserID_B,
+                    'flags_shared' AS SignalType,
+                    LOWER(LTRIM(RTRIM(ISNULL(uf.FlagName, '')))) AS SignalValue
+                FROM UserFlagAssignments f1
+                INNER JOIN UserFlagAssignments f2
+                    ON f1.UserID < f2.UserID
+                   AND f1.FlagID = f2.FlagID
+                INNER JOIN UserFlags uf ON uf.FlagID = f1.FlagID
+                WHERE NULLIF(LTRIM(RTRIM(ISNULL(uf.FlagName, ''))), '') IS NOT NULL
+            ";
+        } else if (normalizedStage EQ "organizations") {
+            sql = "
+                SELECT
+                    CASE WHEN o1.UserID < o2.UserID THEN o1.UserID ELSE o2.UserID END AS UserID_A,
+                    CASE WHEN o1.UserID < o2.UserID THEN o2.UserID ELSE o1.UserID END AS UserID_B,
+                    'organizations_shared' AS SignalType,
+                    LOWER(LTRIM(RTRIM(ISNULL(org.OrgName, '')))) AS SignalValue
+                FROM UserOrganizations o1
+                INNER JOIN UserOrganizations o2
+                    ON o1.UserID < o2.UserID
+                   AND o1.OrgID = o2.OrgID
+                INNER JOIN Organizations org ON org.OrgID = o1.OrgID
+                WHERE NULLIF(LTRIM(RTRIM(ISNULL(org.OrgName, ''))), '') IS NOT NULL
+            ";
+        }
+
+        if (!len(sql)) {
+            return [];
+        }
+
+        var qry = executeQueryWithRetry(
+            sql,
             {},
             { datasource=variables.datasource, timeout=120 }
         );
@@ -1283,6 +1359,148 @@ component extends="dao.BaseDAO" output="false" singleton {
         }
 
         return queryToArray(qry)[1];
+    }
+
+    public struct function getLatestMergeBySecondaryUserID( required numeric secondaryUserID ) {
+        var qry = executeQueryWithRetry(
+            "
+            SELECT TOP 1
+                m.MergeID,
+                m.PairID,
+                m.PrimaryUserID,
+                m.SecondaryUserID,
+                m.MergedByAdminUserID,
+                m.MergeChoices,
+                m.MergedAt,
+                m.Notes
+            FROM DuplicateUserMerges m
+            WHERE m.SecondaryUserID = :secondaryUserID
+            ORDER BY m.MergeID DESC
+            ",
+            { secondaryUserID = { value=arguments.secondaryUserID, cfsqltype='cf_sql_integer' } },
+            { datasource=variables.datasource, timeout=30 }
+        );
+
+        if (qry.recordCount EQ 0) {
+            return {};
+        }
+
+        return queryToArray(qry)[1];
+    }
+
+    public array function getUserDeepScanData(
+        required numeric userID,
+        required string scanType
+    ) {
+        var normalizedType = lCase(trim(arguments.scanType ?: ""));
+        var sql = "";
+
+        switch (normalizedType) {
+            case "profile":
+                sql = "SELECT * FROM Users WHERE UserID = :userID";
+                break;
+            case "aliases":
+                sql = "SELECT * FROM UserAliases WHERE UserID = :userID ORDER BY IsPrimary DESC, SortOrder, AliasID";
+                break;
+            case "emails":
+                sql = "SELECT * FROM UserEmails WHERE UserID = :userID ORDER BY IsPrimary DESC, SortOrder, EmailID";
+                break;
+            case "phones":
+                sql = "SELECT * FROM UserPhone WHERE UserID = :userID ORDER BY IsPrimary DESC, SortOrder, PhoneID";
+                break;
+            case "addresses":
+                sql = "SELECT * FROM UserAddresses WHERE UserID = :userID ORDER BY IsPrimary DESC, AddressType, AddressID";
+                break;
+            case "flags":
+                sql = "
+                    SELECT ufa.*, uf.FlagName
+                    FROM UserFlagAssignments ufa
+                    LEFT JOIN UserFlags uf ON uf.FlagID = ufa.FlagID
+                    WHERE ufa.UserID = :userID
+                    ORDER BY uf.FlagName, ufa.FlagID
+                ";
+                break;
+            case "organizations":
+                sql = "
+                    SELECT uo.*, o.OrgName, o.OrgDescription
+                    FROM UserOrganizations uo
+                    LEFT JOIN Organizations o ON o.OrgID = uo.OrgID
+                    WHERE uo.UserID = :userID
+                    ORDER BY o.OrgName, uo.OrgID
+                ";
+                break;
+            case "external_ids":
+                sql = "
+                    SELECT uei.*, es.SystemName
+                    FROM UserExternalIDs uei
+                    LEFT JOIN ExternalSystems es ON es.SystemID = uei.SystemID
+                    WHERE uei.UserID = :userID
+                    ORDER BY es.SystemName, uei.SystemID, uei.ExternalValue
+                ";
+                break;
+            case "bio":
+                sql = "SELECT * FROM UserBio WHERE UserID = :userID";
+                break;
+            case "academic":
+                sql = "SELECT * FROM UserAcademicInfo WHERE UserID = :userID";
+                break;
+            case "degrees":
+                sql = "SELECT * FROM UserDegrees WHERE UserID = :userID ORDER BY DegreeID";
+                break;
+            case "awards":
+                sql = "SELECT * FROM UserAwards WHERE UserID = :userID ORDER BY AwardID";
+                break;
+            case "student_profile":
+                sql = "SELECT * FROM UserStudentProfile WHERE UserID = :userID";
+                break;
+            case "review_submissions":
+                sql = "SELECT * FROM UserReviewSubmissions WHERE UserID = :userID ORDER BY SubmissionID DESC";
+                break;
+            case "images":
+                sql = "
+                    SELECT ui.*, uis.SourceKey, uis.DropboxPath, uis.Notes, uis.IsActive,
+                           uis.CreatedAt AS SourceCreatedAt, uis.ModifiedAt AS SourceModifiedAt
+                    FROM UserImages ui
+                    LEFT JOIN UserImageSources uis ON uis.UserImageSourceID = ui.UserImageSourceID
+                    WHERE ui.UserID = :userID
+                    ORDER BY ui.SortOrder, ui.ImageID
+                ";
+                break;
+            default:
+                return [];
+        }
+
+        var qry = executeQueryWithRetry(
+            sql,
+            { userID = { value=arguments.userID, cfsqltype='cf_sql_integer' } },
+            { datasource=variables.datasource, timeout=120 }
+        );
+
+        return queryToArray(qry);
+    }
+
+    public array function getInactiveMergedAccounts( numeric limit = 100 ) {
+        var qry = executeQueryWithRetry(
+            "
+            SELECT TOP(:lim)
+                m.SecondaryUserID,
+                MAX(m.MergedAt) AS LastMergedAt,
+                MAX(m.PrimaryUserID) AS LastPrimaryUserID,
+                MAX(u.FirstName) AS FirstName,
+                MAX(u.LastName) AS LastName,
+                MAX(u.EmailPrimary) AS EmailPrimary,
+                COUNT(*) AS MergeCount
+            FROM DuplicateUserMerges m
+            INNER JOIN Users u ON u.UserID = m.SecondaryUserID
+            WHERE ISNULL(u.Active, 1) = 0
+            GROUP BY m.SecondaryUserID
+            ORDER BY MAX(m.MergedAt) DESC, m.SecondaryUserID DESC
+            ",
+            { lim = { value=arguments.limit, cfsqltype='cf_sql_integer' } },
+            { datasource=variables.datasource, timeout=60 }
+        );
+
+        return queryToArray(qry);
     }
 
     public struct function getStatusSummaryByRun( required numeric runID ) {

@@ -183,6 +183,7 @@
         DepartmentName = structKeyExists(o, "DepartmentName") ? o.DepartmentName : (e.DEPARTMENTNAME ?: ""),
         Office_Mailing_Address = structKeyExists(o, "Office_Mailing_Address") ? o.Office_Mailing_Address : (e.OFFICE_MAILING_ADDRESS ?: ""),
         Mailcode   = structKeyExists(o, "Mailcode")   ? o.Mailcode   : (e.MAILCODE ?: ""),
+        Notes      = structKeyExists(o, "Notes")      ? o.Notes      : (e.NOTES ?: ""),
         Active     = val(e.ACTIVE ?: 1)
     }>
     <!--- DOB / Gender: use override if present, else existing --->
@@ -567,7 +568,8 @@
             Department   = structKeyExists(form, "Department")   ? trim(form.Department)   : (existing.DEPARTMENT ?: ""),
             DepartmentName = structKeyExists(form, "DepartmentName") ? trim(form.DepartmentName) : (existing.DEPARTMENTNAME ?: ""),
             Office_Mailing_Address = structKeyExists(form, "Office_Mailing_Address") ? trim(form.Office_Mailing_Address) : (existing.OFFICE_MAILING_ADDRESS ?: ""),
-            Mailcode   = structKeyExists(form, "Mailcode") ? trim(form.Mailcode) : (existing.MAILCODE ?: "")
+            Mailcode   = structKeyExists(form, "Mailcode") ? trim(form.Mailcode) : (existing.MAILCODE ?: ""),
+            Notes      = structKeyExists(form, "Notes") ? trim(form.Notes) : (existing.NOTES ?: "")
         }>
         <cfset userData = buildUserData(existing, overrides)>
         <cfset usersService.updateUser(userID, userData)>

@@ -28,7 +28,10 @@
 </cfif>
 
 <!--- Perform the deletion --->
-<cfset result = usersService.deleteUser( form.userID )>
+<cfset result = usersService.deleteUser(
+    userID = form.userID,
+    forceDeleteRelatedDuplicatePairs = canViewTestUsers
+)>
 
 <cfif result.success>
     <cfset content = "

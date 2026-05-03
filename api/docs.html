@@ -141,7 +141,7 @@ X-API-Secret: uhcs_sec_&lt;your-secret&gt;</pre>
             <section id="errors" class="mb-5">
                 <h2 class="h3 fw-bold mb-3">Errors</h2>
                 <p>Errors return a JSON body with an <code>error</code> key and an appropriate HTTP status code.</p>
-                <pre class="example">{ "ERROR": "User not found" }</pre>
+                <pre class="example">{ "error": "User not found" }</pre>
                 <table class="table table-sm table-bordered mt-3">
                     <thead class="table-light">
                         <tr><th>Status</th><th>Meaning</th></tr>
@@ -190,11 +190,11 @@ X-API-Secret: uhcs_sec_&lt;your-secret&gt;</pre>
                     </table>
 
                     <h6 class="mt-3">Response</h6>
-                    <pre class="example">{
-  "TOTAL": 3319,
-  "LIMIT": 50,
-  "OFFSET": 0,
-  "DATA": [ { "USERID": 1, "FIRSTNAME": "Jane", "LASTNAME": "Doe", ... } ]
+                                        <pre class="example">{
+    "total": 3319,
+    "limit": 50,
+    "offset": 0,
+    "data": [ { "USERID": 1, "FIRSTNAME": "Jane", "LASTNAME": "Doe", ... } ]
 }</pre>
 
                     <h6 class="mt-3">Example Requests</h6>
@@ -242,13 +242,21 @@ GET /api/v1/people?return=xml&amp;token=uhcs_...</pre>
                     </table>
 
                     <h6 class="mt-3">Response</h6>
-                    <pre class="example">{
-  "USER": { "USERID": 42, "FIRSTNAME": "Jane", ... },
-  "FLAGS": [ ... ],
-  "ORGANIZATIONS": [ ... ],
-  "ACADEMIC": { ... },
-  "ADDRESSES": [ ... ],
-  "EXTERNALIDS": [ ... ]
+                                        <pre class="example">{
+    "user": { "USERID": 42, "FIRSTNAME": "Jane", ... },
+    "flags": [ ... ],
+    "organizations": [ ... ],
+    "addresses": [ ... ],
+    "phones": [ ... ],
+    "images": [ ... ],
+    "academic": { ... },
+    "externalIDs": [ ... ],
+    "access": { ... },
+    "emails": [ ... ],
+    "degrees": [ ... ],
+    "studentProfile": { ... },
+    "awards": [ ... ],
+    "bio": { ... }
 }</pre>
 
                     <h6 class="mt-3">Example Requests</h6>
@@ -287,7 +295,7 @@ GET /api/v1/people/42?return=xml&amp;token=uhcs_...</pre>
                     </table>
 
                     <h6 class="mt-3">Response</h6>
-                    <pre class="example">{ "DATA": [ { "FLAGID": 3, "FLAGNAME": "Alumni", ... } ] }</pre>
+                    <pre class="example">{ "userID": 42, "data": [ { "FLAGID": 3, "FLAGNAME": "Alumni", ... } ] }</pre>
 
                     <h6 class="mt-3">Example Requests</h6>
                     <pre class="example">GET /api/v1/people/42/flags?token=uhcs_...
@@ -325,7 +333,7 @@ GET /api/v1/people/42/flags?return=xml&amp;token=uhcs_...</pre>
                     </table>
 
                     <h6 class="mt-3">Response</h6>
-                    <pre class="example">{ "DATA": [ { "ORGID": 5, "ORGNAME": "Clinical Sciences", ... } ] }</pre>
+                    <pre class="example">{ "userID": 42, "data": [ { "ORGID": 5, "ORGNAME": "Clinical Sciences", ... } ] }</pre>
 
                     <h6 class="mt-3">Example Requests</h6>
                     <pre class="example">GET /api/v1/people/42/organizations?token=uhcs_...
@@ -363,7 +371,7 @@ GET /api/v1/people/42/organizations?return=xml&amp;token=uhcs_...</pre>
                     </table>
 
                     <h6 class="mt-3">Response</h6>
-                    <pre class="example">{ "DATA": { "GRADYEAR": 2026, "CLASSSTANDING": "4th Year", ... } }</pre>
+                    <pre class="example">{ "userID": 42, "data": { "CURRENTGRADYEAR": 2026, "CURRENTCLASS": "4th Year", ... } }</pre>
 
                     <h6 class="mt-3">Example Requests</h6>
                     <pre class="example">GET /api/v1/people/42/academic?token=uhcs_...
@@ -402,7 +410,7 @@ GET /api/v1/people/42/academic?return=xml&amp;token=uhcs_...</pre>
                     </table>
 
                     <h6 class="mt-3">Response</h6>
-                    <pre class="example">{ "DATA": [ { "ADDRESSID": 9, "STREET": "4901 Calhoun Rd", "CITY": "Houston", ... } ] }</pre>
+                    <pre class="example">{ "userID": 42, "data": [ { "ADDRESSID": 9, "ADDRESS1": "4901 Calhoun Rd", "CITY": "Houston", ... } ] }</pre>
 
                     <h6 class="mt-3">Example Requests</h6>
                     <pre class="example">GET /api/v1/people/42/addresses?token=uhcs_...
@@ -440,7 +448,7 @@ GET /api/v1/people/42/addresses?return=xml&amp;token=uhcs_...</pre>
                     </table>
 
                     <h6 class="mt-3">Response</h6>
-                    <pre class="example">{ "DATA": [ { "SYSTEMNAME": "Cougarnet", "EXTERNALID": "jdoe2", ... } ] }</pre>
+                    <pre class="example">{ "userID": 42, "data": [ { "SYSTEMNAME": "COUGARNET", "EXTERNALID": "jdoe2", ... } ] }</pre>
 
                     <h6 class="mt-3">Example Requests</h6>
                     <pre class="example">GET /api/v1/people/42/externalids?token=uhcs_...
@@ -469,8 +477,8 @@ GET /api/v1/people/42/externalids?return=xml&amp;token=uhcs_...</pre>
 
                     <h6 class="mt-3">Response</h6>
                     <pre class="example">{
-  "USERID": 42,
-  "DATA": [
+  "userID": 42,
+  "data": [
     { "IMAGEID": 10, "IMAGEVARIANT": "WEB_THUMB", "IMAGEURL": "/published_images/web_thumb/42.jpg" }
   ]
 }</pre>
@@ -503,8 +511,8 @@ GET /api/v1/people/42/images?return=xml&amp;token=uhcs_...</pre>
 
                     <h6 class="mt-3">Response</h6>
                     <pre class="example">{
-  "USERID": 42,
-  "DATA": [
+  "userID": 42,
+  "data": [
     { "EMAILADDRESS": "jdoe@uh.edu", "EMAILTYPE": "Central", "ISPRIMARY": 1, "SORTORDER": 1 },
     { "EMAILADDRESS": "jdoe2@cougarnet.uh.edu", "EMAILTYPE": "CougarNet", "ISPRIMARY": 0, "SORTORDER": 2 }
   ]
@@ -533,8 +541,8 @@ GET /api/v1/people/42/images?return=xml&amp;token=uhcs_...</pre>
 
                     <h6 class="mt-3">Response</h6>
                     <pre class="example">{
-  "USERID": 42,
-  "DATA": [
+  "userID": 42,
+  "data": [
     { "DEGREEID": 1, "DEGREENAME": "O.D.", "UNIVERSITY": "University of Houston", "DEGREEYEAR": "2020" }
   ]
 }</pre>
@@ -562,13 +570,13 @@ GET /api/v1/people/42/images?return=xml&amp;token=uhcs_...</pre>
 
                     <h6 class="mt-3">Response</h6>
                     <pre class="example">{
-  "USERID": 42,
-  "PROFILE": {
+  "userID": 42,
+  "profile": {
     "HOMETOWNCITY": "Houston", "HOMETOWNSTATE": "TX",
     "FIRSTEXTERNSHIP": "...", "SECONDEXTERNSHIP": "...",
     "DOB": "2000-01-15", "GENDER": "Female", "COMMENCEMENTAGE": 26
   },
-  "AWARDS": [
+    "awards": [
     { "AWARDID": 1, "AWARDNAME": "Dean's List", "AWARDTYPE": "Honor" }
   ]
 }</pre>
@@ -596,8 +604,8 @@ GET /api/v1/people/42/images?return=xml&amp;token=uhcs_...</pre>
 
                     <h6 class="mt-3">Response</h6>
                     <pre class="example">{
-  "USERID": 42,
-  "DATA": [
+  "userID": 42,
+  "data": [
     { "AWARDID": 1, "AWARDNAME": "Dean's List", "AWARDTYPE": "Honor" }
   ]
 }</pre>
@@ -625,8 +633,8 @@ GET /api/v1/people/42/images?return=xml&amp;token=uhcs_...</pre>
 
                     <h6 class="mt-3">Response</h6>
                     <pre class="example">{
-  "USERID": 42,
-  "DATA": {
+  "userID": 42,
+  "data": {
     "BIOCONTENT": "&lt;p&gt;Dr. Doe specializes in...&lt;/p&gt;",
     "UPDATEDAT": "2026-04-15T10:30:00Z"
   }
@@ -655,7 +663,7 @@ GET /api/v1/people/42/images?return=xml&amp;token=uhcs_...</pre>
                     </table>
 
                     <h6 class="mt-3">Response</h6>
-                    <pre class="example">{ "DATA": [ { "ORGID": 1, "ORGNAME": "College of Optometry", "PARENTORGID": null, ... } ] }</pre>
+                    <pre class="example">{ "data": [ { "ORGID": 1, "ORGNAME": "College of Optometry", "PARENTORGID": null, ... } ] }</pre>
 
                     <h6 class="mt-3">Example Requests</h6>
                     <pre class="example">GET /api/v1/organizations?token=uhcs_...
@@ -693,7 +701,7 @@ GET /api/v1/organizations?return=xml&amp;token=uhcs_...</pre>
                     </table>
 
                     <h6 class="mt-3">Response</h6>
-                    <pre class="example">{ "DATA": { "ORGID": 5, "ORGNAME": "Clinical Sciences", "PARENTORGID": 1, ... } }</pre>
+                    <pre class="example">{ "ORGID": 5, "ORGNAME": "Clinical Sciences", "PARENTORGID": 1, ... }</pre>
 
                     <h6 class="mt-3">Example Requests</h6>
                     <pre class="example">GET /api/v1/organizations/5?token=uhcs_...
@@ -722,7 +730,7 @@ GET /api/v1/organizations/5?return=xml&amp;token=uhcs_...</pre>
                     </table>
 
                     <h6 class="mt-3">Response</h6>
-                    <pre class="example">{ "DATA": [ { "FLAGID": 1, "FLAGNAME": "Faculty", "DESCRIPTION": "..." } ] }</pre>
+                    <pre class="example">{ "data": [ { "FLAGID": 1, "FLAGNAME": "Faculty", "DESCRIPTION": "..." } ] }</pre>
 
                     <h6 class="mt-3">Example Requests</h6>
                     <pre class="example">GET /api/v1/flags?token=uhcs_...
@@ -742,13 +750,20 @@ GET /api/v1/flags?return=xml&amp;token=uhcs_...</pre>
                                         <h6>Configurable Response Items</h6>
                                         <p>Admin users manage quickpull output in <strong>Settings &gt; UHCO API &gt; Quickpulls</strong>. Each quickpull keeps its default return fields, then can append specific general fields, selected email types, selected phone types, selected address types, selected biographical items, selected image variants, selected external systems, and optional full <code>ORGANIZATIONS</code> or <code>FLAGS</code> arrays.</p>
 
+                                        <h6 class="mt-3">Default Return Items</h6>
+                                        <p><code>USERID</code>, <code>FIRSTNAME</code>, <code>MIDDLENAME</code>, <code>LASTNAME</code>, <code>DEGREES</code>, <code>FULLNAME</code></p>
+
+                                        <h6 class="mt-3">Current Additional Return Items</h6>
+                                        <p><code>EMAILPRIMARY</code></p>
+                                        <p class="small text-muted mb-3">Last verified against current AppConfig on 05-01-2026 (environment-specific).</p>
+
                                         <h6>Authentication</h6>
                                         <p>Requires a valid API token with <code>read</code> scope. No secret is required.</p>
 
                                         <h6 class="mt-3">Response</h6>
                                         <pre class="example">{
-    "TOTAL": 12,
-    "DATA": [
+    "total": 12,
+    "data": [
         {
             "USERID": 42,
             "FIRSTNAME": "Jane",
@@ -756,8 +771,7 @@ GET /api/v1/flags?return=xml&amp;token=uhcs_...</pre>
             "LASTNAME": "Doe",
             "DEGREES": "O.D.",
             "FULLNAME": "Jane A Doe, O.D.",
-            "PHONE_OFFICE": "713-555-1212",
-            "IMAGE_WEB_THUMB": "/published_images/web_thumb/42.jpg"
+            "EMAILPRIMARY": "jane.doe@uh.edu"
         }
     ]
 }</pre>
@@ -782,6 +796,13 @@ GET /api/v1/flags?return=xml&amp;token=uhcs_...</pre>
                                         <h6>Configurable Response Items</h6>
                                         <p>Admin users manage quickpull output in <strong>Settings &gt; UHCO API &gt; Quickpulls</strong>. Each quickpull keeps its default return fields, then can append specific general fields, selected email types, selected phone types, selected address types, selected biographical items, selected image variants, selected external systems, and optional full <code>ORGANIZATIONS</code> or <code>FLAGS</code> arrays.</p>
 
+                                        <h6 class="mt-3">Default Return Items</h6>
+                                        <p><code>USERID</code>, <code>FIRSTNAME</code>, <code>MIDDLENAME</code>, <code>LASTNAME</code>, <code>CURRENTGRADYEAR</code>, <code>PROGRAM</code>, <code>FULLNAME</code>, <code>INTERACTIVEUSERIMAGE</code>, <code>KIOSKROSTERIMAGE</code>, <code>KIOSKPROFILEIMAGE</code></p>
+
+                                        <h6 class="mt-3">Current Additional Return Items</h6>
+                                        <p><code>FIRSTEXTERNSHIP</code>, <code>SECONDEXTERNSHIP</code>, <code>HOMETOWNCITY</code>, <code>HOMETOWNSTATE</code>, <code>HOMETOWNFULL</code>, <code>DEGREES</code>, <code>AWARDS</code></p>
+                                        <p class="small text-muted mb-3">Last verified against current AppConfig on 05-01-2026 (environment-specific).</p>
+
                                         <h6>Authentication</h6>
                                         <p>Requires both a valid API token and a valid secret that unlocks the <code>Alumni</code> flag.</p>
 
@@ -800,8 +821,8 @@ GET /api/v1/flags?return=xml&amp;token=uhcs_...</pre>
 
                                         <h6 class="mt-3">Response</h6>
                                         <pre class="example">{
-    "TOTAL": 87,
-    "DATA": [
+    "total": 87,
+    "data": [
         {
             "USERID": 314,
             "FIRSTNAME": "Alex",
@@ -813,8 +834,17 @@ GET /api/v1/flags?return=xml&amp;token=uhcs_...</pre>
             "INTERACTIVEUSERIMAGE": "/published_images/interactive_roster/314.jpg",
             "KIOSKROSTERIMAGE": "/published_images/kiosk_roster/314.jpg",
             "KIOSKPROFILEIMAGE": "/published_images/kiosk_profile/314.jpg",
-            "EMAIL_CENTRAL": "alex.smith@uh.edu",
-            "EXTERNALID_COUGARNET": "asmith7"
+            "FIRSTEXTERNSHIP": "Houston Eye Associates",
+            "SECONDEXTERNSHIP": "VA Eye Clinic",
+            "HOMETOWNCITY": "Houston",
+            "HOMETOWNSTATE": "TX",
+            "HOMETOWNFULL": "Houston, TX",
+            "DEGREES": [
+                { "DEGREENAME": "O.D.", "UNIVERSITY": "University of Houston", "DEGREEYEAR": "2026" }
+            ],
+            "AWARDS": [
+                { "AWARDNAME": "Dean's List", "AWARDTYPE": "Honor" }
+            ]
         }
     ]
 }</pre>
@@ -840,6 +870,13 @@ GET /api/v1/quickpulls/gradclass?year=2026&amp;program=PhD+Program&amp;secret=uh
                                         <h6>Configurable Response Items</h6>
                                         <p>Admin users manage quickpull output in <strong>Settings &gt; UHCO API &gt; Quickpulls</strong>. Each quickpull keeps its default return fields, then can append specific general fields, selected email types, selected phone types, selected address types, selected biographical items, selected image variants, selected external systems, and optional full <code>ORGANIZATIONS</code> or <code>FLAGS</code> arrays.</p>
 
+                                        <h6 class="mt-3">Default Return Items</h6>
+                                        <p><code>USERID</code>, <code>FIRSTNAME</code>, <code>MIDDLENAME</code>, <code>LASTNAME</code>, <code>DEGREES</code>, <code>AWARDS</code>, <code>INTERACTIVEUSERIMAGE</code>, <code>KIOSKROSTERIMAGE</code>, <code>KIOSKPROFILEIMAGE</code></p>
+
+                                        <h6 class="mt-3">Current Additional Return Items</h6>
+                                        <p><em>None configured.</em></p>
+                                        <p class="small text-muted mb-3">Last verified against current AppConfig on 05-01-2026 (environment-specific).</p>
+
                                         <h6>Authentication</h6>
                                         <p>Requires both a valid API token and a valid secret that unlocks the <code>Alumni</code> flag.</p>
 
@@ -857,8 +894,8 @@ GET /api/v1/quickpulls/gradclass?year=2026&amp;program=PhD+Program&amp;secret=uh
 
                                         <h6 class="mt-3">Response</h6>
                                         <pre class="example">{
-    "USERID": 314,
-    "DATA": {
+    "userID": 314,
+    "data": {
         "USERID": 314,
         "FIRSTNAME": "Alex",
         "MIDDLENAME": "",
@@ -912,13 +949,20 @@ GET /api/v1/quickpulls/gradclass?year=2026&amp;program=PhD+Program&amp;secret=uh
                                         <h6>Configurable Response Items</h6>
                                         <p>Admin users manage quickpull output in <strong>Settings &gt; UHCO API &gt; Quickpulls</strong>. Each quickpull keeps its default return fields, then can append specific general fields, selected email types, selected phone types, selected address types, selected biographical items, selected image variants, selected external systems, and optional full <code>ORGANIZATIONS</code> or <code>FLAGS</code> arrays.</p>
 
+                                        <h6 class="mt-3">Default Return Items</h6>
+                                        <p><code>USERID</code>, <code>FIRSTNAME</code>, <code>MIDDLENAME</code>, <code>LASTNAME</code>, <code>TITLE1</code>, <code>FULLNAME</code>, <code>KIOSKNONGRIDIMAGE</code></p>
+
+                                        <h6 class="mt-3">Current Additional Return Items</h6>
+                                        <p><em>None configured.</em></p>
+                                        <p class="small text-muted mb-3">Last verified against current AppConfig on 05-01-2026 (environment-specific).</p>
+
                                         <h6>Authentication</h6>
                                         <p>Requires a valid API token with <code>read</code> scope. No secret is required.</p>
 
                                         <h6 class="mt-3">Response</h6>
                                         <pre class="example">{
-    "TOTAL": 4,
-    "DATA": [
+    "total": 4,
+    "data": [
         {
             "USERID": 21,
             "FIRSTNAME": "Taylor",
@@ -926,10 +970,7 @@ GET /api/v1/quickpulls/gradclass?year=2026&amp;program=PhD+Program&amp;secret=uh
             "LASTNAME": "Brown",
             "FULLNAME": "Taylor Brown",
             "KIOSKNONGRIDIMAGE": "/published_images/kiosk_non_grid/21.jpg",
-            "TITLE1": "Dean",
-            "ORGANIZATIONS": [
-                { "ORGID": 7, "ORGNAME": "College Leadership" }
-            ]
+            "TITLE1": "Dean"
         }
     ]
 }</pre>
@@ -953,6 +994,13 @@ GET /api/v1/quickpulls/gradclass?year=2026&amp;program=PhD+Program&amp;secret=uh
 
                                         <h6>Authentication</h6>
                                         <p>Requires a valid API token with <code>read</code> scope. A secret is required only when the matched user is flagged as <code>Alumni</code> or <code>Current-Student</code>.</p>
+
+                                        <h6 class="mt-3">Default Return Items</h6>
+                                        <p><code>USERID</code>, <code>FIRSTNAME</code>, <code>MIDDLENAME</code>, <code>LASTNAME</code>, <code>DEGREES</code>, <code>FULLNAME</code>, <code>FLAGS</code>, <code>ORGANIZATIONS</code>, <code>CURRENTGRADYEAR</code>, <code>WEBPROFILEIMAGE</code>, <code>WEBTHUMBIMAGE</code></p>
+
+                                        <h6 class="mt-3">Current Additional Return Items</h6>
+                                        <p><em>None configured.</em></p>
+                                        <p class="small text-muted mb-3">Last verified against current AppConfig on 05-01-2026 (environment-specific).</p>
 
                                         <h6 class="mt-3">Query Parameters</h6>
                                         <table class="table table-sm table-bordered param-table">

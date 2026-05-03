@@ -155,7 +155,21 @@
 
       <!--- Verify against admin access membership --->
       <cfset var adminAuthDAO = _getAdminAuthDAO()>
-      <cfset var accessUser = adminAuthDAO.getUserByCougarnet(lCase(trim(GetUserInfo.sAMAccountName & "")))>
+      <cfset var accessUser = {}>
+      <cfset var activeDatasource = structKeyExists(request, "datasource") ? request.datasource : "(request.datasource not set)">
+      <cfset var activeHost = structKeyExists(cgi, "server_name") ? cgi.server_name : "(unknown host)">
+      <cftry>
+        <cfset accessUser = adminAuthDAO.getUserByCougarnet(lCase(trim(GetUserInfo.sAMAccountName & "")))>
+        <cfcatch type="any">
+          <cflog
+            file="auth-login"
+            type="error"
+            text="ACCESS CHECK DB ERROR | user=#arguments.username# | ds=#activeDatasource# | host=#activeHost# | #cfcatch.message# | #cfcatch.detail#"
+          >
+          <cfset result.message = "Authentication service is temporarily unavailable. Please try again shortly.">
+          <cfreturn result>
+        </cfcatch>
+      </cftry>
       <cfif NOT structCount(accessUser) OR NOT val(accessUser.IS_ACTIVE)>
         <cfset result.message = "User not authorized - Not found in access list">
         <cfreturn result>
@@ -196,9 +210,9 @@
 
       <cfcatch type="any">
         <cflog
-          file="ldap-debug"
+          file="auth-login"
           type="error"
-          text="LDAP ERROR: #cfcatch.message# | #cfcatch.detail#"
+          text="AUTH ERROR | user=#arguments.username# | #cfcatch.message# | #cfcatch.detail#"
         >
         <cfif cfcatch.message CONTAINS "error code 49">
           <cfif cfcatch.message CONTAINS "52e">
@@ -219,7 +233,7 @@
             <cfset result.message = "Login failed (code 49). Please try again.">
           </cfif>
         <cfelse>
-          <cfset result.message = "Authentication error. Please try again. #cfcatch.message# | #cfcatch.detail#">
+          <cfset result.message = "Authentication service is temporarily unavailable. Please try again shortly.">
         </cfif>
         <cfreturn result>
       </cfcatch>
@@ -709,5 +723,106 @@
         <!--- Optional but recommended: rotate session ID --->
         <cfset sessionInvalidate()>
         </cffunction>
+
+  <!--- ═══════════════════════════════════════════════════════════
+        Windows Integrated Authentication
+        ═══════════════════════════════════════════════════════════ --->
+
+  <cffunction name="_normalizeWindowsIdentity" access="private" returntype="string" output="false">
+    <cfargument name="remoteUser" type="string" required="true">
+    <!---
+      Accepts DOMAIN\username or plain username.
+      Returns lowercase username, or empty string if input is malformed/empty.
+    --->
+    <cfset var raw = trim(arguments.remoteUser)>
+    <cfset var username = "">
+
+    <cfif NOT len(raw)>
+      <cfreturn "">
+    </cfif>
+
+    <!--- Strip domain prefix if present --->
+    <cfif raw CONTAINS "\">
+      <cfset username = listLast(raw, "\")>
+    <cfelse>
+      <cfset username = raw>
+    </cfif>
+
+    <cfset username = lCase(trim(username))>
+
+    <!--- Reject if nothing usable remains --->
+    <cfif NOT len(username) OR NOT reFind("^[a-z0-9._\-]+$", username)>
+      <cfreturn "">
+    </cfif>
+
+    <cfreturn username>
+  </cffunction>
+
+  <cffunction name="authenticateWindowsIntegrated" access="public" returntype="struct" output="false">
+    <cfargument name="remoteUser" type="string" required="true">
+    <!---
+      Authenticates a user whose identity was provided by IIS Windows Authentication.
+      Returns the same {success, message, user} contract as authenticate().
+      No password is collected or validated.
+    --->
+
+    <cfset var result = {
+      success = false,
+      message = "",
+      user    = {}
+    }>
+
+    <cfset var username      = _normalizeWindowsIdentity(arguments.remoteUser)>
+    <cfset var dao           = _getAdminAuthDAO()>
+    <cfset var accessUser    = {}>
+    <cfset var authorization = {}>
+
+    <!--- Reject empty or malformed identity --->
+    <cfif NOT len(username)>
+      <cfset result.message = "Windows identity could not be parsed.">
+      <cfreturn result>
+    </cfif>
+
+    <!--- Must exist in admin DB and be active --->
+    <cfset accessUser = dao.getUserByCougarnet(username)>
+    <cfif NOT structCount(accessUser) OR NOT val(accessUser.IS_ACTIVE)>
+      <cfset result.message = "User not authorized - Not found in access list">
+      <cfreturn result>
+    </cfif>
+
+    <!--- Load roles and permissions --->
+    <cfset authorization = _loadAuthorizationContext(val(accessUser.USER_ID))>
+
+    <cfif arrayLen(authorization.roles) EQ 0>
+      <cfset result.message = "User not authorized - No access role assigned">
+      <cfreturn result>
+    </cfif>
+
+    <!--- Build session user struct matching the LDAP path shape --->
+    <cfset result.success = true>
+    <cfset result.user = {
+      adminUserID        = val(accessUser.USER_ID),
+      username           = username,
+      displayName        = (structKeyExists(accessUser, "DISPLAY_NAME") AND len(trim(accessUser.DISPLAY_NAME & "")) ? trim(accessUser.DISPLAY_NAME) : username),
+      email              = (structKeyExists(accessUser, "EMAIL") ? trim(accessUser.EMAIL & "") : ""),
+      department         = "",
+      title              = "",
+      phone              = "",
+      authType           = "windows_integrated",
+      loginAt            = now(),
+      roles              = authorization.roles,
+      roleIDs            = authorization.roleIDs,
+      permissions        = authorization.permissions,
+      actualRoles        = authorization.roles,
+      actualRoleIDs      = authorization.roleIDs,
+      actualPermissions  = authorization.permissions,
+      actualIsSuperAdmin = authorization.isSuperAdmin,
+      isSuperAdmin       = authorization.isSuperAdmin
+    }>
+
+    <cfset createSession(result.user)>
+
+    <cfreturn result>
+  </cffunction>
 
 </cfcomponent>

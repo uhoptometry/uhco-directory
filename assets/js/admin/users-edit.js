@@ -219,7 +219,7 @@ document.addEventListener('DOMContentLoaded', function () {
             'flags-tab': 'refreshFlagsBtn',
             'orgs-tab': 'refreshOrgsBtn',
             'extids-tab': 'refreshExtidsBtn',
-            'address-tab': 'refreshUhBtn'
+            'admin-tab': 'refreshUhBtn'
         };
         return map[tabId] || '';
     }
@@ -1231,7 +1231,7 @@ document.addEventListener('DOMContentLoaded', function () {
     wireSectionDirty('flags', document.getElementById('flags-pane'));
     wireSectionDirty('orgs', document.getElementById('orgs-pane'));
     wireSectionDirty('extids', document.getElementById('extids-pane'));
-    wireSectionDirty('uh', document.getElementById('address-pane'));
+    wireSectionDirty('uh', document.getElementById('admin-pane'));
     wireSectionDirty('bioinfo', document.getElementById('bio-info-pane'));
     wireSectionDirty('studentprofile', document.getElementById('student-profile-pane'));
     wireSectionDirty('tabdegrees', document.getElementById('faculty-profile-pane'));
@@ -1297,7 +1297,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var refreshUhBtn = document.getElementById('refreshUhBtn');
     if (refreshUhBtn) {
         refreshUhBtn.addEventListener('click', function () {
-            refreshTabData('address-tab');
+            refreshTabData('admin-tab');
         });
     }
 
@@ -1691,7 +1691,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var lookupBtn = event.target.closest('.js-cougarnet-lookup');
         if (lookupBtn) {
             var cougarnetEl = document.getElementById('extid-cougarnet-input');
-            var emailEl = document.querySelector('#address-pane [name="EmailPrimary"]') || document.querySelector('#general-pane [name="EmailPrimary"]');
+            var emailEl = document.querySelector('#admin-pane [name="EmailPrimary"]') || document.querySelector('#general-pane [name="EmailPrimary"]');
             var searchTerms = buildLdapSearchTerms(cougarnetEl, emailEl);
 
             if (!searchTerms.length || (searchTerms.length === 1 && searchTerms[0].length < 2)) {
@@ -1806,11 +1806,11 @@ document.addEventListener('DOMContentLoaded', function () {
     var saveUhBtn = document.getElementById('save-uh-btn');
     if (saveUhBtn) {
         saveUhBtn.addEventListener('click', function () {
-            var pane = document.getElementById('address-pane');
+            var pane = document.getElementById('admin-pane');
             var body = new URLSearchParams();
             body.append('userID', pageUserID);
             body.append('section', 'uh');
-            ['EmailPrimary','UH_API_ID','Room','Building','Campus','Division','DivisionName','Department','DepartmentName','Office_Mailing_Address','Mailcode'].forEach(function (f) {
+            ['EmailPrimary','UH_API_ID','Room','Building','Campus','Division','DivisionName','Department','DepartmentName','Office_Mailing_Address','Mailcode','Notes'].forEach(function (f) {
                 var el = pane.querySelector('[name="' + f + '"]');
                 body.append(f, el ? el.value : '');
             });

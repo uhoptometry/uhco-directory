@@ -20,6 +20,7 @@
     { value = "alumni_vs_alumni", label = "Alumni vs Alumni" },
     { value = "alumni_vs_faculty", label = "Alumni vs Faculty (Fulltime/Adjunct)" },
     { value = "alumni_vs_other", label = "Alumni vs Other (not Faculty/Alumni)" },
+    { value = "staff_only", label = "Staff Only (Staff / Temporary-Staff)" },
     { value = "all", label = "ALL" }
 ]>
 <cfset selectedRuleMode = duplicateSvc.normalizeRuleMode(url.mode ?: "")>
@@ -112,9 +113,6 @@
 <div class="d-flex flex-wrap align-items-center gap-2 mt-3 mb-4">
     <a href="/admin/reporting/run_duplicate_users_report.cfm?scan=quick&mode=#urlEncodedFormat(selectedRuleMode)#" class="btn btn-primary">
         <i class="bi bi-play-fill"></i> Run Now (Quick)
-    </a>
-    <a href="/admin/reporting/run_duplicate_users_report.cfm?scan=full&mode=#urlEncodedFormat(selectedRuleMode)#" class="btn btn-outline-danger">
-        <i class="bi bi-hourglass-split"></i> Run Full Scan
     </a>
     <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="##schedulePanel">
         <i class="bi bi-clock"></i> Schedule
@@ -280,23 +278,7 @@
                         <td><span class="badge #duplicateSvc.scoreBadgeClass(val(p.CONFIDENCESCORE ?: 0))#">#val(p.CONFIDENCESCORE ?: 0)#</span></td>
                         <td><span class="badge #p.STATUS EQ 'pending' ? 'bg-warning text-dark' : (p.STATUS EQ 'ignored' ? 'bg-secondary' : 'bg-success')#">#encodeForHTML(p.STATUS)#</span></td>
                         <td>
-                            <cfif p.STATUS EQ "pending">
-                                <a href="/admin/users/merge.cfm?pairID=#p.PAIRID#" class="btn btn-sm btn-outline-primary py-0 px-1 mb-1">Merge</a>
-                                <form method="post" class="d-inline">
-                                    <input type="hidden" name="action" value="ignorePair">
-                                    <input type="hidden" name="pairID" value="#p.PAIRID#">
-                                    <input type="hidden" name="reason" value="Marked as not a duplicate.">
-                                    <button type="submit" class="btn btn-sm btn-outline-secondary py-0 px-1 mb-1">Ignore</button>
-                                </form>
-                            <cfelseif p.STATUS EQ "ignored">
-                                <form method="post" class="d-inline">
-                                    <input type="hidden" name="action" value="unignorePair">
-                                    <input type="hidden" name="pairID" value="#p.PAIRID#">
-                                    <button type="submit" class="btn btn-sm btn-outline-secondary py-0 px-1 mb-1">Restore</button>
-                                </form>
-                            <cfelse>
-                                <span class="text-muted small">Merged</span>
-                            </cfif>
+                            <a href="/admin/users/merge.cfm?pairID=#p.PAIRID#" class="btn btn-sm btn-outline-primary py-0 px-1 mb-1">View</a>
                         </td>
                     </tr>
                 </cfloop>

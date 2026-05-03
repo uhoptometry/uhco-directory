@@ -247,9 +247,21 @@
 <cfif len(sourceUrl)>
     <cfset content &= "
     <div class='card mb-4'>
-        <div class='card-header fw-semibold'>
+        <div class='card-header fw-semibold d-flex justify-content-between align-items-center'>
+            <div>
             <i class='bi bi-crop me-1'></i> Select Crop Area
             <span class='text-muted fw-normal ms-2'>Target: #targetWidth# &times; #targetHeight# px</span>
+            </div>
+            <form method='post' id='cropForm'>
+                <input type='hidden' name='action'    value='cropGenerate'>
+                <input type='hidden' name='cropX'     id='cropX' value=''>
+                <input type='hidden' name='cropY'     id='cropY' value=''>
+                <input type='hidden' name='cropWidth'  id='cropWidth' value=''>
+                <input type='hidden' name='cropHeight' id='cropHeight' value=''>
+                <button type='submit' class='btn btn-success' id='cropSubmitBtn'>
+                    <i class='bi bi-crop me-1'></i> Crop &amp; Generate
+                </button>
+            </form>
         </div>
         <div class='card-body p-0'>
             <div class='media-crop-stage'>

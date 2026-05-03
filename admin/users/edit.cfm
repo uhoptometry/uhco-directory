@@ -19,6 +19,25 @@
 <cfset hideTestUsersForAdmin = NOT showTestUsersForAdmin>
 <cfset profile = directoryService.getFullProfile( url.userID )>
 <cfset user = profile.user>
+<cfset freshUserResult = usersService.getUser(val(url.userID))>
+<cfset userActiveRaw = val(user.ACTIVE ?: 0)>
+<cfif structKeyExists(freshUserResult, "success") AND freshUserResult.success>
+    <cfset userActiveRaw = val(freshUserResult.data.ACTIVE ?: userActiveRaw)>
+</cfif>
+<cftry>
+    <cfset activeQry = queryExecute(
+        "SELECT TOP 1 Active FROM Users WHERE UserID = :id",
+        { id = { value=val(url.userID), cfsqltype="cf_sql_integer" } },
+        { datasource=request.datasource, timeout=30 }
+    )>
+    <cfif activeQry.recordCount GT 0>
+        <cfset userActiveRaw = val(activeQry.Active[1] ?: userActiveRaw)>
+    </cfif>
+    <cfcatch type="any">
+        <!--- Keep previously resolved value when direct query is unavailable. --->
+    </cfcatch>
+</cftry>
+<cfset user.ACTIVE = userActiveRaw>
 <cfset userFlags = profile.flags>
 <cfset userOrganizations = profile.organizations>
 <cfset isTestUser = false>
@@ -718,16 +737,16 @@
 
         <div class='d-flex justify-content-between mb-3 align-items-center users-edit-header'>
             <h1>Edit User: #EncodeForHTML(editUserHeading)#</h1>
-            <div class='text-center text-white py-2 px-3 rounded users-edit-record-status #((val(user.ACTIVE ?: 1) EQ 1) ? "users-edit-record-status-active" : "users-edit-record-status-inactive")#' tabindex='0' role='button' aria-label='Toggle record status'>
+            <div class='text-center text-white py-2 px-3 rounded users-edit-record-status #((userActiveRaw EQ 1) ? "users-edit-record-status-active" : "users-edit-record-status-inactive")#' tabindex='0' role='button' aria-label='Toggle record status'>
                 <label class='form-label d-block mb-1'><strong>Record Status</strong></label>
 
                 <div class='form-check form-switch d-inline-block text-start mb-0'>
                     <input class='form-check-input' type='checkbox' value='1'
                         id='activeSwitch'
                         data-userid='#val(user.USERID)#'
-                        #((val(user.ACTIVE ?: 1) EQ 1) ? 'checked' : '')#>
+                        #((userActiveRaw EQ 1) ? 'checked' : '')#>
                     <label class='form-check-label' id='activeSwitchLabel' for='activeSwitch'>
-                        #((val(user.ACTIVE ?: 1) EQ 1) ? 'Active' : 'Inactive')#
+                        #((userActiveRaw EQ 1) ? 'Active' : 'Inactive')#
                     </label>
                 </div>
                 
@@ -757,7 +776,7 @@
             <button class='nav-link' id='extids-tab' data-bs-toggle='tab' data-bs-target='##extids-pane' type='button' role='tab' aria-controls='extids-pane' aria-selected='false'>External IDs</button>
         </li>
         <li class='nav-item" & (isSuperAdmin ? " ms-auto" : " d-none") & "' role='presentation'>
-            <button class='nav-link' id='address-tab' data-bs-toggle='tab' data-bs-target='##address-pane' type='button' role='tab' aria-controls='address-pane' aria-selected='false'>Administrative</button>
+            <button class='nav-link' id='admin-tab' data-bs-toggle='tab' data-bs-target='##admin-pane' type='button' role='tab' aria-controls='admin-pane' aria-selected='false'>Administrative</button>
         </li>
         <li class='nav-item d-none' id='student-profile-tab-li' role='presentation'>
             <button class='nav-link' id='student-profile-tab' data-bs-toggle='tab' data-bs-target='##student-profile-pane' type='button' role='tab' aria-controls='student-profile-pane' aria-selected='false'>Student Profile</button>
@@ -1176,13 +1195,19 @@
         </div>
 
 " & (isSuperAdmin ? "
-        <div class='tab-pane fade' id='address-pane' role='tabpanel' aria-labelledby='address-tab'>
+        <div class='tab-pane fade' id='admin-pane' role='tabpanel' aria-labelledby='admin-tab'>
             <div class='d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom pb-2 mb-3'>
                 <div>#renderTabActionButtonGroup("refreshUhBtn")#</div>
                 <div></div>
                 <div class='d-flex align-items-center gap-2'>
                     <button type='button' class='btn btn-sm btn-ui-success' id='save-uh-btn'><i class='bi bi-floppy me-1'></i>Save UH Info</button>
                     <span id='save-uh-status' class='ms-1'></span>
+                </div>
+            </div>
+            <div class='row mb-3'>
+                <div class='col-12'>
+                    <label class='form-label fw-semibold' for='recordNotes'>Record Notes</label>
+                    <textarea class='form-control' id='recordNotes' name='Notes' rows='4'>#encodeForHTML(user.NOTES ?: "")#</textarea>
                 </div>
             </div>
             <div class='row mb-3'>

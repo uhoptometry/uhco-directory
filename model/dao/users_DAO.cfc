@@ -1045,6 +1045,7 @@ component extends="dao.BaseDAO" output="false" singleton {
         if ( !structKeyExists(data, "Active") ) { data.Active = 1; }
         if ( !structKeyExists(data, "DOB") ) { data.DOB = { value="", cfsqltype="cf_sql_date", null=true }; }
         if ( !structKeyExists(data, "Gender") ) { data.Gender = { value="", cfsqltype="cf_sql_nvarchar", null=true }; }
+        if ( !structKeyExists(data, "Notes") ) { data.Notes = ""; }
         data.TitleOneParam = data.Title1;
         data.TitleTwoParam = data.Title2;
         data.TitleThreeParam = data.Title3;
@@ -1078,6 +1079,7 @@ component extends="dao.BaseDAO" output="false" singleton {
                 DOB = :DOB,
                 Gender = :Gender,
                 Active = :Active,
+                Notes = :Notes,
                 UpdatedAt = GETDATE()
             WHERE UserID = :id
             ",
@@ -1086,8 +1088,14 @@ component extends="dao.BaseDAO" output="false" singleton {
         );
     }
 
-    public void function deleteUser( required numeric userID ) {
-        _purgeUserRelatedData( userID = arguments.userID );
+    public void function deleteUser(
+        required numeric userID,
+        boolean purgeDuplicatePairs = false
+    ) {
+        _purgeUserRelatedData(
+            userID = arguments.userID,
+            purgeDuplicatePairs = arguments.purgeDuplicatePairs
+        );
         executeQueryWithRetry(
             "DELETE FROM Users WHERE UserID = :id",
             { id = { value=arguments.userID, cfsqltype="cf_sql_integer" } },
@@ -1117,10 +1125,27 @@ component extends="dao.BaseDAO" output="false" singleton {
         );
     }
 
+    public void function setUserActive( required numeric userID, required boolean active ) {
+        executeQueryWithRetry(
+            "
+            UPDATE Users
+            SET Active = :active,
+                UpdatedAt = GETDATE()
+            WHERE UserID = :id
+            ",
+            {
+                id = { value=arguments.userID, cfsqltype="cf_sql_integer" },
+                active = { value=(arguments.active ? 1 : 0), cfsqltype="cf_sql_bit" }
+            },
+            { datasource=variables.datasource, timeout=30 }
+        );
+    }
+
     private void function _purgeUserRelatedData(
         required numeric userID,
         boolean preserveTestUserFlag = false,
-        numeric testFlagID = 0
+        numeric testFlagID = 0,
+        boolean purgeDuplicatePairs = false
     ) {
         var idParam = { id = { value=arguments.userID, cfsqltype="cf_sql_integer" } };
         var opts = { datasource=variables.datasource, timeout=30, fetchSize=10 };
@@ -1145,6 +1170,19 @@ component extends="dao.BaseDAO" output="false" singleton {
         executeQueryWithRetry( "DELETE FROM UserAwards WHERE UserID = :id", idParam, opts );
         executeQueryWithRetry( "DELETE FROM UserStudentProfile WHERE UserID = :id", idParam, opts );
         executeQueryWithRetry( "DELETE FROM UserReviewSubmissions WHERE UserID = :id", idParam, opts );
+        if ( arguments.purgeDuplicatePairs ) {
+            executeQueryWithRetry(
+                "
+                DELETE dum
+                FROM DuplicateUserMerges dum
+                INNER JOIN DuplicateUserPairs dup ON dup.PairID = dum.PairID
+                WHERE dup.UserID_A = :id OR dup.UserID_B = :id
+                ",
+                idParam,
+                opts
+            );
+            executeQueryWithRetry( "DELETE FROM DuplicateUserPairs WHERE UserID_A = :id OR UserID_B = :id", idParam, opts );
+        }
 
         if ( arguments.preserveTestUserFlag AND arguments.testFlagID GT 0 ) {
             executeQueryWithRetry(

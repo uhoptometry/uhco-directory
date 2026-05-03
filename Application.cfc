@@ -24,6 +24,12 @@ component output="false" {
 
         application.webRoot = "";
 
+        // Temporary feature flag: keep Windows SSO code in place but disabled
+        // until production Windows Authentication installation is complete.
+        application.flags = {
+            windowsSSOEnabled : false
+        };
+
         // UH API credentials
         application.uhApiToken  = "";
         application.uhApiSecret = "";
@@ -93,6 +99,9 @@ component output="false" {
         } else {
             request.context    = "admin";
             request.datasource = application.datasources.admin;
+            request.windowsSSOEnabled = structKeyExists(application, "flags")
+                AND structKeyExists(application.flags, "windowsSSOEnabled")
+                AND application.flags.windowsSSOEnabled;
 
             // Expose role-check helpers on every admin request
             request.hasRole    = application.authService.hasRole;
@@ -108,6 +117,11 @@ component output="false" {
                 "/admin/authenticate.cfm",
                 "/admin/logout.cfm"
             ];
+            if (request.windowsSSOEnabled) {
+                arrayAppend(publicPages, "/admin/auth_windows_probe.cfm");
+                arrayAppend(publicPages, "/admin/auth_windows_start.cfm");
+                arrayAppend(publicPages, "/admin/auth_windows_callback.cfm");
+            }
 
             var isAdminPage  = (path CONTAINS "/admin/");
             var isPublicPage = arrayFind(publicPages, path);
@@ -115,8 +129,18 @@ component output="false" {
                 "/admin/unauthorized.cfm",
                 "/admin/settings/admin-users/save.cfm"
             ];
-            var bypassAdminViewGate = arrayFind(adminViewBypassPages, path) GT 0;
 
+            // Windows SSO endpoints must also be reachable without admin.view permission
+            var windowsAuthPages = [];
+            if (request.windowsSSOEnabled) {
+                windowsAuthPages = [
+                    "/admin/auth_windows_probe.cfm",
+                    "/admin/auth_windows_start.cfm",
+                    "/admin/auth_windows_callback.cfm"
+                ];
+            }
+            var bypassAdminViewGate = arrayFind(adminViewBypassPages, path) GT 0
+                OR arrayFind(windowsAuthPages, path) GT 0;
             if (isAdminPage AND NOT isPublicPage) {
                 if (!application.authService.isLoggedIn()) {
                     location(application.webRoot & "/admin/login.cfm", false);

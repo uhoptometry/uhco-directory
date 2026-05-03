@@ -282,10 +282,7 @@
 
 <cfset content = "
 <div class='dashboard-shell'>
-    <div>
-        <h1 class='dashboard-title'>UHCO_<em>Identity</em> Admin Dashboard</h1>
-        <p class='dashboard-subtitle mb-0 mt-2'>Manage directory records, review sync health, and access the core operational tools for UHCO Identity.</p>
-    </div>
+
 
 <div class='row'>
     <div class='col-md-9'>

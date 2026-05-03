@@ -40,6 +40,7 @@
 <cfset flagsService     = createObject("component", "cfc.flags_service").init()>
 <cfset orgsService      = createObject("component", "cfc.organizations_service").init()>
 <cfset usersService     = createObject("component", "cfc.users_service").init()>
+<cfset duplicateSvc     = createObject("component", "cfc.duplicateUsers_service").init()>
 <cfset appConfigService = createObject("component", "cfc.appConfig_service").init()>
 <cfset aliasesDAO       = createObject("component", "dao.aliases_DAO").init()>
 <cfset helpers          = createObject("component", "cfc.helpers")>
@@ -52,6 +53,8 @@
 
 <cfset pageMessage = "">
 <cfset pageMessageClass = "alert-info">
+<cfset canViewTestUsers = application.authService.hasRole("SUPER_ADMIN")>
+<cfset inactiveMergedAccounts = []>
 <cfset currentAdminUser = structKeyExists(session, "user") AND isStruct(session.user) ? session.user : {}>
 <cfset currentUserDisplayName = encodeForHTML(trim(currentAdminUser.displayName ?: "Admin User"))>
 <cfset currentUserEmail = encodeForHTML(trim(currentAdminUser.email ?: ""))>
@@ -63,6 +66,20 @@
 
 <cfif structKeyExists(currentAdminUser, "roles") AND isArray(currentAdminUser.roles) AND arrayLen(currentAdminUser.roles)>
     <cfset currentUserRoleLabel = encodeForHTML(replace(currentAdminUser.roles[1], "_", " ", "all"))>
+</cfif>
+
+<cfif cgi.request_method EQ "POST" AND trim(form.action ?: "") EQ "deleteInactiveMergedUser">
+    <cfif canViewTestUsers AND request.hasPermission("users.delete") AND isNumeric(form.userID ?: "")>
+        <cfset deleteResult = usersService.deleteUser(
+            userID = val(form.userID),
+            forceDeleteRelatedDuplicatePairs = true
+        )>
+        <cfset pageMessage = deleteResult.message ?: "Inactive merged account deletion complete.">
+        <cfset pageMessageClass = deleteResult.success ? "alert-success" : "alert-danger">
+    <cfelse>
+        <cfset pageMessage = "You do not have permission to delete inactive merged accounts.">
+        <cfset pageMessageClass = "alert-danger">
+    </cfif>
 </cfif>
 
 <!--- Load all users --->
@@ -80,7 +97,6 @@
 <cfset allFlags       = allFlagsResult.data>
 <cfset allUserFlagMap = flagsService.getAllUserFlagMap()>
 <cfset allUserOrgMap  = orgsService.getAllUserOrgMap()>
-<cfset canViewTestUsers = application.authService.hasRole("SUPER_ADMIN")>
 <cfset testModeEnabledValue = trim(appConfigService.getValue("test_mode.enabled", "0"))>
 <cfset testModeEnabled = usersService.isTestModeEnabled() OR (listFindNoCase("1,true,yes,on", testModeEnabledValue) GT 0)>
 <cfset isSuperAdminImpersonation = structKeyExists(request, "isImpersonating") AND request.isImpersonating() AND structKeyExists(request, "isActualSuperAdmin") AND request.isActualSuperAdmin()>
@@ -103,6 +119,10 @@
 </cfif>
 <cfset emailsService  = createObject("component", "cfc.emails_service").init()>
 <cfset allUserEmailMap = emailsService.getAllEmailsMap()>
+
+<cfif canViewTestUsers>
+    <cfset inactiveMergedAccounts = duplicateSvc.getInactiveMergedAccounts(75)>
+</cfif>
 
 <cfif hideTestUsersForAdmin>
     <cfset visibleUsers = []>
@@ -793,6 +813,70 @@
 
 " & (pageMessage != "" ? "<div class='alert " & pageMessageClass & "'>" & EncodeForHTML(pageMessage) & "</div>" : "") & "
 ">
+
+<cfif canViewTestUsers>
+    <cfset content &= "
+<div class='card mb-4 border-warning-subtle'>
+    <div class='card-header bg-warning-subtle d-flex justify-content-between align-items-center'>
+        <div><strong>Inactive Merged Accounts</strong></div>
+        <span class='badge text-bg-dark'>#arrayLen(inactiveMergedAccounts)#</span>
+    </div>
+    <div class='card-body'>
+        <p class='text-muted mb-3'>These are secondary records from merges that are inactive and safe candidates for permanent delete.</p>
+    ">
+
+    <cfif arrayLen(inactiveMergedAccounts) EQ 0>
+        <cfset content &= "<div class='alert alert-light border mb-0'>No inactive merged accounts found.</div>">
+    <cfelse>
+        <cfset content &= "
+        <div class='table-responsive'>
+            <table class='table table-sm align-middle mb-0'>
+                <thead>
+                    <tr>
+                        <th>User ID</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Last Primary</th>
+                        <th>Last Merged</th>
+                        <th>Merges</th>
+                        <th class='text-end'>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+        ">
+        <cfloop from="1" to="#arrayLen(inactiveMergedAccounts)#" index="inactiveIdx">
+            <cfset inactiveRow = inactiveMergedAccounts[inactiveIdx]>
+            <cfset content &= "
+                    <tr>
+                        <td>##" & val(inactiveRow.SECONDARYUSERID ?: 0) & "</td>
+                        <td>" & encodeForHTML(trim((inactiveRow.FIRSTNAME ?: "") & " " & (inactiveRow.LASTNAME ?: ""))) & "</td>
+                        <td>" & encodeForHTML(inactiveRow.EMAILPRIMARY ?: "") & "</td>
+                        <td>##" & val(inactiveRow.LASTPRIMARYUSERID ?: 0) & "</td>
+                        <td>" & encodeForHTML(dateTimeFormat(inactiveRow.LASTMERGEDAT, "mmm d, yyyy HH:nn")) & "</td>
+                        <td>" & val(inactiveRow.MERGECOUNT ?: 0) & "</td>
+                        <td class='text-end'>
+                            <a class='btn btn-sm btn-outline-secondary me-1' href='/admin/users/view.cfm?userID=" & val(inactiveRow.SECONDARYUSERID ?: 0) & "&returnTo=" & urlEncodedFormat(currentListUrl) & "'>View</a>
+                            <form method='post' class='d-inline'>
+                                <input type='hidden' name='action' value='deleteInactiveMergedUser'>
+                                <input type='hidden' name='userID' value='" & val(inactiveRow.SECONDARYUSERID ?: 0) & "'>
+                                <button type='submit' class='btn btn-sm btn-outline-danger'" & (request.hasPermission("users.delete") ? "" : " disabled") & ">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+            ">
+        </cfloop>
+        <cfset content &= "
+                </tbody>
+            </table>
+        </div>
+        ">
+    </cfif>
+
+    <cfset content &= "
+    </div>
+</div>
+    ">
+</cfif>
 
 <!--- Top pagination --->
 <cfset content &= "

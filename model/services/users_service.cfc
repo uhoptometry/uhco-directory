@@ -113,17 +113,30 @@ component output="false" singleton {
         variables.UsersDAO.updateTitle1Field( userID, trim(arguments.title1 ?: "") );
     }
 
+    public void function setUserActive( required numeric userID, required boolean active ) {
+        variables.UsersDAO.setUserActive(
+            userID = arguments.userID,
+            active = arguments.active
+        );
+    }
+
     /**
      * Delete a user and all related records
      */
-    public struct function deleteUser( required numeric userID ) {
+    public struct function deleteUser(
+        required numeric userID,
+        boolean forceDeleteRelatedDuplicatePairs = false
+    ) {
         var user = variables.UsersDAO.getUserByID( userID );
         
         if ( structIsEmpty( user ) ) {
             return { success=false, message="User not found." };
         }
 
-        variables.UsersDAO.deleteUser( userID );
+        variables.UsersDAO.deleteUser(
+            userID = userID,
+            purgeDuplicatePairs = arguments.forceDeleteRelatedDuplicatePairs
+        );
 
         return { 
             success=true, 

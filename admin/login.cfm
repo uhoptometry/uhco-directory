@@ -18,11 +18,40 @@
 
         <cfif structKeyExists(url, "error") AND len(trim(url.error))>
           <cfoutput>
-          <div class="alert alert-danger" role="alert">
-            #encodeForHTML(url.error)#
-          </div>
+          <cfswitch expression="#url.error#">
+            <cfcase value="windows_unavailable">
+              <div class="alert alert-warning" role="alert">
+                Windows login is not available on this network. Please sign in with your Cougarnet credentials below.
+              </div>
+            </cfcase>
+            <cfcase value="windows_failed">
+              <div class="alert alert-warning" role="alert">
+                Windows login did not complete. You may not have access, or your account may not be active. Please sign in with your Cougarnet credentials below.
+              </div>
+            </cfcase>
+            <cfdefaultcase>
+              <div class="alert alert-danger" role="alert">
+                #encodeForHTML(url.error)#
+              </div>
+            </cfdefaultcase>
+          </cfswitch>
           </cfoutput>
         </cfif>
+
+        <cfif structKeyExists(request, "windowsSSOEnabled") AND request.windowsSSOEnabled>
+          <!--- Windows SSO option (revealed after successful probe) --->
+          <div id="windows-sso-section" class="mb-4" style="display:none;">
+            <a href="auth_windows_start.cfm" class="btn btn-outline-secondary d-grid w-100">
+              <span><i class="bi bi-windows me-2"></i>Login via Windows (SSO)</span>
+            </a>
+            <div class="text-center mt-2">
+              <small class="text-muted">Uses your current Windows / domain session</small>
+            </div>
+            <hr class="my-3">
+          </div>
+        </cfif>
+
+        <p class="text-center text-muted small mb-3">Sign in with your Cougarnet credentials</p>
 
         <form method="post" action="authenticate.cfm" class="needs-validation" novalidate>
           
@@ -69,11 +98,20 @@
 
           <div class="d-grid">
             <button type="submit" class="btn btn-primary">
-              Login
+              Login via Cougarnet
             </button>
           </div>
 
         </form>
+
+        <cfif structKeyExists(request, "windowsSSOEnabled") AND request.windowsSSOEnabled>
+          <div class="text-center mt-3">
+            <button type="button" class="btn btn-link btn-sm text-muted" id="checkWindowsBtn">
+              Check Windows Login Availability
+            </button>
+            <div id="windows-probe-msg" class="small mt-1" style="display:none;"></div>
+          </div>
+        </cfif>
 
       </div>
     </div>
@@ -85,6 +123,44 @@
   <script>
 
     document.getElementById("username").focus();
+
+    // Windows SSO availability probe
+    const checkWindowsBtn  = document.getElementById('checkWindowsBtn');
+    const windowsSection   = document.getElementById('windows-sso-section');
+    const windowsProbeMsg  = document.getElementById('windows-probe-msg');
+
+    if (checkWindowsBtn && windowsSection && windowsProbeMsg) {
+      checkWindowsBtn.addEventListener('click', () => {
+        checkWindowsBtn.disabled = true;
+        checkWindowsBtn.textContent = 'Checking...';
+        windowsProbeMsg.style.display = 'none';
+
+        fetch('auth_windows_probe.cfm', { method: 'GET', credentials: 'include' })
+          .then(r => {
+            if (!r.ok) throw new Error('status:' + r.status);
+            return r.json();
+          })
+          .then(data => {
+            if (data.available) {
+              windowsSection.style.display = 'block';
+              checkWindowsBtn.style.display = 'none';
+              windowsProbeMsg.style.display = 'none';
+            } else {
+              windowsProbeMsg.textContent = 'Windows login is not available on this network.';
+              windowsProbeMsg.style.display = 'block';
+              checkWindowsBtn.disabled = false;
+              checkWindowsBtn.textContent = 'Check Windows Login Availability';
+            }
+          })
+          .catch(err => {
+            windowsProbeMsg.textContent = 'Could not check Windows login availability. Please use Cougarnet login.';
+            windowsProbeMsg.style.display = 'block';
+            checkWindowsBtn.disabled = false;
+            checkWindowsBtn.textContent = 'Check Windows Login Availability';
+            console.debug('[windows-probe] error:', err && err.message ? err.message : err);
+          });
+      });
+    }
 
     // Bootstrap client-side validation
     (() => {

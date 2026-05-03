@@ -3,6 +3,7 @@ component output="false" singleton {
     public any function init() {
         variables.duplicateUsersDAO = createObject("component", "dao.duplicateUsers_DAO").init();
         variables.appConfigService = createObject("component", "cfc.appConfig_service").init();
+        variables.usersService = createObject("component", "cfc.users_service").init();
         variables.externalSystemLabelMap = {};
         variables.externalSystemLabelMapLoaded = false;
 
@@ -14,6 +15,7 @@ component output="false" singleton {
             users_name = 35,
             aliases_name = 30,
             phones_number = 25,
+            flags_shared = 14,
             aliases_display_name = 20,
             academic_multi_grad_year = 18,
             flags_faculty_alumni_split = 18,
@@ -32,7 +34,8 @@ component output="false" singleton {
     public struct function runScan(
         string triggeredBy = "manual",
         boolean includeDeepSignals = false,
-        string ruleMode = ""
+        string ruleMode = "",
+        string scanStage = ""
     ) {
         var runID = 0;
         var persistedCount = 0;
@@ -40,7 +43,8 @@ component output="false" singleton {
         var pairSignals = {};
         var rawSignals = [];
         var minConfidence = getMinConfidence();
-        var scanMode = arguments.includeDeepSignals ? "full" : "quick";
+        var normalizedStage = lCase(trim(arguments.scanStage ?: ""));
+        var scanMode = len(normalizedStage) ? "staged:" & normalizedStage : (arguments.includeDeepSignals ? "full" : "quick");
         var resolvedRuleMode = resolveRuleMode(
             triggeredBy = arguments.triggeredBy,
             requestedRuleMode = arguments.ruleMode
@@ -50,7 +54,15 @@ component output="false" singleton {
         try {
             runID = variables.duplicateUsersDAO.createRun( trim(arguments.triggeredBy ?: "manual") );
             totalUsers = variables.duplicateUsersDAO.getTotalUserCount();
-            if (arguments.includeDeepSignals) {
+            if (normalizedStage EQ "all") {
+                rawSignals = variables.duplicateUsersDAO.findDuplicateSignalsQuick();
+                arrayAppend(rawSignals, variables.duplicateUsersDAO.findDuplicateSignalsForStage("emails"), true);
+                arrayAppend(rawSignals, variables.duplicateUsersDAO.findDuplicateSignalsForStage("phones"), true);
+                arrayAppend(rawSignals, variables.duplicateUsersDAO.findDuplicateSignalsForStage("flags"), true);
+                arrayAppend(rawSignals, variables.duplicateUsersDAO.findDuplicateSignalsForStage("organizations"), true);
+            } else if (listFindNoCase("emails,phones,flags,organizations", normalizedStage)) {
+                rawSignals = variables.duplicateUsersDAO.findDuplicateSignalsForStage(normalizedStage);
+            } else if (arguments.includeDeepSignals) {
                 rawSignals = variables.duplicateUsersDAO.findDuplicateSignals();
             } else {
                 rawSignals = variables.duplicateUsersDAO.findDuplicateSignalsQuick();
@@ -150,7 +162,7 @@ component output="false" singleton {
     public string function normalizeRuleMode( string value = "" ) {
         var normalized = lCase(trim(arguments.value ?: ""));
 
-        if (!listFindNoCase("alumni_vs_alumni,alumni_vs_faculty,alumni_vs_other,all", normalized)) {
+        if (!listFindNoCase("alumni_vs_alumni,alumni_vs_faculty,alumni_vs_other,staff_only,all", normalized)) {
             return "all";
         }
 
@@ -192,12 +204,47 @@ component output="false" singleton {
         return variables.duplicateUsersDAO.getLatestMergeByPairID(arguments.pairID);
     }
 
+    public struct function getLatestMergeBySecondaryUserID( required numeric secondaryUserID ) {
+        return variables.duplicateUsersDAO.getLatestMergeBySecondaryUserID(arguments.secondaryUserID);
+    }
+
+    public struct function getPairDeepScan(
+        required numeric pairID,
+        string scanType = "profile"
+    ) {
+        var pair = getPairByID(arguments.pairID);
+        if (structIsEmpty(pair)) {
+            return {
+                success = false,
+                message = "Pair not found.",
+                data = {}
+            };
+        }
+
+        var normalizedType = lCase(trim(arguments.scanType ?: "profile"));
+
+        return {
+            success = true,
+            message = "",
+            data = {
+                scanType = normalizedType,
+                userA = {
+                    userID = val(pair.USERID_A ?: 0),
+                    rows = variables.duplicateUsersDAO.getUserDeepScanData(val(pair.USERID_A ?: 0), normalizedType)
+                },
+                userB = {
+                    userID = val(pair.USERID_B ?: 0),
+                    rows = variables.duplicateUsersDAO.getUserDeepScanData(val(pair.USERID_B ?: 0), normalizedType)
+                }
+            }
+        };
+    }
+
     public struct function mergePair(
         required numeric pairID,
         required numeric primaryUserID,
         numeric mergedByAdminUserID = 0,
         string notes = "",
-        boolean hardDeleteSecondary = false,
         struct mergeChoices = {}
     ) {
         var pair = getPairByID(arguments.pairID);
@@ -215,38 +262,29 @@ component output="false" singleton {
         var secondaryUser = (primaryUser EQ userA) ? userB : userA;
         var migrationSummary = {};
         var warnings = [];
-        var hardDeleteApplied = false;
 
         if (lCase(trim(pair.STATUS ?: "")) EQ "merged") {
             return { success = false, message = "Pair is already marked as merged." };
         }
 
-        migrationSummary = variables.duplicateUsersDAO.consolidateUsers(
-            primaryUserID = primaryUser,
-            secondaryUserID = secondaryUser,
-            deactivateSecondary = true
-        );
-
-        if (arguments.hardDeleteSecondary) {
-            // Duplicate-user audit history keeps FK references to both users.
-            // Keep secondary deactivation as the safe default until schema supports hard delete.
-            arrayAppend(warnings, "Hard delete was requested, but secondary user remains deactivated because duplicate-merge audit references require the user row to remain.");
-        }
-
-        var mergeChoicePayload = structIsEmpty(arguments.mergeChoices)
-            ? {
-                selectedPrimaryUserID = primaryUser,
-                selectedSecondaryUserID = secondaryUser,
-                mode = "phase3_transactional_consolidation",
-                dataMigrationSummary = migrationSummary,
-                secondaryUserDeactivated = true,
-                hardDeleteRequested = (arguments.hardDeleteSecondary ? true : false),
-                hardDeleteApplied = hardDeleteApplied,
-                warnings = warnings
-            }
-            : arguments.mergeChoices;
-
         try {
+            migrationSummary = variables.duplicateUsersDAO.consolidateUsers(
+                primaryUserID = primaryUser,
+                secondaryUserID = secondaryUser,
+                deactivateSecondary = true
+            );
+
+            var mergeChoicePayload = structIsEmpty(arguments.mergeChoices)
+                ? {
+                    selectedPrimaryUserID = primaryUser,
+                    selectedSecondaryUserID = secondaryUser,
+                    mode = "phase3_transactional_consolidation",
+                    dataMigrationSummary = migrationSummary,
+                    secondaryUserDeactivated = true,
+                    warnings = warnings
+                }
+                : arguments.mergeChoices;
+
             var mergeID = variables.duplicateUsersDAO.createMergeRecord(
                 pairID = arguments.pairID,
                 primaryUserID = primaryUser,
@@ -258,14 +296,29 @@ component output="false" singleton {
 
             variables.duplicateUsersDAO.updatePairStatus(arguments.pairID, "merged", "");
 
+            try {
+                // Always enforce secondary inactivity after merge to avoid drift when downstream logic or triggers interfere.
+                variables.usersService.setUserActive(
+                    userID = secondaryUser,
+                    active = false
+                );
+
+                var secondaryUserResult = variables.usersService.getUser(secondaryUser);
+                if (secondaryUserResult.success AND val(secondaryUserResult.data.ACTIVE ?: 1) EQ 0) {
+                    migrationSummary.SECONDARYDEACTIVATED = 1;
+                } else {
+                    arrayAppend(warnings, "Secondary account merge completed, but inactive verification did not confirm Active=0 for user ##" & secondaryUser & ".");
+                }
+            } catch (any inactiveError) {
+                arrayAppend(warnings, "Secondary account merge completed, but inactive enforcement failed: " & buildErrorMessage(inactiveError));
+            }
+
             return {
                 success = true,
                 message = "Pair marked as merged.",
                 mergeID = mergeID,
                 primaryUserID = primaryUser,
                 secondaryUserID = secondaryUser,
-                hardDeleteRequested = (arguments.hardDeleteSecondary ? true : false),
-                hardDeleteApplied = hardDeleteApplied,
                 warnings = warnings,
                 migrationSummary = migrationSummary
             };
@@ -279,6 +332,10 @@ component output="false" singleton {
 
     public struct function getStatusSummaryByRun( required numeric runID ) {
         return variables.duplicateUsersDAO.getStatusSummaryByRun(arguments.runID);
+    }
+
+    public array function getInactiveMergedAccounts( numeric limit = 100 ) {
+        return variables.duplicateUsersDAO.getInactiveMergedAccounts(arguments.limit);
     }
 
     public numeric function getLatestPendingPairCount() {
@@ -469,6 +526,7 @@ component output="false" singleton {
         return {
             isAlumni = false,
             isFaculty = false,
+            isStaff = false,
             hasOther = false
         };
     }
@@ -495,6 +553,9 @@ component output="false" singleton {
                     OR
                     (arguments.userBFlags.isAlumni AND isOtherOnly(arguments.userAFlags))
                 );
+
+            case "staff_only":
+                return arguments.userAFlags.isStaff AND arguments.userBFlags.isStaff;
 
             case "all":
             default:

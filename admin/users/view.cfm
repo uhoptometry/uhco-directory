@@ -16,6 +16,28 @@
 <cfset showTestUsersForAdmin = canViewTestUsers OR testModeEnabled OR isSuperAdminImpersonation>
 <cfset hideTestUsersForAdmin = NOT showTestUsersForAdmin>
 <cfset profile = directoryService.getFullProfile(url.userID)>
+<cfset freshUserResult = usersService.getUser(val(url.userID))>
+<cfset userActiveRaw = val(profile.user.ACTIVE ?: 0)>
+<cfif structKeyExists(freshUserResult, "success") AND freshUserResult.success>
+    <cfset userActiveRaw = val(freshUserResult.data.ACTIVE ?: userActiveRaw)>
+</cfif>
+<cftry>
+    <cfset activeQry = queryExecute(
+        "SELECT TOP 1 Active FROM Users WHERE UserID = :id",
+        { id = { value=val(url.userID), cfsqltype="cf_sql_integer" } },
+        { datasource=request.datasource, timeout=30 }
+    )>
+    <cfif activeQry.recordCount GT 0>
+        <cfset userActiveRaw = val(activeQry.Active[1] ?: userActiveRaw)>
+    </cfif>
+    <cfcatch type="any">
+        <!--- Keep previously resolved value when direct query is unavailable. --->
+    </cfcatch>
+</cftry>
+<cfset userIsActive = userActiveRaw EQ 1>
+<cfset userStatusBadgeHtml = userIsActive
+    ? "<span class='badge badge-success users-view-badge'><i class='bi bi-check-circle me-1'></i>Record Active</span>"
+    : "<span class='badge badge-danger users-view-badge'><i class='bi bi-x-circle me-1'></i>Record Inactive</span>">
 <cfset isTestUser = false>
 <cfloop from="1" to="#arrayLen(profile.flags ?: [])#" index="flagIndex">
     <cfif compareNoCase(trim(profile.flags[flagIndex].FLAGNAME ?: ""), "TEST_USER") EQ 0>
@@ -381,7 +403,7 @@
 
 <cfset userAliasesHtml = "">
 <cfif arrayLen(userAliases)>
-    <cfset userAliasesHtml = "<div class='mb-3'><strong>Aliases:</strong><div class='table-responsive mt-2'><table class='table table-sm table-striped mb-0'><thead><tr><th>First</th><th>Middle</th><th>Last</th><th>Type / System</th><th>Status</th></tr></thead><tbody>">
+    <cfset userAliasesHtml = "<div class='mb-3'><strong>Aliases:</strong><div class='table-responsive mt-2'><table class='table table-sm table-striped mb-0'><thead><tr><th>First</th><th>Middle</th><th>Last</th><th>Type / System</th><th>Alias Status</th></tr></thead><tbody>">
     <cfloop from="1" to="#arrayLen(userAliases)#" index="aliasIndex">
         <cfset aliasItem = userAliases[aliasIndex]>
         <cfset aliasFirst = trim(aliasItem.FIRSTNAME ?: "")>
@@ -392,7 +414,12 @@
         <cfset aliasTypeSystem = len(aliasType) AND len(aliasSystem) ? aliasType & " / " & aliasSystem : (len(aliasType) ? aliasType : aliasSystem)>
         <cfset aliasIsActive = val(aliasItem.ISACTIVE ?: 0) EQ 1>
         <cfset aliasIsPrimary = val(aliasItem.ISPRIMARY ?: 0) EQ 1>
-        <cfset aliasStatusHtml = (aliasIsActive ? "<span class='badge badge-success users-view-badge'>Active</span>" : "<span class='badge badge-danger users-view-badge'>Inactive</span>") & (aliasIsPrimary ? " <span class='badge badge-isprimary users-view-badge'><i class='bi bi-check2 me-1'></i>Primary</span>" : "")>
+        <cfif aliasIsActive AND NOT userIsActive>
+            <cfset aliasStatusHtml = "<span class='badge badge-warning users-view-badge'>Alias Active (Record Inactive)</span>">
+        <cfelse>
+            <cfset aliasStatusHtml = (aliasIsActive ? "<span class='badge badge-success users-view-badge'>Alias Active</span>" : "<span class='badge badge-danger users-view-badge'>Alias Inactive</span>")>
+        </cfif>
+        <cfset aliasStatusHtml &= (aliasIsPrimary ? " <span class='badge badge-isprimary users-view-badge'><i class='bi bi-check2 me-1'></i>Primary</span>" : "")>
         <cfset userAliasesHtml &= "<tr><td>" & (len(aliasFirst) ? EncodeForHTML(aliasFirst) : "<span class='text-muted'>-</span>") & "</td><td>" & (len(aliasMiddle) ? EncodeForHTML(aliasMiddle) : "<span class='text-muted'>-</span>") & "</td><td>" & (len(aliasLast) ? EncodeForHTML(aliasLast) : "<span class='text-muted'>-</span>") & "</td><td>" & (len(aliasTypeSystem) ? EncodeForHTML(aliasTypeSystem) : "<span class='text-muted'>-</span>") & "</td><td>" & aliasStatusHtml & "</td></tr>">
     </cfloop>
     <cfset userAliasesHtml &= "</tbody></table></div></div>">
@@ -752,6 +779,7 @@
         <img src='#profileThumbnail#' alt='Profile Thumbnail' class='rounded float-start me-3 mb-2 admin-object-cover users-view-profile-thumb'>
         <h1 class='users-view-title'>#(len(prefix) ? prefix & ' ' : '')##resolvedFirstName# #resolvedLastName##(len(suffix) ? ', ' & suffix : '')##(len(trim(degrees)) ? ', ' & EncodeForHTML(degrees) : '')#</h1>
         <div class='users-view-subtitle'>#SubTitle#</div>
+        <div class='mb-2'>#userStatusBadgeHtml#</div>
         #flagsRowHtml#
     </div>
 
