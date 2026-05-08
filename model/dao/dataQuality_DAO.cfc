@@ -111,13 +111,23 @@ component extends="dao.BaseDAO" output="false" singleton {
                 )
                 UNION ALL
 
-                -- Missing CurrentGradYear — Current-Student flag holders only
+                -- Missing grad year — Current-Student flag holders only
+                -- Cleared by: enrolled UHCO degree with ExpectedGradYear, OR legacy UserAcademicInfo.CurrentGradYear
                 SELECT u.UserID, 'missing_grad_year'
                 FROM Users u
                 WHERE EXISTS (
                     SELECT 1 FROM UserFlagAssignments ufa
                     INNER JOIN UserFlags uf ON ufa.FlagID = uf.FlagID
                     WHERE ufa.UserID = u.UserID AND uf.FlagName = 'Current-Student'
+                )
+                AND NOT EXISTS (
+                    SELECT 1 FROM UserDegrees ud
+                    WHERE ud.UserID = u.UserID
+                      AND ud.IsUHCO = 1
+                      AND ud.IsEnrolled = 1
+                      AND (ud.Program IS NULL OR ud.Program <> 'Residency')
+                      AND ud.ExpectedGradYear IS NOT NULL
+                      AND ud.ExpectedGradYear > 0
                 )
                 AND NOT EXISTS (
                     SELECT 1 FROM UserAcademicInfo uai

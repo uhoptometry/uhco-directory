@@ -271,30 +271,61 @@ component extends="dao.BaseDAO" output="false" singleton {
 
     /**
      * Return all active users who have the 'current-student' flag
-     * and a matching CurrentGradYear.
+     * and an active enrolled UHCO degree (IsUHCO=1, IsEnrolled=1, Program != 'Residency')
+     * with a matching ExpectedGradYear.
+     * Falls back to also including users whose UserAcademicInfo.CurrentGradYear matches
+     * but who do not yet have a UHCO degree row (legacy users not yet migrated).
      */
     public array function getGraduatingStudents( required numeric gradYear ) {
         var qry = executeQueryWithRetry(
             "SELECT u.UserID, u.FirstName, u.LastName, u.EmailPrimary,
-                                        u.Title1,
-                                        cnet.ExternalValue AS CougarNetID,
-                    uai.CurrentGradYear,
+                    u.Title1,
+                    cnet.ExternalValue AS CougarNetID,
+                    COALESCE(deg.ExpectedGradYear, uai.CurrentGradYear) AS CurrentGradYear,
                     uf.FlagID AS CurrentStudentFlagID
              FROM   Users u
              INNER JOIN UserFlagAssignments ufa ON ufa.UserID = u.UserID
              INNER JOIN UserFlags           uf  ON uf.FlagID  = ufa.FlagID
                                                AND LOWER(TRIM(uf.FlagName)) = 'current-student'
-             INNER JOIN UserAcademicInfo    uai ON uai.UserID = u.UserID
-                         OUTER APPLY (
-                                 SELECT TOP 1 ue.ExternalValue
-                                 FROM UserExternalIDs ue
-                                 INNER JOIN ExternalSystems es ON es.SystemID = ue.SystemID
-                                 WHERE ue.UserID = u.UserID
-                                     AND LOWER(TRIM(es.SystemName)) = 'cougarnet'
-                                 ORDER BY ue.ExternalValue
-                         ) cnet
-             WHERE  uai.CurrentGradYear = :yr
-               AND  u.Active = 1
+             OUTER APPLY (
+                     SELECT TOP 1 ue.ExternalValue
+                     FROM UserExternalIDs ue
+                     INNER JOIN ExternalSystems es ON es.SystemID = ue.SystemID
+                     WHERE ue.UserID = u.UserID
+                         AND LOWER(TRIM(es.SystemName)) = 'cougarnet'
+                     ORDER BY ue.ExternalValue
+             ) cnet
+             -- Degree-based match: active enrolled UHCO degree with matching ExpectedGradYear
+             OUTER APPLY (
+                 SELECT TOP 1 ud.DegreeID, ud.ExpectedGradYear
+                 FROM UserDegrees ud
+                 WHERE ud.UserID    = u.UserID
+                   AND ud.IsUHCO    = 1
+                   AND ud.IsEnrolled = 1
+                   AND (ud.Program IS NULL OR ud.Program <> 'Residency')
+                   AND ud.ExpectedGradYear = :yr
+             ) deg
+             -- Legacy match: UserAcademicInfo
+             OUTER APPLY (
+                 SELECT TOP 1 ai.CurrentGradYear
+                 FROM UserAcademicInfo ai
+                 WHERE ai.UserID = u.UserID
+             ) uai
+             WHERE  u.Active = 1
+               AND  (
+                       deg.DegreeID IS NOT NULL
+                    OR (
+                           deg.DegreeID IS NULL
+                       AND uai.CurrentGradYear = :yr
+                       AND NOT EXISTS (
+                               SELECT 1 FROM UserDegrees ud2
+                               WHERE ud2.UserID = u.UserID
+                                 AND ud2.IsUHCO = 1
+                                 AND ud2.IsEnrolled = 1
+                                 AND (ud2.Program IS NULL OR ud2.Program <> 'Residency')
+                           )
+                       )
+                   )
              ORDER BY u.LastName, u.FirstName",
             { yr = { value=arguments.gradYear, cfsqltype="cf_sql_integer" } },
             { datasource=variables.datasource, timeout=30 }

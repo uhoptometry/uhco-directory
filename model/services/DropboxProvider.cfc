@@ -233,6 +233,128 @@
         <cfreturn responseData.link>
     </cffunction>
 
+    <cffunction name="buildPathUnderRoot" access="public" returntype="string" output="false">
+        <cfargument name="path" type="string" required="true">
+
+        <cfreturn _buildPathUnderRoot(arguments.path)>
+    </cffunction>
+
+    <cffunction name="createFolder" access="public" returntype="string" output="false">
+        <cfargument name="folderPath" type="string" required="true">
+
+        <cfset var normalizedFolder = _buildPathUnderRoot(arguments.folderPath)>
+        <cfset var payload = "">
+        <cfset var responseData = {}>
+
+        <cfset _assertWriteEnabled()>
+        <cfset _assertWritePathAllowed(normalizedFolder)>
+
+        <cfset payload = '{'
+            & '"path":' & serializeJSON(normalizedFolder)
+            & ',"autorename":false'
+            & '}'>
+
+        <cftry>
+            <cfset responseData = _postDropboxJson(
+                endpoint = "https://api.dropboxapi.com/2/files/create_folder_v2",
+                payload = payload,
+                timeoutSeconds = 30
+            )>
+            <cfcatch type="DropboxProvider.ApiError">
+                <cfif findNoCase("conflict", cfcatch.message ?: "")>
+                    <cfreturn normalizedFolder>
+                </cfif>
+                <cfrethrow>
+            </cfcatch>
+        </cftry>
+
+        <cfreturn normalizedFolder>
+    </cffunction>
+
+    <cffunction name="uploadFile" access="public" returntype="string" output="false">
+        <cfargument name="localPath" type="string" required="true">
+        <cfargument name="dropboxPath" type="string" required="true">
+        <cfargument name="overwrite" type="boolean" required="false" default="true">
+
+        <cfset var normalizedPath = _buildPathUnderRoot(arguments.dropboxPath)>
+        <cfset var sourceLocalPath = trim(arguments.localPath)>
+        <cfset var fileExt = lCase(listLast(normalizedPath, "."))>
+        <cfset var apiArg = "">
+        <cfset var httpResp = "">
+        <cfset var binaryContent = "">
+        <cfset var pathRootHeader = _getPathRootHeaderValue()>
+        <cfset var selectUserHeader = _getSelectUserHeaderValue()>
+        <cfset var modeValue = arguments.overwrite ? "overwrite" : "add">
+
+        <cfset _assertWriteEnabled()>
+
+        <cfif !len(sourceLocalPath) OR !fileExists(sourceLocalPath)>
+            <cfthrow type="DropboxProvider.InvalidSourceFile" message="Local file for Dropbox upload was not found.">
+        </cfif>
+
+        <cfif fileExt NEQ "pdf">
+            <cfthrow type="DropboxProvider.InvalidPath" message="Dropbox upload path must end in .pdf for this phase.">
+        </cfif>
+
+        <cfset _assertWritePathAllowed(normalizedPath)>
+        <cfset binaryContent = fileReadBinary(sourceLocalPath)>
+
+        <cfset apiArg = '{'
+            & '"path":' & serializeJSON(normalizedPath)
+            & ',"mode":' & serializeJSON(modeValue)
+            & ',"autorename":false'
+            & ',"mute":true'
+            & ',"strict_conflict":false'
+            & '}'>
+
+        <cfhttp
+            url="https://content.dropboxapi.com/2/files/upload"
+            method="post"
+            result="httpResp"
+            timeout="180"
+            throwOnError="false"
+        >
+            <cfhttpparam type="header" name="Authorization" value="Bearer #getAccessToken()#">
+            <cfif len(pathRootHeader)>
+                <cfhttpparam type="header" name="Dropbox-API-Path-Root" value="#pathRootHeader#">
+            </cfif>
+            <cfif len(selectUserHeader)>
+                <cfhttpparam type="header" name="Dropbox-API-Select-User" value="#selectUserHeader#">
+            </cfif>
+            <cfhttpparam type="header" name="Content-Type" value="application/octet-stream">
+            <cfhttpparam type="header" name="Dropbox-API-Arg" value="#apiArg#">
+            <cfhttpparam type="body" value="#binaryContent#">
+        </cfhttp>
+
+        <cfif left(httpResp.statusCode, 3) NEQ "200">
+            <cfthrow
+                type="DropboxProvider.UploadError"
+                message="#_extractErrorMessage(httpResp, "Dropbox file upload failed.")#"
+            >
+        </cfif>
+
+        <cfreturn normalizedPath>
+    </cffunction>
+
+    <cffunction name="uploadImageShell" access="public" returntype="void" output="false">
+        <cfargument name="localPath" type="string" required="true">
+        <cfargument name="dropboxPath" type="string" required="true">
+
+        <cfthrow
+            type="DropboxProvider.FuturePhaseShell"
+            message="Image upload to Dropbox is reserved for a future phase shell and is not implemented in this release."
+        >
+    </cffunction>
+
+    <cffunction name="createImageFolderShell" access="public" returntype="void" output="false">
+        <cfargument name="folderPath" type="string" required="true">
+
+        <cfthrow
+            type="DropboxProvider.FuturePhaseShell"
+            message="Image folder provisioning in Dropbox is reserved for a future phase shell and is not implemented in this release."
+        >
+    </cffunction>
+
     <cffunction name="testConnection" access="public" returntype="struct" output="false">
         <cfargument name="folderPath" type="string" required="false" default="">
 
@@ -442,6 +564,95 @@
         </cfif>
 
         <cfreturn messageText>
+    </cffunction>
+
+    <cffunction name="_assertWriteEnabled" access="private" returntype="void" output="false">
+        <cfset var enabledValue = lCase(trim(variables.AppConfigService.getValue("dropbox.write_enabled", "false")))>
+
+        <cfif !listFindNoCase("1,true,yes,on", enabledValue)>
+            <cfthrow
+                type="DropboxProvider.WriteDisabled"
+                message="Dropbox write operations are disabled by configuration."
+            >
+        </cfif>
+    </cffunction>
+
+    <cffunction name="_getWriteRootFolder" access="private" returntype="string" output="false">
+        <cfset var writeRootFolder = _normalizeDropboxPath(variables.AppConfigService.getValue("dropbox.write_root_folder", ""))>
+
+        <cfif len(writeRootFolder)>
+            <cfreturn writeRootFolder>
+        </cfif>
+
+        <cfreturn _normalizeDropboxPath(variables.AppConfigService.getValue("dropbox.root_folder", ""))>
+    </cffunction>
+
+    <cffunction name="_buildPathUnderRoot" access="private" returntype="string" output="false">
+        <cfargument name="path" type="string" required="true">
+
+        <cfset var rootFolder = _getWriteRootFolder()>
+        <cfset var normalizedPath = _normalizeDropboxPath(arguments.path)>
+
+        <cfif !len(normalizedPath)>
+            <cfreturn rootFolder>
+        </cfif>
+
+        <cfif len(rootFolder)>
+            <cfif normalizedPath EQ rootFolder OR left(normalizedPath & "/", len(rootFolder) + 1) EQ (rootFolder & "/")>
+                <cfreturn normalizedPath>
+            </cfif>
+            <cfreturn _normalizeDropboxPath(rootFolder & "/" & normalizedPath)>
+        </cfif>
+
+        <cfreturn normalizedPath>
+    </cffunction>
+
+    <cffunction name="_assertWritePathAllowed" access="private" returntype="void" output="false">
+        <cfargument name="normalizedPath" type="string" required="true">
+
+        <cfset var allowListRaw = trim(variables.AppConfigService.getValue(
+            "dropbox.write_allowed_prefixes",
+            "Digital Assets/MyUHCO"
+        ))>
+        <cfset var rootFolder = _getWriteRootFolder()>
+        <cfset var allowItems = []>
+        <cfset var i = 0>
+        <cfset var item = "">
+        <cfset var normalizedItem = "">
+
+        <cfif !len(arguments.normalizedPath)>
+            <cfthrow type="DropboxProvider.PathNotAllowed" message="Dropbox write path cannot be blank.">
+        </cfif>
+
+        <cfif !len(allowListRaw)>
+            <cfthrow type="DropboxProvider.PathNotAllowed" message="Dropbox write allowlist is empty.">
+        </cfif>
+
+        <cfset allowItems = listToArray(allowListRaw, ",")>
+
+        <cfloop from="1" to="#arrayLen(allowItems)#" index="i">
+            <cfset item = trim(allowItems[i])>
+            <cfif !len(item)>
+                <cfcontinue>
+            </cfif>
+
+            <cfset normalizedItem = _normalizeDropboxPath(item)>
+
+            <cfif len(rootFolder)>
+                <cfif normalizedItem NEQ rootFolder AND left(normalizedItem & "/", len(rootFolder) + 1) NEQ (rootFolder & "/")>
+                    <cfset normalizedItem = _normalizeDropboxPath(rootFolder & "/" & normalizedItem)>
+                </cfif>
+            </cfif>
+
+            <cfif arguments.normalizedPath EQ normalizedItem OR left(arguments.normalizedPath & "/", len(normalizedItem) + 1) EQ (normalizedItem & "/")>
+                <cfreturn>
+            </cfif>
+        </cfloop>
+
+        <cfthrow
+            type="DropboxProvider.PathNotAllowed"
+            message="Dropbox write path is outside allowed prefixes: #arguments.normalizedPath#"
+        >
     </cffunction>
 
     <cffunction name="_normalizeDropboxPath" access="private" returntype="string" output="false">

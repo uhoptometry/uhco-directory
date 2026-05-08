@@ -41,6 +41,7 @@ component output="false" singleton {
         profile.emails      = variables.emails_service.getEmails( userID ).data;
         profile.degrees     = variables.degrees_service.getDegrees( userID ).data;
         profile.studentProfile = variables.studentProfile_service.getProfile( userID ).data;
+        profile.residencies = variables.studentProfile_service.getResidencies( userID ).data;
         profile.awards      = variables.studentProfile_service.getAwards( userID ).data;
         profile.bio         = variables.bio_service.getBio( userID ).data;
 
@@ -51,6 +52,10 @@ component output="false" singleton {
             profile.studentProfile.HOMETOWNCITY ?: "",
             profile.studentProfile.HOMETOWNSTATE ?: ""
         );
+
+        if ( !isArray(profile.residencies) ) {
+            profile.residencies = [];
+        }
 
         return profile;
     }

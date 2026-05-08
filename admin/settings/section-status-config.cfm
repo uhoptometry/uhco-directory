@@ -8,6 +8,7 @@ settingsSectionStatuses = {
     "media-config" = "BETA",
     "uhco-api" = "BETA",
     "migrations" = "BETA",
+    "rosters" = "ALPHA",
     "scheduled-tasks" = "ALPHA",
     "import" = "ALPHA",
     "bulk-exclusions" = "ALPHA",

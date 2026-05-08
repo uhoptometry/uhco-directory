@@ -313,8 +313,27 @@ component extends="dao.BaseDAO" output="false" singleton {
         // Filter to a specific graduation year (class)
         if (len(trim(arguments.filterClass)) AND isNumeric(trim(arguments.filterClass))) {
             arrayAppend(conditions,
-                "EXISTS (SELECT 1 FROM UserAcademicInfo uai
-                         WHERE uai.UserID = u.UserID AND uai.CurrentGradYear = :gradYear)");
+                "(
+                  EXISTS (
+                      SELECT 1 FROM UserDegrees ud
+                      WHERE ud.UserID = u.UserID AND ud.IsUHCO = 1
+                        AND (
+                               (ud.IsEnrolled = 1 AND ud.ExpectedGradYear = :gradYear
+                                AND (ud.Program IS NULL OR ud.Program <> 'Residency'))
+                            OR (ud.IsEnrolled = 0 AND TRY_CAST(ud.GraduationYear AS INT) = :gradYear)
+                        )
+                  )
+               OR (
+                      NOT EXISTS (
+                          SELECT 1 FROM UserDegrees ud2
+                          WHERE ud2.UserID = u.UserID AND ud2.IsUHCO = 1
+                      )
+                  AND EXISTS (
+                          SELECT 1 FROM UserAcademicInfo uai
+                          WHERE uai.UserID = u.UserID AND uai.CurrentGradYear = :gradYear
+                      )
+               )
+              )");
             params["gradYear"] = { value=val(trim(arguments.filterClass)), cfsqltype="cf_sql_integer" };
         }
 
@@ -373,7 +392,7 @@ component extends="dao.BaseDAO" output="false" singleton {
         dataParams["rows"]   = { value=arguments.maxRows,      cfsqltype="cf_sql_integer" };
 
         var dataQry = executeQueryWithRetry(
-            "SELECT u.*, uai.CurrentGradYear AS CurrentGradYear, prog.Program AS Program, thumb.ImageURL AS WebThumbURL,
+            "SELECT u.*, COALESCE(degYr.EffectiveGradYear, uai.CurrentGradYear) AS CurrentGradYear, prog.Program AS Program, thumb.ImageURL AS WebThumbURL,
                     COALESCE(pa.FirstName, '')  AS PreferredFirstName,
                     COALESCE(pa.MiddleName, '') AS PreferredMiddleName,
                     COALESCE(pa.LastName, '')   AS PreferredLastName
@@ -383,6 +402,16 @@ component extends="dao.BaseDAO" output="false" singleton {
                  FROM UserAcademicInfo ai
                  WHERE ai.UserID = u.UserID
              ) uai
+             OUTER APPLY (
+                 SELECT TOP 1
+                     CASE WHEN ud.IsEnrolled = 1 THEN ud.ExpectedGradYear
+                          ELSE TRY_CAST(ud.GraduationYear AS INT)
+                     END AS EffectiveGradYear
+                 FROM UserDegrees ud
+                 WHERE ud.UserID = u.UserID AND ud.IsUHCO = 1
+                   AND (ud.Program IS NULL OR ud.Program <> 'Residency')
+                 ORDER BY ud.IsEnrolled DESC, ud.DegreeID DESC
+             ) degYr
              OUTER APPLY (
                  SELECT TOP 1 o.OrgName AS Program
                  FROM UserOrganizations uo

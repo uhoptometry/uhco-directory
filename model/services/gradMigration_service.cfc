@@ -160,6 +160,9 @@ component output="false" singleton {
                         // Step 5: Add alumni exclusions
                         var addedCount = dao.addAlumniExclusions( student.USERID );
 
+                        // Step 6: Mark active enrolled UHCO degree as graduated
+                        degreesDAO().graduateUHCODegree( student.USERID, arguments.gradYear );
+
                         // Mark success
                         dao.updateDetailStatus(
                             detailID, "migrated", addedCount, removedCount
@@ -283,6 +286,11 @@ component output="false" singleton {
                     } catch ( any exclusionErr ) {
                         // Keep rollback moving for this user; details capture this user's prior error row already.
                     }
+
+                    // Reverse the UHCO degree graduation flag (best-effort)
+                    try {
+                        degreesDAO().rollbackGraduateUHCODegree( detail.USERID, run.GRADYEAR );
+                    } catch ( any degErr ) { /* swallow */ }
                 }
 
                 // Mark run and details as rolled back only after all user-level reversals succeed.
@@ -401,6 +409,10 @@ component output="false" singleton {
 
     private any function helpersSvc() {
         return createObject("component", "cfc.helpers").init();
+    }
+
+    private any function degreesDAO() {
+        return createObject("component", "dao.degrees_DAO").init();
     }
 
 }

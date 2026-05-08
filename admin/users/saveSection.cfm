@@ -364,17 +364,64 @@
         <cfoutput>{"success":true,"message":"Awards saved."}</cfoutput>
     </cfcase>
 
+    <!--- ── Residencies ── --->
+    <cfcase value="residencies">
+        <cfset studentProfileSvc = createObject("component", "cfc.studentProfile_service").init()>
+        <cfset residencyCount = (structKeyExists(form, "count") AND isNumeric(form.count)) ? val(form.count) : 0>
+        <cfset residenciesToSave = []>
+        <cfloop from="0" to="#residencyCount - 1#" index="i">
+            <cfset rLocation = structKeyExists(form, "location_#i#") ? trim(form["location_#i#"]) : "">
+            <cfset rSpecialty = structKeyExists(form, "specialty_#i#") ? trim(form["specialty_#i#"]) : "">
+            <cfset rStartingYear = structKeyExists(form, "startingyear_#i#") ? trim(form["startingyear_#i#"]) : "">
+            <cfset rIsUHCO = structKeyExists(form, "isuhco_#i#") ? (val(form["isuhco_#i#"]) EQ 1) : false>
+            <cfset rIsCurrent = structKeyExists(form, "iscurrent_#i#") ? (val(form["iscurrent_#i#"]) EQ 1) : false>
+            <cfif len(rLocation) OR len(rSpecialty) OR len(rStartingYear)>
+                <cfset arrayAppend(residenciesToSave, {
+                    location = rLocation,
+                    specialty = rSpecialty,
+                    startingYear = rStartingYear,
+                    isUHCO = rIsUHCO,
+                    isCurrent = rIsCurrent
+                })>
+            </cfif>
+        </cfloop>
+        <cfset studentProfileSvc.replaceResidencies(userID, residenciesToSave)>
+        <cfoutput>{"success":true,"message":"Residencies saved."}</cfoutput>
+    </cfcase>
+
     <!--- ── Degrees ── --->
     <cfcase value="degrees">
         <cfset degreesSvc = createObject("component", "cfc.degrees_service").init()>
         <cfset degCount = (structKeyExists(form, "count") AND isNumeric(form.count)) ? val(form.count) : 0>
         <cfset degreesToSave = []>
         <cfloop from="0" to="#degCount - 1#" index="i">
-            <cfset dName = structKeyExists(form, "name_#i#") ? trim(form["name_#i#"]) : "">
-            <cfset dUniv = structKeyExists(form, "univ_#i#") ? trim(form["univ_#i#"]) : "">
-            <cfset dYear = structKeyExists(form, "year_#i#") ? trim(form["year_#i#"]) : "">
+            <cfset dName         = structKeyExists(form, "name_#i#")            ? trim(form["name_#i#"])            : "">
+            <cfset dUniv         = structKeyExists(form, "univ_#i#")            ? trim(form["univ_#i#"])            : "">
+            <cfset dYear         = structKeyExists(form, "year_#i#")            ? trim(form["year_#i#"])            : "">
+            <cfset dIsUHCO       = structKeyExists(form, "isuhco_#i#")     ? (val(form["isuhco_#i#"]) EQ 1)      : false>
+            <cfset dIsEnrolled   = structKeyExists(form, "isenrolled_#i#") ? (val(form["isenrolled_#i#"]) EQ 1)  : false>
+            <cfset dHasChange    = structKeyExists(form, "haschange_#i#")  ? (val(form["haschange_#i#"]) EQ 1)   : false>
+            <cfset dOrigExpGrad  = "">
+            <cfif structKeyExists(form, "origexpgrad_#i#") AND isNumeric(trim(form["origexpgrad_#i#"]))>
+                <cfset dOrigExpGrad = val(form["origexpgrad_#i#"])>
+            </cfif>
+            <cfset dExpGrad      = "">
+            <cfif structKeyExists(form, "expgrad_#i#") AND isNumeric(trim(form["expgrad_#i#"]))>
+                <cfset dExpGrad = val(form["expgrad_#i#"])>
+            </cfif>
+            <cfset dProgram      = structKeyExists(form, "program_#i#")         ? trim(form["program_#i#"])         : "">
             <cfif len(dName)>
-                <cfset arrayAppend(degreesToSave, { name=dName, university=dUniv, year=dYear })>
+                <cfset arrayAppend(degreesToSave, {
+                    name                 = dName,
+                    university           = dUniv,
+                    year                 = dYear,
+                    isUHCO               = dIsUHCO,
+                    isEnrolled           = dIsEnrolled,
+                    hasYearChange        = dHasChange,
+                    originalExpectedGradYear = dOrigExpGrad,
+                    expectedGradYear     = dExpGrad,
+                    program              = dProgram
+                })>
             </cfif>
         </cfloop>
         <cfset degreesSvc.replaceDegrees(userID, degreesToSave)>
@@ -600,7 +647,8 @@
             userID,
             structKeyExists(form, "sp_first_externship")  ? trim(form.sp_first_externship)  : "",
             structKeyExists(form, "sp_second_externship") ? trim(form.sp_second_externship) : "",
-            structKeyExists(form, "sp_commencement_age")  ? trim(form.sp_commencement_age)  : ""
+            structKeyExists(form, "sp_commencement_age")  ? trim(form.sp_commencement_age)  : "",
+            structKeyExists(form, "sp_dissertation_thesis") ? trim(form.sp_dissertation_thesis) : ""
         )>
 
         <cfif structKeyExists(form, "bioContent")>
@@ -624,7 +672,8 @@
             userID,
             structKeyExists(form, "sp_first_externship")  ? trim(form.sp_first_externship)  : "",
             structKeyExists(form, "sp_second_externship") ? trim(form.sp_second_externship) : "",
-            structKeyExists(form, "sp_commencement_age")  ? trim(form.sp_commencement_age)  : ""
+            structKeyExists(form, "sp_commencement_age")  ? trim(form.sp_commencement_age)  : "",
+            structKeyExists(form, "sp_dissertation_thesis") ? trim(form.sp_dissertation_thesis) : ""
         )>
         <!--- Process student profile degrees if present --->
         <cfset spDegCount = (structKeyExists(form, "sp_degree_count") AND isNumeric(form.sp_degree_count)) ? val(form.sp_degree_count) : 0>
@@ -632,11 +681,33 @@
             <cfset degreesSvc = createObject("component", "cfc.degrees_service").init()>
             <cfset degreesToSave = []>
             <cfloop from="0" to="#spDegCount - 1#" index="di">
-                <cfset dName = structKeyExists(form, "sp_deg_name_#di#") ? trim(form["sp_deg_name_#di#"]) : "">
-                <cfset dUniv = structKeyExists(form, "sp_deg_univ_#di#") ? trim(form["sp_deg_univ_#di#"]) : "">
-                <cfset dYear = structKeyExists(form, "sp_deg_year_#di#") ? trim(form["sp_deg_year_#di#"]) : "">
+                <cfset dName        = structKeyExists(form, "sp_deg_name_#di#")       ? trim(form["sp_deg_name_#di#"])       : "">
+                <cfset dUniv        = structKeyExists(form, "sp_deg_univ_#di#")       ? trim(form["sp_deg_univ_#di#"])       : "">
+                <cfset dYear        = structKeyExists(form, "sp_deg_year_#di#")       ? trim(form["sp_deg_year_#di#"])       : "">
+                <cfset dIsUHCO      = structKeyExists(form, "sp_deg_isuhco_#di#")   ? (val(form["sp_deg_isuhco_#di#"]) EQ 1)   : false>
+                <cfset dIsEnrolled  = structKeyExists(form, "sp_deg_enrolled_#di#") ? (val(form["sp_deg_enrolled_#di#"]) EQ 1)  : false>
+                <cfset dHasChange   = structKeyExists(form, "sp_deg_haschange_#di#") ? (val(form["sp_deg_haschange_#di#"]) EQ 1) : false>
+                <cfset dOrigExpGrad = "">
+                <cfif structKeyExists(form, "sp_deg_origexpgrad_#di#") AND isNumeric(trim(form["sp_deg_origexpgrad_#di#"]))>
+                    <cfset dOrigExpGrad = val(form["sp_deg_origexpgrad_#di#"])>
+                </cfif>
+                <cfset dExpGrad     = "">
+                <cfif structKeyExists(form, "sp_deg_expgrad_#di#") AND isNumeric(trim(form["sp_deg_expgrad_#di#"]))>
+                    <cfset dExpGrad = val(form["sp_deg_expgrad_#di#"])>
+                </cfif>
+                <cfset dProgram     = structKeyExists(form, "sp_deg_program_#di#")    ? trim(form["sp_deg_program_#di#"])    : "">
                 <cfif len(dName)>
-                    <cfset arrayAppend(degreesToSave, { name=dName, university=dUniv, year=dYear })>
+                    <cfset arrayAppend(degreesToSave, {
+                        name                     = dName,
+                        university               = dUniv,
+                        year                     = dYear,
+                        isUHCO                   = dIsUHCO,
+                        isEnrolled               = dIsEnrolled,
+                        hasYearChange            = dHasChange,
+                        originalExpectedGradYear = dOrigExpGrad,
+                        expectedGradYear         = dExpGrad,
+                        program                  = dProgram
+                    })>
                 </cfif>
             </cfloop>
             <cfset degreesSvc.replaceDegrees(userID, degreesToSave)>
@@ -661,11 +732,33 @@
             <cfset degCount = (structKeyExists(form, "#pfx#_degree_count") AND isNumeric(form["#pfx#_degree_count"])) ? val(form["#pfx#_degree_count"]) : 0>
             <cfset degreesToSave = []>
             <cfloop from="0" to="#degCount - 1#" index="di">
-                <cfset dName = structKeyExists(form, "#pfx#_deg_name_#di#") ? trim(form["#pfx#_deg_name_#di#"]) : "">
-                <cfset dUniv = structKeyExists(form, "#pfx#_deg_univ_#di#") ? trim(form["#pfx#_deg_univ_#di#"]) : "">
-                <cfset dYear = structKeyExists(form, "#pfx#_deg_year_#di#") ? trim(form["#pfx#_deg_year_#di#"]) : "">
+                <cfset dName        = structKeyExists(form, "#pfx#_deg_name_#di#")        ? trim(form["#pfx#_deg_name_#di#"])        : "">
+                <cfset dUniv        = structKeyExists(form, "#pfx#_deg_univ_#di#")        ? trim(form["#pfx#_deg_univ_#di#"])        : "">
+                <cfset dYear        = structKeyExists(form, "#pfx#_deg_year_#di#")        ? trim(form["#pfx#_deg_year_#di#"])        : "">
+                <cfset dIsUHCO      = structKeyExists(form, "#pfx#_deg_isuhco_#di#")    ? (val(form["#pfx#_deg_isuhco_#di#"]) EQ 1)   : false>
+                <cfset dIsEnrolled  = structKeyExists(form, "#pfx#_deg_enrolled_#di#")  ? (val(form["#pfx#_deg_enrolled_#di#"]) EQ 1)  : false>
+                <cfset dHasChange   = structKeyExists(form, "#pfx#_deg_haschange_#di#") ? (val(form["#pfx#_deg_haschange_#di#"]) EQ 1) : false>
+                <cfset dOrigExpGrad = "">
+                <cfif structKeyExists(form, "#pfx#_deg_origexpgrad_#di#") AND isNumeric(trim(form["#pfx#_deg_origexpgrad_#di#"]))>
+                    <cfset dOrigExpGrad = val(form["#pfx#_deg_origexpgrad_#di#"])>
+                </cfif>
+                <cfset dExpGrad     = "">
+                <cfif structKeyExists(form, "#pfx#_deg_expgrad_#di#") AND isNumeric(trim(form["#pfx#_deg_expgrad_#di#"]))>
+                    <cfset dExpGrad = val(form["#pfx#_deg_expgrad_#di#"])>
+                </cfif>
+                <cfset dProgram     = structKeyExists(form, "#pfx#_deg_program_#di#")     ? trim(form["#pfx#_deg_program_#di#"])     : "">
                 <cfif len(dName)>
-                    <cfset arrayAppend(degreesToSave, { name=dName, university=dUniv, year=dYear })>
+                    <cfset arrayAppend(degreesToSave, {
+                        name                     = dName,
+                        university               = dUniv,
+                        year                     = dYear,
+                        isUHCO                   = dIsUHCO,
+                        isEnrolled               = dIsEnrolled,
+                        hasYearChange            = dHasChange,
+                        originalExpectedGradYear = dOrigExpGrad,
+                        expectedGradYear         = dExpGrad,
+                        program                  = dProgram
+                    })>
                 </cfif>
             </cfloop>
             <cfset degreesSvc.replaceDegrees(userID, degreesToSave)>

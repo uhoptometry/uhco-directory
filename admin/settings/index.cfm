@@ -18,6 +18,7 @@
         "settings.import.manage",
         "settings.bulk_exclusions.manage",
         "settings.migrations.manage",
+        "settings.rosters.manage",
         "settings.uh_sync.view",
         "settings.query_builder.use",
         "settings.scheduled_tasks.manage",
@@ -131,6 +132,20 @@
             </div>
         </a>
     </div>
+
+    <cfif request.hasPermission("settings.rosters.manage")>
+        <div class="col-md-6 col-lg-4">
+            <a href="/admin/settings/rosters/" class="text-decoration-none">
+                <div class="card h-100 border-0 shadow-sm settings-hub-card">
+                    <div class="card-body text-center py-4">
+                        <i class="bi bi-card-image display-4 mb-3 settings-hub-icon"></i>
+                        <h5 class="card-title text-dark">Rosters<cfif len(getSettingsSectionStatus("rosters"))> <span class="badge settings-status-badge settings-status-badge--#lCase(getSettingsSectionStatus("rosters"))#">#getSettingsSectionStatus("rosters")#</span></cfif></h5>
+                        <p class="card-text text-muted small">Generate printable class roster PDFs by grad year and program</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </cfif>
 
     <!--- Scheduled Tasks --->
     <div class="col-md-6 col-lg-4">

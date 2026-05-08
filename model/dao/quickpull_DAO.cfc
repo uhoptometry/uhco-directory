@@ -50,20 +50,46 @@ component extends="dao.BaseDAO" output="false" singleton {
 
     /**
      * Alumni filtered to a specific graduation year.
-     * Returns: UserID, FirstName, MiddleName, LastName, CurrentGradYear
+     * Returns: UserID, FirstName, MiddleName, LastName, Program,
+        *          FirstExternship, SecondExternship, HometownCity, HometownState (from UserAddresses where AddressType=Hometown)
      */
-    public array function getGradClassUsers( required numeric gradYear, required string programName ) {
+    public array function getGradClassUsers(
+        required numeric gradYear,
+        required string programName,
+        string lastNameStart = "",
+        string lastNameFinish = ""
+    ) {
         var qry = executeQueryWithRetry(
             "SELECT u.UserID,
                     COALESCE(pa.FirstName, u.FirstName) AS FirstName,
                     COALESCE(pa.MiddleName, u.MiddleName) AS MiddleName,
                     COALESCE(pa.LastName, u.LastName) AS LastName,
-                    uai.CurrentGradYear,
-                    o.OrgName AS Program
+                    programAgg.ProgramList AS Program,
+                    usp.FirstExternship,
+                    usp.SecondExternship,
+                    usp.DissertationThesis,
+                    hometownAddr.City AS HometownCity,
+                    hometownAddr.[State] AS HometownState
              FROM   Users u
-                    INNER JOIN UserAcademicInfo uai ON u.UserID = uai.UserID
-                    INNER JOIN UserOrganizations uo ON u.UserID = uo.UserID
-                    INNER JOIN Organizations o ON uo.OrgID = o.OrgID
+                    LEFT JOIN UserStudentProfile usp ON u.UserID = usp.UserID
+                    OUTER APPLY (
+                        SELECT ProgramList = STUFF((
+                                                        SELECT ', ' + p.OrgName
+                                                        FROM (
+                                                                SELECT DISTINCT o2.OrgName
+                                                                FROM UserOrganizations uo2
+                                                                INNER JOIN Organizations o2 ON uo2.OrgID = o2.OrgID
+                                                                WHERE uo2.UserID = u.UserID
+                                                                    AND o2.OrgName IN ('OD Program', 'PhD Program', 'MS Program')
+                                                                    AND (
+                                                                                UPPER(:programName) = 'ALL'
+                                                                                OR o2.OrgName = :programName
+                                                                    )
+                                                        ) p
+                                                        ORDER BY p.OrgName
+                            FOR XML PATH(''), TYPE
+                        ).value('.', 'nvarchar(max)'), 1, 2, '')
+                    ) programAgg
                     OUTER APPLY (
                         SELECT TOP 1 ua.FirstName, ua.MiddleName, ua.LastName
                         FROM UserAliases ua
@@ -74,10 +100,36 @@ component extends="dao.BaseDAO" output="false" singleton {
                             ISNULL(ua.SortOrder, 2147483647),
                             ua.AliasID
                     ) pa
+                                        OUTER APPLY (
+                                                SELECT TOP 1 uaHome.City, uaHome.[State]
+                                                FROM UserAddresses uaHome
+                                                WHERE uaHome.UserID = u.UserID
+                                                    AND LOWER(LTRIM(RTRIM(ISNULL(uaHome.AddressType, '')))) = 'hometown'
+                                                ORDER BY ISNULL(uaHome.IsPrimary, 0) DESC, uaHome.AddressID
+                                        ) hometownAddr
              WHERE  u.Active = 1
-               AND  uai.CurrentGradYear = :gradYear
-               AND  o.OrgName = :programName
-               AND  o.OrgName IN ('OD Program', 'PhD Program', 'MS Program')
+                             AND  LEN(ISNULL(programAgg.ProgramList, '')) > 0
+               AND  (
+                                                EXISTS (
+                                                        SELECT 1
+                                                        FROM UserDegrees udMatch
+                                                        WHERE udMatch.UserID = u.UserID
+                                                            AND (
+                                                                        udMatch.IsUHCO = 1
+                                                                        OR udMatch.Program IN ('OD', 'MS', 'PhD')
+                                                                    )
+                                                            AND ISNULL(udMatch.IsEnrolled, 0) = 0
+                                                            AND (udMatch.Program IS NULL OR udMatch.Program <> 'Residency')
+                                                            AND TRY_CAST(udMatch.GraduationYear AS INT) = :gradYear
+                                                )
+                                     )
+               AND  (
+                        :lastNameStart = ''
+                        OR (
+                            LEFT(UPPER(LTRIM(COALESCE(pa.LastName, u.LastName))), 1) >= :lastNameStart
+                            AND LEFT(UPPER(LTRIM(COALESCE(pa.LastName, u.LastName))), 1) <= :lastNameFinish
+                        )
+                    )
                AND  EXISTS (
                         SELECT 1
                         FROM   UserFlagAssignments ufa
@@ -95,7 +147,9 @@ component extends="dao.BaseDAO" output="false" singleton {
                          ORDER BY COALESCE(pa.LastName, u.LastName), COALESCE(pa.FirstName, u.FirstName)",
             {
                 gradYear = { value=arguments.gradYear, cfsqltype="cf_sql_integer" },
-                programName = { value=arguments.programName, cfsqltype="cf_sql_varchar" }
+                programName = { value=arguments.programName, cfsqltype="cf_sql_varchar" },
+                lastNameStart = { value=uCase(trim(arguments.lastNameStart ?: "")), cfsqltype="cf_sql_varchar" },
+                lastNameFinish = { value=uCase(trim(arguments.lastNameFinish ?: "")), cfsqltype="cf_sql_varchar" }
             },
             { datasource=variables.datasource, timeout=30, fetchSize=500 }
         );
@@ -195,7 +249,7 @@ component extends="dao.BaseDAO" output="false" singleton {
 
     /**
      * Bulk-fetch degrees for a set of UserIDs.
-     * Returns: array of { USERID, DEGREENAME, UNIVERSITY, DEGREEYEAR }
+     * Returns: array of { USERID, DEGREENAME, UNIVERSITY, GRADUATIONYEAR }
      */
     public array function getDegreesForUsers( required array userIDs ) {
         if ( arrayLen(arguments.userIDs) == 0 ) return [];
@@ -209,7 +263,7 @@ component extends="dao.BaseDAO" output="false" singleton {
         }
 
         var qry = executeQueryWithRetry(
-            "SELECT UserID, DegreeName, University, DegreeYear
+            "SELECT UserID, DegreeName, University, GraduationYear
              FROM   UserDegrees
              WHERE  UserID IN (#inClause#)
              ORDER BY UserID, DegreeID",

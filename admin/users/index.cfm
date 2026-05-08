@@ -113,6 +113,7 @@
 </cfloop>
 <cfif needsAcademic>
     <cfset allAcademicMap = academicService.getAllAcademicInfoMap()>
+    <cfset allGradYearMap = academicService.getAllGradYearMap()>
 </cfif>
 <cfif needsImages>
     <cfset webThumbMap = imagesService.getWebThumbMap()>
@@ -373,8 +374,18 @@
     <cfloop from="1" to="#arrayLen(filteredUsers)#" index="i">
         <cfset row = duplicate(filteredUsers[i])>
         <cfset acadData = structKeyExists(allAcademicMap, toString(row.USERID)) ? allAcademicMap[toString(row.USERID)] : {}>
+        <cfset gradYearData = structKeyExists(allGradYearMap, toString(row.USERID)) ? allGradYearMap[toString(row.USERID)] : { YEARS = [], DISPLAY = "" }>
         <cfset row.CURRENTGRADYEAR  = (NOT structIsEmpty(acadData) AND structKeyExists(acadData, "CURRENTGRADYEAR"))  ? acadData.CURRENTGRADYEAR  : "">
         <cfset row.ORIGINALGRADYEAR = (NOT structIsEmpty(acadData) AND structKeyExists(acadData, "ORIGINALGRADYEAR")) ? acadData.ORIGINALGRADYEAR : "">
+        <cfset row.GRADYEARS = gradYearData.YEARS>
+        <cfset row.GRADYEARDISPLAY = gradYearData.DISPLAY>
+
+        <cfif structKeyExists(acadData, "EFFECTIVEGRADYEAR") AND isNumeric(acadData.EFFECTIVEGRADYEAR) AND val(acadData.EFFECTIVEGRADYEAR) GT 0>
+            <cfset row.CURRENTGRADYEAR = val(acadData.EFFECTIVEGRADYEAR)>
+        <cfelseif arrayLen(row.GRADYEARS)>
+            <cfset row.CURRENTGRADYEAR = row.GRADYEARS[arrayLen(row.GRADYEARS)]>
+        </cfif>
+
         <cfset arrayAppend(mergedUsers, row)>
     </cfloop>
     <cfset filteredUsers = mergedUsers>
@@ -383,11 +394,14 @@
     <cfset allGradYears = []>
     <cfset gradYearSeen = {}>
     <cfloop from="1" to="#arrayLen(filteredUsers)#" index="i">
-        <cfset gy = filteredUsers[i].CURRENTGRADYEAR ?: "">
-        <cfif isNumeric(gy) AND val(gy) GT 0 AND NOT structKeyExists(gradYearSeen, toString(val(gy)))>
-            <cfset gradYearSeen[toString(val(gy))] = true>
-            <cfset arrayAppend(allGradYears, val(gy))>
-        </cfif>
+        <cfset userGradYears = structKeyExists(filteredUsers[i], "GRADYEARS") AND isArray(filteredUsers[i].GRADYEARS) ? filteredUsers[i].GRADYEARS : []>
+        <cfloop from="1" to="#arrayLen(userGradYears)#" index="gyIdx">
+            <cfset gy = userGradYears[gyIdx]>
+            <cfif isNumeric(gy) AND val(gy) GT 0 AND NOT structKeyExists(gradYearSeen, toString(val(gy)))>
+                <cfset gradYearSeen[toString(val(gy))] = true>
+                <cfset arrayAppend(allGradYears, val(gy))>
+            </cfif>
+        </cfloop>
     </cfloop>
     <cfset arraySort(allGradYears, "numeric", "desc")>
 </cfif>
@@ -421,7 +435,15 @@
 <cfif showGradFilter AND selectedGradYear NEQ "" AND isNumeric(selectedGradYear)>
     <cfset gradYearFiltered = []>
     <cfloop from="1" to="#arrayLen(filteredUsers)#" index="i">
-        <cfif isNumeric(filteredUsers[i].CURRENTGRADYEAR) AND val(filteredUsers[i].CURRENTGRADYEAR) EQ val(selectedGradYear)>
+        <cfset userGradYears = structKeyExists(filteredUsers[i], "GRADYEARS") AND isArray(filteredUsers[i].GRADYEARS) ? filteredUsers[i].GRADYEARS : []>
+        <cfset hasSelectedGradYear = false>
+        <cfloop from="1" to="#arrayLen(userGradYears)#" index="gyIdx">
+            <cfif val(userGradYears[gyIdx]) EQ val(selectedGradYear)>
+                <cfset hasSelectedGradYear = true>
+                <cfbreak>
+            </cfif>
+        </cfloop>
+        <cfif hasSelectedGradYear>
             <cfset arrayAppend(gradYearFiltered, filteredUsers[i])>
         </cfif>
     </cfloop>
@@ -1014,9 +1036,10 @@
     ">
 
     <cfif showGradYear>
-        <cfset gradYear      = (structKeyExists(u, "CURRENTGRADYEAR") AND isNumeric(u.CURRENTGRADYEAR) AND val(u.CURRENTGRADYEAR) GT 0) ? u.CURRENTGRADYEAR : "">
-        <cfset hasOrigChange = (structKeyExists(u, "ORIGINALGRADYEAR") AND isNumeric(u.ORIGINALGRADYEAR) AND val(u.ORIGINALGRADYEAR) GT 0) ? true : false>
-        <cfset gradYearDisplay = len(gradYear) ? gradYear & (hasOrigChange ? " *" : "") : "">
+        <cfset gradYearDisplay = trim(u.GRADYEARDISPLAY ?: "")>
+        <cfif NOT len(gradYearDisplay) AND isNumeric(u.CURRENTGRADYEAR ?: "") AND val(u.CURRENTGRADYEAR) GT 0>
+            <cfset gradYearDisplay = toString(val(u.CURRENTGRADYEAR))>
+        </cfif>
         <cfset content &= "<td class='text-center'>#gradYearDisplay#</td>">
     </cfif>
 

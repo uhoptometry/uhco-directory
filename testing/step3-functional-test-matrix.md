@@ -128,6 +128,22 @@ This document contains the main test matrix organized by workflow. Each test cas
 
 ---
 
+### UE-007A: Multi-Degree Grad Year Filter Coverage
+
+| Field | Value |
+|-------|-------|
+| **ID** | UE-007A |
+| **Workflow** | User Editing |
+| **Scenario** | Verify Users list grad-year filter matches all UHCO degree years for a multi-degree user and displays the combined year/program format |
+| **Role** | testadmin.user@uhco.local (UserAdmin) |
+| **Preconditions** | A test user exists with two UHCO degrees/years (example: OD 2020 and PhD 2026); user is active and visible on [admin/users/index.cfm](admin/users/index.cfm) in an academic list view |
+| **Steps** | 1. Navigate to [admin/users/index.cfm](admin/users/index.cfm?list=all) 2. Set Grad Year filter to 2020 and apply 3. Confirm test user appears in results 4. Set Grad Year filter to 2026 and apply 5. Confirm same user appears in results 6. Verify Grad Year column for that user shows combined format `(2020 : OD | 2026 : PHD)` 7. Verify grad-year dropdown contains both 2020 and 2026 |
+| **Expected Result** | User appears under both filter years (2020 and 2026); Grad Year display shows combined pair format for multi-degree users; no regression to legacy single-year-only filtering |
+| **Severity if Fail** | Critical (core user-list filtering is incomplete for multi-degree records) |
+| **Notes** | This is a regression guard for degree-table-based grad year logic with legacy fallback |
+
+---
+
 ### UE-008: Edit Bio (Rich Text)
 
 | Field | Value |
@@ -506,6 +522,24 @@ This document contains the main test matrix organized by workflow. Each test cas
 
 ---
 
+## WORKFLOW 7: API QuickPulls
+
+### QP-001: GradClass Uses Degree-Based UHCO Grad Year
+
+| Field | Value |
+|-------|-------|
+| **ID** | QP-001 |
+| **Workflow** | API QuickPulls |
+| **Scenario** | Verify `gradclass` quickpull filters by degree-table graduation year and does not emit legacy `CURRENTGRADYEAR` |
+| **Role** | Valid API token + secret with Alumni access |
+| **Preconditions** | A test alumni user exists with UHCO degrees OD 2020 and PhD 2026; user is active; API auth token and Alumni-enabled secret are available |
+| **Steps** | 1. Call [api/v1/handlers/quickpulls.cfm](api/v1/handlers/quickpulls.cfm) via `GET /api/v1/quickpulls/gradclass?year=2020&program=All` 2. Confirm test user appears in response data 3. Call `GET /api/v1/quickpulls/gradclass?year=2026&program=All` 4. Confirm same user appears in response data 5. Inspect returned row payload for that user 6. Verify `CURRENTGRADYEAR` key is not present in the GradClass response |
+| **Expected Result** | User appears in both 2020 and 2026 GradClass quickpull responses based on UserDegrees graduation years; GradClass output does not include `CURRENTGRADYEAR`; no fallback to legacy `UserAcademicInfo.CurrentGradYear` is required |
+| **Severity if Fail** | Critical (public quickpull data is filtered from legacy/incomplete grad-year source) |
+| **Notes** | Regression guard for GradClass parity with the Users list grad-year logic |
+
+---
+
 ## Test Matrix Summary
 
 | Workflow | Scenario ID | Scenario | Total |
@@ -516,7 +550,8 @@ This document contains the main test matrix organized by workflow. Each test cas
 | User Review - Submit | UR-001 to UR-004 | 4 scenarios | 4 |
 | User Review - Approve | UA-001 to UA-004 | 4 scenarios | 4 |
 | Permission Boundaries | PB-001 to PB-005 | 5 scenarios | 5 |
-| **TOTAL PHASE 1 SCENARIOS** | | | **30** |
+| API QuickPulls | QP-001 | 1 scenario | 1 |
+| **TOTAL PHASE 1 SCENARIOS** | | | **31** |
 
 ---
 

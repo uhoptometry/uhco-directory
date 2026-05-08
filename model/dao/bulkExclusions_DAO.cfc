@@ -238,9 +238,28 @@ component extends="dao.BaseDAO" output="false" {
                     INNER JOIN UserFlagAssignments ufa ON ufa.UserID = u.UserID
                     INNER JOIN UserFlags uf ON uf.FlagID = ufa.FlagID
                         AND LOWER(TRIM(uf.FlagName)) = 'alumni'
-                    INNER JOIN UserAcademicInfo uai ON uai.UserID = u.UserID
                     WHERE LOWER(TRIM(u.Title1)) = 'alumni'
-                      AND uai.CurrentGradYear BETWEEN 1955 AND 2025
+                      AND (
+                            -- Degree-based: has a UHCO degree with a numeric graduation year in range
+                            EXISTS (
+                                SELECT 1 FROM UserDegrees ud
+                                WHERE ud.UserID = u.UserID AND ud.IsUHCO = 1
+                                  AND ud.IsEnrolled = 0
+                                  AND TRY_CAST(ud.GraduationYear AS INT) BETWEEN 1955 AND 2025
+                            )
+                            -- Legacy fallback: no UHCO degree row but UserAcademicInfo in range
+                            OR (
+                                NOT EXISTS (
+                                    SELECT 1 FROM UserDegrees ud2
+                                    WHERE ud2.UserID = u.UserID AND ud2.IsUHCO = 1 AND ud2.IsEnrolled = 0
+                                )
+                                AND EXISTS (
+                                    SELECT 1 FROM UserAcademicInfo uai
+                                    WHERE uai.UserID = u.UserID
+                                      AND uai.CurrentGradYear BETWEEN 1955 AND 2025
+                                )
+                            )
+                          )
                 ) q
                 CROSS JOIN (VALUES
                     ('missing_uh_api_id'),('missing_email_primary'),('missing_room'),

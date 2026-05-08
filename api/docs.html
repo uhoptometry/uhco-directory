@@ -48,6 +48,7 @@
                     <a class="nav-link py-1 ps-4 small" href="#ep-quickpull-graduate">GET /quickpulls/graduate</a>
                     <a class="nav-link py-1 ps-4 small" href="#ep-quickpull-deans">GET /quickpulls/deans</a>
                     <a class="nav-link py-1 ps-4 small" href="#ep-quickpull-myuhco">GET /quickpulls/myuhco</a>
+                    <a class="nav-link py-1 ps-4 small" href="#ep-quickpull-myuhco-rosters">GET /quickpulls/myuhco-rosters</a>
                     <div class="fw-semibold text-uppercase text-muted small mt-3 mb-1 ps-2">More</div>
                     <a class="nav-link py-1" href="examples.html"><i class="bi bi-code-slash me-1"></i>Code Examples</a>
                 </nav>
@@ -835,16 +836,16 @@ GET /api/v1/flags?return=xml&amp;token=uhcs_...</pre>
                                         <code>/api/v1/quickpulls/gradclass</code>
                                 </div>
                                 <div class="card-body">
-                                        <p class="mb-3">Returns active alumni for a single graduation year as a flat list, filtered to a specific academic program organization. Each result includes the matched <code>PROGRAM</code>, a combined <code>FULLNAME</code>, and image URLs for the <code>interactive_roster</code>, <code>KIOSK_ROSTER</code>, and <code>KIOSK_PROFILE</code> variants. This endpoint is protected because it exposes alumni data.</p>
+                                        <p class="mb-3">Returns active alumni for a single graduation year as a flat list, filtered to a specific academic program organization. Default results include <code>PROGRAM</code>, combined <code>FULLNAME</code>, kiosk image URLs, externships, <code>HOMETOWNFULL</code>, a combined <code>DEGREES</code> string, and flattened award names as <code>AWARDNAME1</code>, <code>AWARDNAME2</code>, and so on. This endpoint is protected because it exposes alumni data.</p>
 
                                         <h6>Configurable Response Items</h6>
                                         <p>Admin users manage quickpull output in <strong>Settings &gt; UHCO API &gt; Quickpulls</strong>. Each quickpull keeps its default return fields, then can append specific general fields, selected email types, selected phone types, selected address types, selected biographical items, selected image variants, selected external systems, and optional full <code>ORGANIZATIONS</code> or <code>FLAGS</code> arrays.</p>
 
                                         <h6 class="mt-3">Default Return Items</h6>
-                                        <p><code>USERID</code>, <code>FIRSTNAME</code>, <code>MIDDLENAME</code>, <code>LASTNAME</code>, <code>CURRENTGRADYEAR</code>, <code>PROGRAM</code>, <code>FULLNAME</code>, <code>INTERACTIVEUSERIMAGE</code>, <code>KIOSKROSTERIMAGE</code>, <code>KIOSKPROFILEIMAGE</code></p>
+                                        <p><code>USERID</code>, <code>FULLNAME</code>, <code>PROGRAM</code>, <code>KIOSKROSTERIMAGE</code>, <code>KIOSKPROFILEIMAGE</code>, <code>CURRENTGRADYEAR</code>, <code>FIRSTEXTERNSHIP</code>, <code>SECONDEXTERNSHIP</code>, <code>HOMETOWNFULL</code>, <code>DEGREES</code>, <code>AWARDNAME1</code></p>
 
                                         <h6 class="mt-3">Current Additional Return Items</h6>
-                                        <p><code>FIRSTEXTERNSHIP</code>, <code>SECONDEXTERNSHIP</code>, <code>HOMETOWNCITY</code>, <code>HOMETOWNSTATE</code>, <code>HOMETOWNFULL</code>, <code>DEGREES</code>, <code>AWARDS</code></p>
+                                        <p><em>None configured.</em></p>
                                         <p class="small text-muted mb-3">Last verified against current AppConfig on 05-01-2026 (environment-specific).</p>
 
                                         <h6>Authentication</h6>
@@ -858,6 +859,7 @@ GET /api/v1/flags?return=xml&amp;token=uhcs_...</pre>
                                                 <tbody>
                                                         <tr><td><code>year</code></td><td>integer</td><td><em>required</em></td><td>Graduation year to filter by, for example <code>2026</code>.</td></tr>
                                                     <tr><td><code>program</code></td><td>string</td><td><em>required</em></td><td>Academic program organization name. Allowed values: <code>OD Program</code>, <code>PhD Program</code>, <code>MS Program</code>.</td></tr>
+                                                        <tr><td><code>filter</code></td><td>string</td><td><em>none</em></td><td>Optional last-name initial range. Allowed values: <code>A-C</code>, <code>D-G</code>, <code>H-K</code>, <code>L-M</code>, <code>N-P</code>, <code>Q-S</code>, <code>T-Z</code>.</td></tr>
                                                         <tr><td><code>secret</code></td><td>string</td><td><em>none</em></td><td>API secret with Alumni access, as an alternative to the <code>X-API-Secret</code> header.</td></tr>
                                                         <tr><td><code>token</code></td><td>string</td><td><em>none</em></td><td>API token, as an alternative to the <code>Authorization</code> header.</td></tr>
                                                 </tbody>
@@ -869,36 +871,28 @@ GET /api/v1/flags?return=xml&amp;token=uhcs_...</pre>
     "data": [
         {
             "USERID": 314,
-            "FIRSTNAME": "Alex",
-            "MIDDLENAME": "",
-            "LASTNAME": "Smith",
-            "CURRENTGRADYEAR": 2026,
-            "PROGRAM": "OD Program",
             "FULLNAME": "Alex Smith",
-            "INTERACTIVEUSERIMAGE": "/published_images/interactive_roster/314.jpg",
+            "PROGRAM": "OD Program",
             "KIOSKROSTERIMAGE": "/published_images/kiosk_roster/314.jpg",
             "KIOSKPROFILEIMAGE": "/published_images/kiosk_profile/314.jpg",
+            "CURRENTGRADYEAR": 2026,
             "FIRSTEXTERNSHIP": "Houston Eye Associates",
             "SECONDEXTERNSHIP": "VA Eye Clinic",
-            "HOMETOWNCITY": "Houston",
-            "HOMETOWNSTATE": "TX",
             "HOMETOWNFULL": "Houston, TX",
-            "DEGREES": [
-                { "DEGREENAME": "O.D.", "UNIVERSITY": "University of Houston", "DEGREEYEAR": "2026" }
-            ],
-            "AWARDS": [
-                { "AWARDNAME": "Dean's List", "AWARDTYPE": "Honor" }
-            ]
+            "DEGREES": "O.D.",
+            "AWARDNAME1": "Dean's List",
+            "AWARDNAME2": "Clinical Excellence Award"
         }
     ]
 }</pre>
 
                                         <h6 class="mt-3">Notes</h6>
-                                        <p>Returned users must have the <code>Alumni</code> flag and belong to the selected academic program org. If a user does not have one or more default image variants, the corresponding image field is still included with an empty string value. Configured append fields are added as top-level keys such as <code>EMAIL_CENTRAL</code>, <code>PHONE_MOBILE</code>, <code>IMAGE_WEB_THUMB</code>, or <code>EXTERNALID_COUGARNET</code>. Matching contact/address append fields prefer <code>ISPRIMARY=1</code> rows.</p>
+                                        <p>Returned users must have the <code>Alumni</code> flag and belong to the selected academic program org. If provided, <code>filter</code> limits rows by last-name initial range. If a user does not have one or more default image variants, the corresponding image field is still included with an empty string value. <code>DEGREES</code> is a single comma-separated display string. Awards are flattened to top-level name-only fields (<code>AWARDNAME1</code>, <code>AWARDNAME2</code>, etc.) and are not nested. Configured append fields are added as top-level keys such as <code>EMAIL_CENTRAL</code>, <code>PHONE_MOBILE</code>, <code>IMAGE_WEB_THUMB</code>, or <code>EXTERNALID_COUGARNET</code>. Matching contact/address append fields prefer <code>ISPRIMARY=1</code> rows.</p>
 
                                         <h6 class="mt-3">Example Requests</h6>
                                         <pre class="example">GET /api/v1/quickpulls/gradclass?year=2026&amp;program=OD+Program&amp;secret=uhcs_sec_...&amp;token=uhcs_...
-GET /api/v1/quickpulls/gradclass?year=2026&amp;program=PhD+Program&amp;secret=uhcs_sec_...&amp;token=uhcs_...</pre>
+                    GET /api/v1/quickpulls/gradclass?year=2026&amp;program=OD+Program&amp;filter=A-C&amp;secret=uhcs_sec_...&amp;token=uhcs_...
+                    GET /api/v1/quickpulls/gradclass?year=2026&amp;program=PhD+Program&amp;filter=T-Z&amp;secret=uhcs_sec_...&amp;token=uhcs_...</pre>
                                 </div>
                         </div>
 
@@ -1078,6 +1072,77 @@ GET /api/v1/quickpulls/gradclass?year=2026&amp;program=PhD+Program&amp;secret=uh
                                         <h6 class="mt-3">Example Requests</h6>
                                         <pre class="example">GET /api/v1/quickpulls/myuhco?id=asmith7&amp;token=uhcs_...
                     GET /api/v1/quickpulls/myuhco?id=asmith7&amp;secret=uhcs_sec_...&amp;token=uhcs_...</pre>
+                                    </div>
+                                </div>
+
+                                <!-- GET /quickpulls/myuhco-rosters -->
+                                <div class="card endpoint-card shadow-sm mb-4" id="ep-quickpull-myuhco-rosters">
+                                    <div class="card-header bg-white">
+                                        <span class="badge bg-primary method-badge me-2">GET</span>
+                                        <code>/api/v1/quickpulls/myuhco-rosters</code>
+                                    </div>
+                                    <div class="card-body">
+                                        <p class="mb-3">Returns a catalog of locally generated class roster PDFs, including each file's last Dropbox publish status and path. Optionally filter to only published files.</p>
+
+                                        <h6>Authentication</h6>
+                                        <p>Requires a valid API token with <code>read</code> scope and a secret that unlocks <code>Alumni</code> or <code>Current-Student</code> access.</p>
+
+                                        <h6 class="mt-3">Query Parameters</h6>
+                                        <table class="table table-sm table-bordered param-table">
+                                            <thead class="table-light">
+                                                <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr><td><code>publishedOnly</code></td><td>boolean</td><td><code>false</code></td><td>When <code>true</code>, only return files that have been successfully published to Dropbox.</td></tr>
+                                                <tr><td><code>secret</code></td><td>string</td><td><em>required</em></td><td>Secret that unlocks Alumni or Current-Student access.</td></tr>
+                                                <tr><td><code>token</code></td><td>string</td><td><em>none</em></td><td>API token, as an alternative to the <code>Authorization</code> header.</td></tr>
+                                            </tbody>
+                                        </table>
+
+                                        <h6 class="mt-3">Return Fields Per Item</h6>
+                                        <table class="table table-sm table-bordered param-table">
+                                            <thead class="table-light">
+                                                <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr><td><code>FILENAME</code></td><td>string</td><td>PDF file name (e.g. <code>class-of-2026-roster.pdf</code>).</td></tr>
+                                                <tr><td><code>GRADYEAR</code></td><td>number</td><td>Graduation year parsed from the file name.</td></tr>
+                                                <tr><td><code>SIZEKB</code></td><td>number</td><td>File size in kilobytes.</td></tr>
+                                                <tr><td><code>DATELASTMODIFIED</code></td><td>string</td><td>ISO-8601 timestamp of last file modification.</td></tr>
+                                                <tr><td><code>LOCALURL</code></td><td>string</td><td>Server-relative URL for direct access (admin only).</td></tr>
+                                                <tr><td><code>PUBLISHED</code></td><td>boolean</td><td><code>true</code> when the last publish attempt succeeded.</td></tr>
+                                                <tr><td><code>LASTPUBLISHSTATUS</code></td><td>string</td><td><code>ok</code>, <code>fail</code>, or empty string.</td></tr>
+                                                <tr><td><code>LASTPUBLISHATTEMPTAT</code></td><td>string</td><td>Timestamp of the last publish attempt.</td></tr>
+                                                <tr><td><code>LASTPUBLISHEDAT</code></td><td>string</td><td>Timestamp of the last successful publish.</td></tr>
+                                                <tr><td><code>LASTPUBLISHEDPATH</code></td><td>string</td><td>Dropbox path the file was last published to.</td></tr>
+                                                <tr><td><code>LASTERROR</code></td><td>string</td><td>Error message from the last failed publish, if any.</td></tr>
+                                            </tbody>
+                                        </table>
+
+                                        <h6 class="mt-3">Response</h6>
+                                        <pre class="example">{
+  "total": 2,
+  "publishedOnly": false,
+  "data": [
+    {
+      "FILENAME": "class-of-2026-roster.pdf",
+      "GRADYEAR": 2026,
+      "SIZEKB": 312.5,
+      "DATELASTMODIFIED": "2026-05-03T09:14:00",
+      "LOCALURL": "/_temp_rosters/class-of-2026-roster.pdf",
+      "PUBLISHED": true,
+      "LASTPUBLISHSTATUS": "ok",
+      "LASTPUBLISHATTEMPTAT": "05/03/2026 9:14 AM",
+      "LASTPUBLISHEDAT": "05/03/2026 9:14 AM",
+      "LASTPUBLISHEDPATH": "/Digital Assets/MyUHCO/class-of-2026-roster.pdf",
+      "LASTERROR": ""
+    }
+  ]
+}</pre>
+
+                                        <h6 class="mt-3">Example Requests</h6>
+                                        <pre class="example">GET /api/v1/quickpulls/myuhco-rosters?token=uhcs_...&amp;secret=uhcs_sec_...
+GET /api/v1/quickpulls/myuhco-rosters?publishedOnly=true&amp;token=uhcs_...&amp;secret=uhcs_sec_...</pre>
                                     </div>
                                 </div>
 

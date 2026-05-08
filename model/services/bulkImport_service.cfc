@@ -700,7 +700,16 @@ component output="false" singleton {
 
         academicChanged = len(currentGradYear) OR len(originalGradYear) OR modeValue EQ "replace";
         if (academicChanged) {
-            variables.academicService.saveAcademicInfo(arguments.userGroup.userID, modeValue EQ "replace" ? currentGradYear : (len(currentGradYear) ? currentGradYear : trim(fullProfile.academic.CURRENTGRADYEAR ?: "")), modeValue EQ "replace" ? originalGradYear : (len(originalGradYear) ? originalGradYear : trim(fullProfile.academic.ORIGINALGRADYEAR ?: "")));
+            var savedCurrentGradYear = modeValue EQ "replace" ? currentGradYear : (len(currentGradYear) ? currentGradYear : trim(fullProfile.academic.CURRENTGRADYEAR ?: ""));
+            var savedOriginalGradYear = modeValue EQ "replace" ? originalGradYear : (len(originalGradYear) ? originalGradYear : trim(fullProfile.academic.ORIGINALGRADYEAR ?: ""));
+            variables.academicService.saveAcademicInfo(arguments.userGroup.userID, savedCurrentGradYear, savedOriginalGradYear);
+            // Bridge: if a numeric grad year was provided, also update any enrolled UHCO degree row
+            if (len(savedCurrentGradYear) AND isNumeric(savedCurrentGradYear) AND val(savedCurrentGradYear) GT 0) {
+                try {
+                    var degDAO = createObject("component", "dao.degrees_DAO").init();
+                    degDAO.syncExpectedGradYearFromLegacy(arguments.userGroup.userID, val(savedCurrentGradYear));
+                } catch (any degEx) { /* non-fatal: legacy row still updated */ }
+            }
         }
 
         bioChanged = _stringValuesDiffer(bioContent, fullProfile.bio.BIOCONTENT ?: "") OR modeValue EQ "replace";

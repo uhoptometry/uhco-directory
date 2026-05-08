@@ -346,9 +346,11 @@
     <cfset studentProfileSvc = createObject("component", "cfc.studentProfile_service").init()>
     <cfset spProfile  = studentProfileSvc.getProfile(url.userID).data>
     <cfset spAwards   = studentProfileSvc.getAwards(url.userID).data>
+    <cfset spResidencies = studentProfileSvc.getResidencies(url.userID).data>
     <cfset spFirstExt      = structIsEmpty(spProfile) ? "" : (spProfile.FIRSTEXTERNSHIP   ?: "")>
     <cfset spSecondExt     = structIsEmpty(spProfile) ? "" : (spProfile.SECONDEXTERNSHIP  ?: "")>
     <cfset spCommAge       = structIsEmpty(spProfile) ? "" : (spProfile.COMMENCEMENTAGE   ?: "")>
+    <cfset spDissertation  = structIsEmpty(spProfile) ? "" : (spProfile.DISSERTATIONTHESIS ?: "")>
     <!--- Legacy vars kept for hidden old Student Profile tab --->
     <cfset spHometownCity  = structIsEmpty(spProfile) ? "" : (spProfile.HOMETOWNCITY      ?: "")>
     <cfset spHometownState = structIsEmpty(spProfile) ? "" : (spProfile.HOMETOWNSTATE     ?: "")>
@@ -356,9 +358,11 @@
     <cfset spGender        = structIsEmpty(spProfile) ? "" : (spProfile.GENDER           ?: "")>
 <cfelse>
     <cfset spAwards        = []>
+    <cfset spResidencies   = []>
     <cfset spFirstExt      = "">
     <cfset spSecondExt     = "">
     <cfset spCommAge       = "">
+    <cfset spDissertation  = "">
     <cfset spHometownCity  = "">
     <cfset spHometownState = "">
     <cfset spDOB           = "">
@@ -538,30 +542,109 @@
     <cfargument name="showComposite" type="boolean" required="false" default="false" hint="Show read-only composite Degrees field for Super Admins">
     <cfargument name="compositeValue" type="string" required="false" default="">
 
-    <cfset var html = "">
-    <cfif arguments.showComposite>
-        <cfset html &= "<div class='row mb-3'><div class='col-md-8'>">
-        <cfset html &= "<label class='form-label text-muted'>Combined Degrees (auto-generated, read-only)</label>">
-        <cfset html &= "<input class='form-control form-control-sm' id='#arguments.prefix#_composite' value='#EncodeForHTMLAttribute(arguments.compositeValue)#' readonly disabled>">
-        <cfset html &= "</div></div>">
-    </cfif>
-    <cfset html &= "<div class='mb-4'>">
-    <cfset html &= "<label class='form-label fw-semibold'>Degrees</label>">
-    <cfset html &= "<div id='#arguments.prefix#_degreesContainer'>">
-    <cfloop from="1" to="#arrayLen(arguments.degrees)#" index="local.di">
-        <cfset local.dg = arguments.degrees[local.di]>
-        <cfset html &= "<div class='row g-2 mb-2 degree-row'>">
-        <cfset html &= "<div class='col-md-4'><input class='form-control form-control-sm' name='#arguments.prefix#_deg_name_#(local.di-1)#' data-field='deg_name' value='#EncodeForHTMLAttribute(local.dg.DEGREENAME)#' placeholder='Degree (required)' required></div>">
-        <cfset html &= "<div class='col-md-4'><input class='form-control form-control-sm' name='#arguments.prefix#_deg_univ_#(local.di-1)#' data-field='deg_univ' value='#EncodeForHTMLAttribute(local.dg.UNIVERSITY ?: "")#' placeholder='University'></div>">
-        <cfset html &= "<div class='col-md-2'><input class='form-control form-control-sm' name='#arguments.prefix#_deg_year_#(local.di-1)#' data-field='deg_year' value='#EncodeForHTMLAttribute(local.dg.DEGREEYEAR ?: "")#' placeholder='Year'></div>">
-        <cfset html &= "<div class='col-md-2'><button type='button' class='btn btn-sm btn-remove remove-degree-row w-100'><i class='bi bi-trash me-1'></i>Remove</button></div>">
-        <cfset html &= "</div>">
-    </cfloop>
-    <cfset html &= "</div>">
-    <cfset html &= "<input type='hidden' name='#arguments.prefix#_degree_count' id='#arguments.prefix#_degreeCount' value='#arrayLen(arguments.degrees)#'>">
-    <cfset html &= "<button type='button' class='btn btn-sm btn-ui-add mt-2 add-degree-row' data-prefix='#arguments.prefix#'><i class='bi bi-plus-circle me-1'></i>Add Degree</button>">
-    <cfset html &= "</div>">
-    <cfreturn html>
+    <cfsavecontent variable="local.result"><!--- Use cfsavecontent to prevent re-parsing of # expressions --->
+        <div class="mb-4">
+            <cfif arguments.showComposite>
+                <div class="row mb-3">
+                    <div class="col-md-8">
+                        <label class="form-label text-muted">Combined Degrees (auto-generated, read-only)</label>
+                        <input class="form-control form-control-sm" id="<cfoutput>#arguments.prefix#_composite</cfoutput>" value="<cfoutput>#EncodeForHTMLAttribute(arguments.compositeValue)#</cfoutput>" readonly disabled>
+                    </div>
+                </div>
+            </cfif>
+            <label class="form-label fw-semibold">Degrees</label>
+            <div id="<cfoutput>#arguments.prefix#_degreesContainer</cfoutput>">
+                <cfloop from="1" to="#arrayLen(arguments.degrees)#" index="local.di">
+                    <cfset local.dg = arguments.degrees[local.di]>
+                    <cfset local.idx = local.di - 1>
+                    <cfset local.isUHCO     = isBoolean(local.dg.ISUHCO ?: "") ? local.dg.ISUHCO : (val(local.dg.ISUHCO ?: 0) EQ 1)>
+                    <cfset local.isEnrolled = isBoolean(local.dg.ISENROLLED ?: "") ? local.dg.ISENROLLED : (val(local.dg.ISENROLLED ?: 0) EQ 1)>
+                    <cfset local.hasChange  = isBoolean(local.dg.HASYEARCHANGE ?: "") ? local.dg.HASYEARCHANGE : (val(local.dg.HASYEARCHANGE ?: 0) EQ 1)>
+                    <cfset local.uhcoCheckedAttr       = local.isUHCO ? "checked" : "">
+                    <cfset local.enrolledCheckedAttr   = local.isEnrolled ? "checked" : "">
+                    <cfset local.hasChangeCheckedAttr  = local.hasChange ? "checked" : "">
+                    <cfset local.uhcoHiddenClass       = local.isUHCO ? "" : "d-none">
+                    <cfset local.uhcoDisabledAttr      = local.isUHCO ? "" : "disabled">
+                    <cfset local.enrolledDisabledAttr  = local.isEnrolled ? "" : "disabled">
+                    <cfset local.hasChangeDisabledAttr = local.hasChange ? "" : "disabled">
+                    <!--- Precompute values --->
+                    <cfset local.univVal        = trim(local.dg.UNIVERSITY ?: '')>
+                    <cfset local.gradYearVal    = trim(local.dg.GRADUATIONYEAR ?: '')>
+                    <cfset local.expGradVal     = ''>
+                    <cfif structKeyExists(local.dg, 'EXPECTEDGRADYEAR')>
+                        <cfset local.expGradRaw = local.dg.EXPECTEDGRADYEAR>
+                        <cfif len(trim(local.expGradRaw & '')) AND isNumeric(local.expGradRaw)>
+                            <cfset local.expGradVal = toString(val(local.expGradRaw))>
+                        </cfif>
+                    </cfif>
+                    <cfset local.origExpGradVal = ''>
+                    <cfif structKeyExists(local.dg, 'ORIGINALEXPECTEDGRADYEAR')>
+                        <cfset local.origExpGradRaw = local.dg.ORIGINALEXPECTEDGRADYEAR>
+                        <cfif len(trim(local.origExpGradRaw & '')) AND isNumeric(local.origExpGradRaw)>
+                            <cfset local.origExpGradVal = toString(val(local.origExpGradRaw))>
+                        </cfif>
+                    </cfif>
+                    <cfset local.programVal     = trim(local.dg.PROGRAM ?: '')>
+                    
+                    <div class="row g-2 mb-2 degree-row">
+                        <div class="col-md-4">
+                            <input class="form-control form-control-sm" name="<cfoutput>#arguments.prefix#_deg_name_#local.idx#</cfoutput>" data-field="deg_name" value="<cfoutput>#EncodeForHTMLAttribute(local.dg.DEGREENAME)#</cfoutput>" placeholder="Degree (required)" required>
+                        </div>
+                        <div class="col-md-4">
+                            <input class="form-control form-control-sm" name="<cfoutput>#arguments.prefix#_deg_univ_#local.idx#</cfoutput>" data-field="deg_univ" value="<cfoutput>#EncodeForHTMLAttribute(local.univVal)#</cfoutput>" placeholder="University">
+                        </div>
+                        <div class="col-md-2">
+                            <input class="form-control form-control-sm" name="<cfoutput>#arguments.prefix#_deg_year_#local.idx#</cfoutput>" data-field="deg_year" value="<cfoutput>#EncodeForHTMLAttribute(local.gradYearVal)#</cfoutput>" placeholder="Year">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="button" class="btn btn-sm btn-remove remove-degree-row w-100"><i class="bi bi-trash me-1"></i>Remove</button>
+                        </div>
+                    </div>
+                    
+                    <div class="col-12 uhco-fields mt-1 <cfoutput>#local.uhcoHiddenClass#</cfoutput>">
+                        <div class="row g-2 border-start border-2 border-primary ps-2">
+                            <div class="col-auto">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input deg-isuhco" type="checkbox" name="<cfoutput>#arguments.prefix#_deg_isuhco_#local.idx#</cfoutput>" value="1" <cfoutput>#local.uhcoCheckedAttr#</cfoutput>>
+                                    <label class="form-check-label small">UHCO Degree</label>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input deg-isenrolled" type="checkbox" name="<cfoutput>#arguments.prefix#_deg_enrolled_#local.idx#</cfoutput>" value="1" <cfoutput>#local.enrolledCheckedAttr#</cfoutput> <cfoutput>#local.uhcoDisabledAttr#</cfoutput>>
+                                    <label class="form-check-label small">Currently Enrolled</label>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input deg-haschange" type="checkbox" name="<cfoutput>#arguments.prefix#_deg_haschange_#local.idx#</cfoutput>" value="1" <cfoutput>#local.hasChangeCheckedAttr#</cfoutput> <cfoutput>#local.enrolledDisabledAttr#</cfoutput>>
+                                    <label class="form-check-label small">Year Changed</label>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <input class="form-control form-control-sm deg-expgrad" name="<cfoutput>#arguments.prefix#_deg_expgrad_#local.idx#</cfoutput>" type="number" min="2000" max="2099" value="<cfoutput>#EncodeForHTMLAttribute(local.expGradVal)#</cfoutput>" placeholder="Exp. Grad Yr" <cfoutput>#local.enrolledDisabledAttr#</cfoutput>>
+                            </div>
+                            <div class="col-md-2">
+                                <input class="form-control form-control-sm deg-origexpgrad" name="<cfoutput>#arguments.prefix#_deg_origexpgrad_#local.idx#</cfoutput>" type="number" min="2000" max="2099" value="<cfoutput>#EncodeForHTMLAttribute(local.origExpGradVal)#</cfoutput>" placeholder="Orig. Exp. Yr" <cfoutput>#local.hasChangeDisabledAttr#</cfoutput>>
+                            </div>
+                            <div class="col-md-2">
+                                <select class="form-select form-select-sm deg-program" name="<cfoutput>#arguments.prefix#_deg_program_#local.idx#</cfoutput>" <cfoutput>#local.uhcoDisabledAttr#</cfoutput>>
+                                    <option value="">-- Program --</option>
+                                    <cfloop list="OD,MS,PhD,Residency" index="local.prog">
+                                        <cfset local.selected = (local.programVal EQ local.prog) ? 'selected' : ''>
+                                        <option value="<cfoutput>#local.prog#</cfoutput>" <cfoutput>#local.selected#</cfoutput>><cfoutput>#local.prog#</cfoutput></option>
+                                    </cfloop>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </cfloop>
+            </div>
+            <input type="hidden" name="<cfoutput>#arguments.prefix#_degree_count</cfoutput>" id="<cfoutput>#arguments.prefix#_degreeCount</cfoutput>" value="<cfoutput>#arrayLen(arguments.degrees)#</cfoutput>">
+            <button type="button" class="btn btn-sm btn-ui-add mt-2 add-degree-row" data-prefix="<cfoutput>#arguments.prefix#</cfoutput>"><i class="bi bi-plus-circle me-1"></i>Add Degree</button>
+        </div>
+    </cfsavecontent>
+    <cfreturn local.result>
 </cffunction>
 
 <!--- ── Data Quality Exclusions ── --->
@@ -1327,222 +1410,293 @@
     </cfif>
 </cfloop>
 
+<!--- ── Biographical Information pane ── --->
 <cfset showDegreesAwards = showFacultyProfile OR showAlumni OR showCurrentStudent OR showEmeritusProfile OR showResidentProfile>
 <cfset local.bioDegreesDisplayStyle = showDegreesAwards ? "" : " style='display:none'">
 <cfset local.compositeDegreesValue = "">
 <cfif structKeyExists(user, "DEGREES") AND NOT isNull(user.DEGREES)>
     <cfset local.compositeDegreesValue = trim(toString(user.DEGREES))>
 </cfif>
-
-<!--- ── Biographical Information pane ── --->
-<cfset content &= "
-        <div class='tab-pane fade' id='bio-info-pane' role='tabpanel' aria-labelledby='bio-info-tab'>
-
-            <div class='d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom pb-2 mb-3'>
-                <div class='d-flex align-items-center flex-wrap gap-2'>
-                    #renderTabActionButtonGroup("refreshBiographicalInfoBtn")#
-                    <span id='bioActionsLabel' class='navbar-text'#local.bioDegreesDisplayStyle#><strong>Actions:</strong></span>
-                    <button type='button' class='btn btn-sm btn-ui-add' id='addDegreeBtn'#local.bioDegreesDisplayStyle#><i class='bi bi-mortarboard me-1'></i>Add Degree</button>
-                    <button type='button' class='btn btn-sm btn-ui-add' id='addAwardBtn'#local.bioDegreesDisplayStyle#><i class='bi bi-award me-1'></i>Add Award</button>
-                    <span id='degreesSaveStatus' class='save-status ms-1'#local.bioDegreesDisplayStyle#></span>
-                    <span id='awardsSaveStatus' class='save-status ms-1'#local.bioDegreesDisplayStyle#></span>
+<cfsavecontent variable="local.bioTabContent"><!--- Use cfsavecontent to prevent # expression re-parsing by layout.cfm --->
+    <div class="tab-pane fade" id="bio-info-pane" role="tabpanel" aria-labelledby="bio-info-tab">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom pb-2 mb-3">
+            <div class="d-flex align-items-center flex-wrap gap-2">
+                <cfoutput>#renderTabActionButtonGroup("refreshBiographicalInfoBtn")#</cfoutput>
+                <span id="bioActionsLabel" class="navbar-text" <cfoutput>#local.bioDegreesDisplayStyle#</cfoutput>><strong>Actions:</strong></span>
+                <button type="button" class="btn btn-sm btn-ui-add" id="addDegreeBtn" <cfoutput>#local.bioDegreesDisplayStyle#</cfoutput>><i class="bi bi-mortarboard me-1"></i>Add Degree</button>
+                <button type="button" class="btn btn-sm btn-ui-add" id="addAwardBtn" <cfoutput>#local.bioDegreesDisplayStyle#</cfoutput>><i class="bi bi-award me-1"></i>Add Award</button>
+                <span id="degreesSaveStatus" class="save-status ms-1" <cfoutput>#local.bioDegreesDisplayStyle#</cfoutput>></span>
+                <span id="awardsSaveStatus" class="save-status ms-1" <cfoutput>#local.bioDegreesDisplayStyle#</cfoutput>></span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <button type="button" class="btn btn-sm btn-ui-success" id="save-bioinfo-btn"><i class="bi bi-floppy me-1"></i>Save Biographical Info</button>
+                <span id="save-bioinfo-status" class="ms-1"></span>
+            </div>
+        </div>
+        <h6 class="fw-bold mb-3">Personal</h6>
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <label class="form-label">Date of Birth</label>
+                <cfset local.dobVal = (isDate(user.DOB ?: "") ? dateFormat(user.DOB, "yyyy-mm-dd") : "")>
+                <input class="form-control" type="date" name="DOB" value="<cfoutput>#local.dobVal#</cfoutput>">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Gender</label>
+                <select class="form-select" name="Gender">
+                    <option value="">--</option>
+                    <cfset local.genderVal = user.GENDER ?: "">
+                    <option value="Male" <cfoutput>#(local.genderVal EQ "Male" ? "selected" : "")#</cfoutput>>Male</option>
+                    <option value="Female" <cfoutput>#(local.genderVal EQ "Female" ? "selected" : "")#</cfoutput>>Female</option>
+                </select>
+            </div>
+        </div>
+        <hr id="bioDegreesAwardsDivider" <cfoutput>#local.bioDegreesDisplayStyle#</cfoutput>>
+        <h6 id="bioDegreesAwardsHeading" class="fw-bold mb-3" <cfoutput>#local.bioDegreesDisplayStyle#</cfoutput>>Degrees &amp; Awards</h6>
+        <cfif isSuperAdmin AND len(local.compositeDegreesValue)>
+            <div class="row mb-3">
+                <div class="col-md-8">
+                    <label class="form-label text-muted">Combined Degrees (auto-generated, read-only)</label>
+                    <input class="form-control form-control-sm" id="bio_composite" value="<cfoutput>#EncodeForHTMLAttribute(local.compositeDegreesValue)#</cfoutput>" readonly disabled>
                 </div>
-                <div class='d-flex align-items-center gap-2'>
-                    <button type='button' class='btn btn-sm btn-ui-success' id='save-bioinfo-btn'><i class='bi bi-floppy me-1'></i>Save Biographical Info</button>
-                    <span id='save-bioinfo-status' class='ms-1'></span>
+            </div>
+        </cfif>
+        <cfset local.bioDegreesHiddenStyle = (NOT showDegreesAwards ? "style='display:none'" : "")>
+        <div id="bioDegreesSection" class="mb-4" <cfoutput>#local.bioDegreesHiddenStyle#</cfoutput>>
+            <label class="form-label fw-semibold">Degrees</label>
+            <div id="degreesContainer">
+                <cfif showDegreesAwards>
+                    <cfset local.degreeValues = []>
+                    <cfloop from="1" to="#arrayLen(userDegrees)#" index="local.di">
+                        <cfset local.dg = userDegrees[local.di]>
+                        <cfset local.univVal = trim(local.dg.UNIVERSITY ?: '')>
+                        <cfset local.gradYearVal = structKeyExists(local.dg, 'GRADUATIONYEAR') ? local.dg.GRADUATIONYEAR : (structKeyExists(local.dg, 'DEGREEYEAR') ? local.dg.DEGREEYEAR : '')>
+                        <cfset local.expGradVal = ''>
+                        <cfif structKeyExists(local.dg, 'EXPECTEDGRADYEAR')>
+                            <cfset local.expGradRaw = local.dg.EXPECTEDGRADYEAR>
+                            <cfif len(trim(local.expGradRaw & '')) AND isNumeric(local.expGradRaw)>
+                                <cfset local.expGradVal = toString(val(local.expGradRaw))>
+                            </cfif>
+                        </cfif>
+                        <cfset local.origExpGradVal = ''>
+                        <cfif structKeyExists(local.dg, 'ORIGINALEXPECTEDGRADYEAR')>
+                            <cfset local.origExpGradRaw = local.dg.ORIGINALEXPECTEDGRADYEAR>
+                            <cfif len(trim(local.origExpGradRaw & '')) AND isNumeric(local.origExpGradRaw)>
+                                <cfset local.origExpGradVal = toString(val(local.origExpGradRaw))>
+                            </cfif>
+                        </cfif>
+                        <cfset local.programVal = structKeyExists(local.dg, 'PROGRAM') ? (local.dg.PROGRAM ?: '') : ''>
+                        <cfset local.idx = local.di - 1>
+                        <cfset local.nameEncoded = EncodeForHTMLAttribute(local.dg.DEGREENAME)>
+                        <cfset local.univEncoded = EncodeForHTMLAttribute(local.univVal)>
+                        <cfset local.gradYearEncoded = EncodeForHTMLAttribute(local.gradYearVal)>
+                        <cfset local.expGradEncoded = EncodeForHTMLAttribute(local.expGradVal)>
+                        <cfset local.origExpGradEncoded = EncodeForHTMLAttribute(local.origExpGradVal)>
+                        <cfset local.programEncoded = EncodeForHTMLAttribute(local.programVal)>
+                        <cfset arrayAppend(local.degreeValues, {
+                            degreeName = local.dg.DEGREENAME,
+                            nameEncoded = local.nameEncoded,
+                            university = local.univVal,
+                            univEncoded = local.univEncoded,
+                            gradYear = local.gradYearVal,
+                            gradYearEncoded = local.gradYearEncoded,
+                            isUhco = (structKeyExists(local.dg, 'ISUHCO') AND ((isBoolean(local.dg.ISUHCO ?: "") AND local.dg.ISUHCO) OR (val(local.dg.ISUHCO ?: 0) EQ 1))) ? 1 : 0,
+                            isEnrolled = (structKeyExists(local.dg, 'ISENROLLED') AND ((isBoolean(local.dg.ISENROLLED ?: "") AND local.dg.ISENROLLED) OR (val(local.dg.ISENROLLED ?: 0) EQ 1))) ? 1 : 0,
+                            hasChange = (structKeyExists(local.dg, 'HASYEARCHANGE') AND ((isBoolean(local.dg.HASYEARCHANGE ?: "") AND local.dg.HASYEARCHANGE) OR (val(local.dg.HASYEARCHANGE ?: 0) EQ 1))) ? 1 : 0,
+                            expGrad = local.expGradVal,
+                            expGradEncoded = local.expGradEncoded,
+                            origExpGrad = local.origExpGradVal,
+                            origExpGradEncoded = local.origExpGradEncoded,
+                            program = local.programVal,
+                            programEncoded = local.programEncoded,
+                            idx = local.idx
+                        })>
+                    </cfloop>
+                    <cfloop from="1" to="#arrayLen(local.degreeValues)#" index="local.di">
+                        <cfset local.dv = local.degreeValues[local.di]>
+                        <cfset local.uhcoBadge = (val(local.dv.isUhco ?: 0) EQ 1) ? " <span class='badge bg-primary ms-1'>UHCO</span>" : "">
+                        <cfset local.programBadge = len(trim(local.dv.program ?: "")) ? " <span class='badge bg-info text-dark ms-1'>" & EncodeForHTML(local.dv.program) & "</span>" : "">
+                        <div class="card mb-2 degree-card card-surface" data-idx="<cfoutput>#local.dv.idx#</cfoutput>">
+                            <div class="card-body py-2 px-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong><cfoutput>#local.dv.nameEncoded#</cfoutput></strong><cfif len(local.dv.university)> | <cfoutput>#local.dv.univEncoded#</cfoutput></cfif><cfif len(local.dv.gradYear)> <span class="badge badge-secondary"><cfoutput>#local.dv.gradYearEncoded#</cfoutput></span></cfif><cfoutput>#local.uhcoBadge##local.programBadge#</cfoutput>
+                                    </div>
+                                    <div>
+                                        <button type="button" class="btn btn-sm btn-edit edit-degree-btn" data-idx="<cfoutput>#local.dv.idx#</cfoutput>"><i class="bi bi-pencil-square me-1"></i>Edit</button>
+                                        <button type="button" class="btn btn-sm btn-remove remove-degree-btn" data-idx="<cfoutput>#local.dv.idx#</cfoutput>"><i class="bi bi-trash me-1"></i>Remove</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </cfloop>
+                    <cfloop from="1" to="#arrayLen(local.degreeValues)#" index="local.di">
+                        <cfset local.dv = local.degreeValues[local.di]>
+                        <input type="hidden" data-degree-field="name" data-degree-idx="<cfoutput>#local.dv.idx#</cfoutput>" value="<cfoutput>#local.dv.nameEncoded#</cfoutput>">
+                        <input type="hidden" data-degree-field="university" data-degree-idx="<cfoutput>#local.dv.idx#</cfoutput>" value="<cfoutput>#local.dv.univEncoded#</cfoutput>">
+                        <input type="hidden" data-degree-field="year" data-degree-idx="<cfoutput>#local.dv.idx#</cfoutput>" value="<cfoutput>#local.dv.gradYearEncoded#</cfoutput>">
+                        <input type="hidden" data-degree-field="isuhco" data-degree-idx="<cfoutput>#local.dv.idx#</cfoutput>" value="<cfoutput>#local.dv.isUhco#</cfoutput>">
+                        <input type="hidden" data-degree-field="isenrolled" data-degree-idx="<cfoutput>#local.dv.idx#</cfoutput>" value="<cfoutput>#local.dv.isEnrolled#</cfoutput>">
+                        <input type="hidden" data-degree-field="haschange" data-degree-idx="<cfoutput>#local.dv.idx#</cfoutput>" value="<cfoutput>#local.dv.hasChange#</cfoutput>">
+                        <input type="hidden" data-degree-field="origexpgrad" data-degree-idx="<cfoutput>#local.dv.idx#</cfoutput>" value="<cfoutput>#local.dv.origExpGradEncoded#</cfoutput>">
+                        <input type="hidden" data-degree-field="expgrad" data-degree-idx="<cfoutput>#local.dv.idx#</cfoutput>" value="<cfoutput>#local.dv.expGradEncoded#</cfoutput>">
+                        <input type="hidden" data-degree-field="program" data-degree-idx="<cfoutput>#local.dv.idx#</cfoutput>" value="<cfoutput>#local.dv.programEncoded#</cfoutput>">
+                    </cfloop>
+                </cfif>
+            </div>
+            <cfset local.degreeCountVal = showDegreesAwards ? arrayLen(userDegrees) : 0>
+            <input type="hidden" id="degreeCount" value="<cfoutput>#local.degreeCountVal#</cfoutput>">
+        </div>
+        <cfset local.bioAwardsHiddenStyle = (NOT showDegreesAwards ? "style='display:none'" : "")>
+        <div id="bioAwardsSection" class="mb-4 mt-3" <cfoutput>#local.bioAwardsHiddenStyle#</cfoutput>>
+            <label class="form-label fw-semibold">Awards &amp; Honors</label>
+            <div id="awardsContainer">
+                <cfif showDegreesAwards>
+                    <cfset awardOptions = 'Gold Key,Summa cum laude,Magna cum laude,BSK Gold,BSK Black & Gold,AOSA Honors,NOSA Honors,Other'>
+                    <cfloop from="1" to="#arrayLen(spAwards)#" index="ai">
+                        <cfset aw = spAwards[ai]>
+                        <cfset local.awName = trim(aw.AWARDNAME)>
+                        <cfset local.awType = aw.AWARDTYPE ?: "">
+                        <cfset local.awIdx = ai - 1>
+                        <cfset local.awNameEncoded = EncodeForHTML(local.awName)>
+                        <cfset local.awTypeEncoded = EncodeForHTML(local.awType)>
+                        <div class="card mb-2 award-card card-surface" data-idx="<cfoutput>#local.awIdx#</cfoutput>">
+                            <div class="card-body py-2 px-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong><cfoutput>#local.awNameEncoded#</cfoutput></strong><cfif len(local.awType)> <span class="badge badge-secondary"><cfoutput>#local.awTypeEncoded#</cfoutput></span></cfif>
+                                    </div>
+                                    <div>
+                                        <button type="button" class="btn btn-sm btn-edit edit-award-btn" data-idx="<cfoutput>#local.awIdx#</cfoutput>"><i class="bi bi-pencil-square me-1"></i>Edit</button>
+                                        <button type="button" class="btn btn-sm btn-remove remove-award-btn" data-idx="<cfoutput>#local.awIdx#</cfoutput>"><i class="bi bi-trash me-1"></i>Remove</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </cfloop>
+                    <cfloop from="1" to="#arrayLen(spAwards)#" index="ai">
+                        <cfset aw = spAwards[ai]>
+                        <cfset local.awIdx = ai - 1>
+                        <input type="hidden" data-award-field="name" data-award-idx="<cfoutput>#local.awIdx#</cfoutput>" value="<cfoutput>#EncodeForHTMLAttribute(trim(aw.AWARDNAME))#</cfoutput>">
+                        <input type="hidden" data-award-field="type" data-award-idx="<cfoutput>#local.awIdx#</cfoutput>" value="<cfoutput>#EncodeForHTMLAttribute(aw.AWARDTYPE ?: "")#</cfoutput>">
+                    </cfloop>
+                </cfif>
+            </div>
+            <cfset local.awardCountVal = showDegreesAwards ? arrayLen(spAwards) : 0>
+            <input type="hidden" id="awardCount" value="<cfoutput>#local.awardCountVal#</cfoutput>">
+        </div>
+        <cfif showFacultyProfile>
+            <hr>
+            <h6 class="fw-bold mb-3">Faculty</h6>
+            <input type="hidden" name="processBio" value="1">
+            <div class="mb-4">
+                <label class="form-label fw-bold">Bio / About Me</label>
+                <div id="bio-editor" class="users-edit-bio-editor"><cfoutput>#bioContent#</cfoutput></div>
+                <input type="hidden" name="bioContent" id="bioContentHidden" value="<cfoutput>#EncodeForHTMLAttribute(bioContent)#</cfoutput>">
+            </div>
+        </cfif>
+        <cfif showStaffProfile>
+            <hr>
+            <h6 class="fw-bold mb-3">Staff</h6>
+            <cfif showBio AND NOT showFacultyProfile>
+                <input type="hidden" name="processBio" value="1">
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Bio (Public-Facing)</label>
+                    <div id="bio-editor" class="users-edit-bio-editor"><cfoutput>#bioContent#</cfoutput></div>
+                    <input type="hidden" name="bioContent" id="bioContentHidden" value="<cfoutput>#EncodeForHTMLAttribute(bioContent)#</cfoutput>">
+                </div>
+            <cfelseif NOT showBio>
+                <p class="text-muted">Bio is available when the <em>public-facing</em> flag is enabled.</p>
+            <cfelse>
+                <p class="text-muted">Bio is managed in the Faculty section above.</p>
+            </cfif>
+        </cfif>
+        <cfif showCurrentStudent OR showAlumni>
+            <hr>
+            <h6 class="fw-bold mb-3">Student Data</h6>
+            <input type="hidden" name="processAcademicInfo" value="1">
+            <input type="hidden" name="processStudentProfile" value="1">
+            <cfif isSuperAdmin>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Current Grad Year <span class="badge badge-warning">Legacy / Super Admin</span></label>
+                        <input class="form-control" name="CurrentGradYear" id="currentGradYear" value="<cfoutput>#currentGradYear#</cfoutput>" placeholder="e.g. 2028">
+                        <div class="form-text text-muted">Legacy field. Prefer setting Expected Grad Year on the UHCO degree row above.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Original Grad Year <span class="badge badge-warning">Legacy / Super Admin</span></label>
+                        <cfset local.origGradDisabled = (len(currentGradYear) ? "" : "disabled")>
+                        <input class="form-control" name="OriginalGradYear" id="originalGradYear" value="<cfoutput>#originalGradYear#</cfoutput>" placeholder="e.g. 2027" <cfoutput>#local.origGradDisabled#</cfoutput>>
+                        <div class="form-text">Requires a Current Grad Year.</div>
+                    </div>
+                </div>
+            <cfelse>
+                <input type="hidden" name="CurrentGradYear" value="<cfoutput>#EncodeForHTMLAttribute(currentGradYear)#</cfoutput>">
+                <input type="hidden" name="OriginalGradYear" value="<cfoutput>#EncodeForHTMLAttribute(originalGradYear)#</cfoutput>">
+            </cfif>
+            <div class="row mb-3">
+                <div class="col-md-3">
+                    <label class="form-label">Commencement Age</label>
+                    <input class="form-control" type="number" name="sp_commencement_age" min="0" max="120" value="<cfoutput>#EncodeForHTMLAttribute(spCommAge)#</cfoutput>">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">First Externship</label>
+                    <input class="form-control" name="sp_first_externship" value="<cfoutput>#EncodeForHTMLAttribute(spFirstExt)#</cfoutput>">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Second Externship</label>
+                    <input class="form-control" name="sp_second_externship" value="<cfoutput>#EncodeForHTMLAttribute(spSecondExt)#</cfoutput>">
+                </div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-12">
+                    <label class="form-label">Dissertation / Thesis</label>
+                    <textarea class="form-control" name="sp_dissertation_thesis" rows="3" placeholder="Enter dissertation or thesis title"><cfoutput>#EncodeForHTML(spDissertation)#</cfoutput></textarea>
                 </div>
             </div>
 
-            <h6 class='fw-bold mb-3'>Personal</h6>
-            <div class='row mb-3'>
-                <div class='col-md-3'>
-                    <label class='form-label'>Date of Birth</label>
-                    <input class='form-control' type='date' name='DOB' value='#(isDate(user.DOB ?: "") ? dateFormat(user.DOB, "yyyy-mm-dd") : "")#'>
-                </div>
-                <div class='col-md-3'>
-                    <label class='form-label'>Gender</label>
-                    <select class='form-select' name='Gender'>
-                        <option value=''>--</option>
-                        <option value='Male' #((user.GENDER ?: "") EQ "Male" ? "selected" : "")#>Male</option>
-                        <option value='Female' #((user.GENDER ?: "") EQ "Female" ? "selected" : "")#>Female</option>
-                    </select>
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <label class="form-label fw-semibold mb-0">Residencies</label>
+                <div>
+                    <button type="button" class="btn btn-sm btn-ui-add" id="addResidencyBtn"><i class="bi bi-plus-circle me-1"></i>Add Residency</button>
+                    <span id="residenciesSaveStatus" class="save-status ms-1"></span>
                 </div>
             </div>
-
-">
-
-<!--- ── Degrees & Awards (shared, shown once) ── --->
-<!---
-     degreesContainer and awardsContainer are ALWAYS rendered (possibly hidden) so
-     users-edit.js can always find them and wire the Add Degree / Add Award buttons.
-     The wrapping div uses display:none when showDegreesAwards is false so nothing
-     is visible, but the JS IIFE no longer bails out on a null container.
---->
-<cfset content &= "<hr id='bioDegreesAwardsDivider'#local.bioDegreesDisplayStyle#><h6 id='bioDegreesAwardsHeading' class='fw-bold mb-3'#local.bioDegreesDisplayStyle#>Degrees &amp; Awards</h6>">
-
-<cfif showDegreesAwards>
-    <!--- Degrees composite read-only field for super-admin --->
-    <cfif isSuperAdmin AND len(local.compositeDegreesValue)>
-        <cfset content &= "<div class='row mb-3'><div class='col-md-8'>
-            <label class='form-label text-muted'>Combined Degrees (auto-generated, read-only)</label>
-            <input class='form-control form-control-sm' id='bio_composite' value='#EncodeForHTMLAttribute(local.compositeDegreesValue)#' readonly disabled>
-        </div></div>">
-    </cfif>
-</cfif>
-
-<!--- Always render degreesContainer --->
-<cfset content &= "
-            <div id='bioDegreesSection' class='mb-4'#(NOT showDegreesAwards ? ' style=''display:none''' : '')#>
-                <label class='form-label fw-semibold'>Degrees</label>
-                <div id='degreesContainer'>
-">
-<cfif showDegreesAwards>
-    <cfloop from="1" to="#arrayLen(userDegrees)#" index="local.di">
-        <cfset local.dg = userDegrees[local.di]>
-        <cfset content &= "
-                    <div class='card mb-2 degree-card card-surface' data-idx='#(local.di-1)#'>
-                        <div class='card-body py-2 px-3'>
-                            <div class='d-flex justify-content-between align-items-center'>
+            <div id="residenciesContainer" class="mb-3">
+                <cfloop from="1" to="#arrayLen(spResidencies)#" index="local.ri">
+                    <cfset local.rr = spResidencies[local.ri]>
+                    <cfset local.resIdx = local.ri - 1>
+                    <cfset local.location = trim(local.rr.LOCATION ?: "")>
+                    <cfset local.specialty = trim(local.rr.SPECIALTY ?: "")>
+                    <cfset local.startingYear = trim((local.rr.STARTINGYEAR ?: "") & "")>
+                    <cfset local.isUHCO = (structKeyExists(local.rr, "ISUHCO") AND ((isBoolean(local.rr.ISUHCO ?: "") AND local.rr.ISUHCO) OR (val(local.rr.ISUHCO ?: 0) EQ 1))) ? 1 : 0>
+                    <cfset local.isCurrent = (structKeyExists(local.rr, "ISCURRENT") AND ((isBoolean(local.rr.ISCURRENT ?: "") AND local.rr.ISCURRENT) OR (val(local.rr.ISCURRENT ?: 0) EQ 1))) ? 1 : 0>
+                    <div class="card mb-2 residency-card card-surface" data-idx="<cfoutput>#local.resIdx#</cfoutput>">
+                        <div class="card-body py-2 px-3">
+                            <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <strong>#EncodeForHTML(local.dg.DEGREENAME)#</strong>
-                                    <cfif len(trim(local.dg.UNIVERSITY ?: ""))> — #EncodeForHTML(local.dg.UNIVERSITY)#</cfif>
-                                    <cfif len(trim(local.dg.DEGREEYEAR ?: ""))> <span class='badge badge-secondary'>#EncodeForHTML(local.dg.DEGREEYEAR)#</span></cfif>
+                                    <strong><cfoutput>#EncodeForHTML(local.location)#</cfoutput></strong>
+                                    <cfif len(local.specialty)><span class="text-muted"> - <cfoutput>#EncodeForHTML(local.specialty)#</cfoutput></span></cfif>
+                                    <cfif len(local.startingYear)><span class="badge badge-secondary ms-1"><cfoutput>#EncodeForHTML(local.startingYear)#</cfoutput></span></cfif>
+                                    <cfif local.isUHCO EQ 1><span class="badge bg-primary ms-1">UHCO</span></cfif>
+                                    <cfif local.isCurrent EQ 1><span class="badge bg-success ms-1">Current</span></cfif>
                                 </div>
                                 <div>
-                                    <button type='button' class='btn btn-sm btn-edit edit-degree-btn' data-idx='#(local.di-1)#'><i class='bi bi-pencil-square me-1'></i>Edit</button>
-                                    <button type='button' class='btn btn-sm btn-remove remove-degree-btn' data-idx='#(local.di-1)#'><i class='bi bi-trash me-1'></i>Remove</button>
+                                    <button type="button" class="btn btn-sm btn-edit edit-residency-btn" data-idx="<cfoutput>#local.resIdx#</cfoutput>"><i class="bi bi-pencil-square me-1"></i>Edit</button>
+                                    <button type="button" class="btn btn-sm btn-remove remove-residency-btn" data-idx="<cfoutput>#local.resIdx#</cfoutput>"><i class="bi bi-trash me-1"></i>Remove</button>
                                 </div>
                             </div>
                         </div>
                     </div>
-        ">
-    </cfloop>
-    <cfloop from="1" to="#arrayLen(userDegrees)#" index="local.di">
-        <cfset local.dg = userDegrees[local.di]>
-        <cfset content &= "
-                <input type='hidden' data-degree-field='name' data-degree-idx='#(local.di-1)#' value='#EncodeForHTMLAttribute(local.dg.DEGREENAME)#'>
-                <input type='hidden' data-degree-field='university' data-degree-idx='#(local.di-1)#' value='#EncodeForHTMLAttribute(local.dg.UNIVERSITY ?: "")#'>
-                <input type='hidden' data-degree-field='year' data-degree-idx='#(local.di-1)#' value='#EncodeForHTMLAttribute(local.dg.DEGREEYEAR ?: "")#'>
-        ">
-    </cfloop>
-</cfif>
-<cfset content &= "
-                </div>
-                <input type='hidden' id='degreeCount' value='#(showDegreesAwards ? arrayLen(userDegrees) : 0)#'>
+                    <input type="hidden" data-residency-field="location" data-residency-idx="<cfoutput>#local.resIdx#</cfoutput>" value="<cfoutput>#EncodeForHTMLAttribute(local.location)#</cfoutput>">
+                    <input type="hidden" data-residency-field="specialty" data-residency-idx="<cfoutput>#local.resIdx#</cfoutput>" value="<cfoutput>#EncodeForHTMLAttribute(local.specialty)#</cfoutput>">
+                    <input type="hidden" data-residency-field="startingyear" data-residency-idx="<cfoutput>#local.resIdx#</cfoutput>" value="<cfoutput>#EncodeForHTMLAttribute(local.startingYear)#</cfoutput>">
+                    <input type="hidden" data-residency-field="isuhco" data-residency-idx="<cfoutput>#local.resIdx#</cfoutput>" value="<cfoutput>#local.isUHCO#</cfoutput>">
+                    <input type="hidden" data-residency-field="iscurrent" data-residency-idx="<cfoutput>#local.resIdx#</cfoutput>" value="<cfoutput>#local.isCurrent#</cfoutput>">
+                </cfloop>
             </div>
-">
-
-<!--- Always render awardsContainer --->
-<cfset content &= "
-            <div id='bioAwardsSection' class='mb-4 mt-3'#(NOT showDegreesAwards ? ' style=''display:none''' : '')#>
-                <label class='form-label fw-semibold'>Awards &amp; Honors</label>
-                <div id='awardsContainer'>
-">
-<cfif showDegreesAwards>
-    <cfset awardOptions = 'Gold Key,Summa cum laude,Magna cum laude,BSK Gold,BSK Black & Gold,AOSA Honors,NOSA Honors,Other'>
-    <cfloop from="1" to="#arrayLen(spAwards)#" index="ai">
-        <cfset aw = spAwards[ai]>
-        <cfset awName = trim(aw.AWARDNAME)>
-        <cfset content &= "
-                    <div class='card mb-2 award-card card-surface' data-idx='#(ai-1)#'>
-                        <div class='card-body py-2 px-3'>
-                            <div class='d-flex justify-content-between align-items-center'>
-                                <div>
-                                    <strong>#EncodeForHTML(awName)#</strong>
-                                    <cfif len(trim(aw.AWARDTYPE ?: ""))> <span class='badge badge-secondary'>#EncodeForHTML(aw.AWARDTYPE)#</span></cfif>
-                                </div>
-                                <div>
-                                    <button type='button' class='btn btn-sm btn-edit edit-award-btn' data-idx='#(ai-1)#'><i class='bi bi-pencil-square me-1'></i>Edit</button>
-                                    <button type='button' class='btn btn-sm btn-remove remove-award-btn' data-idx='#(ai-1)#'><i class='bi bi-trash me-1'></i>Remove</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-        ">
-    </cfloop>
-    <cfloop from="1" to="#arrayLen(spAwards)#" index="ai">
-        <cfset aw = spAwards[ai]>
-        <cfset content &= "
-                <input type='hidden' data-award-field='name' data-award-idx='#(ai-1)#' value='#EncodeForHTMLAttribute(trim(aw.AWARDNAME))#'>
-                <input type='hidden' data-award-field='type' data-award-idx='#(ai-1)#' value='#EncodeForHTMLAttribute(aw.AWARDTYPE ?: "")#'>
-        ">
-    </cfloop>
-</cfif>
-<cfset content &= "
-                </div>
-                <input type='hidden' id='awardCount' value='#(showDegreesAwards ? arrayLen(spAwards) : 0)#'>
-            </div>
-">
-
-<!--- ── Faculty section (bio editor) ── --->
-<cfif showFacultyProfile>
-    <cfset content &= "
-            <div id='bioFacultySection'>
-            <hr>
-            <h6 class='fw-bold mb-3'>Faculty</h6>
-            <input type='hidden' name='processBio' value='1'>
-            <div class='mb-4'>
-                <label class='form-label fw-bold'>Bio / About Me</label>
-                <div id='bio-editor' class='users-edit-bio-editor'>#bioContent#</div>
-                <input type='hidden' name='bioContent' id='bioContentHidden' value='#EncodeForHTMLAttribute(bioContent)#'>
-            </div>
-            </div>
-    ">
-</cfif>
-
-<!--- ── Staff section (bio editor if public-facing) ── --->
-<cfif showStaffProfile>
-    <cfset content &= "<hr><h6 class='fw-bold mb-3'>Staff</h6>">
-    <cfif showBio AND NOT showFacultyProfile>
-        <cfset content &= "
-            <input type='hidden' name='processBio' value='1'>
-            <div class='mb-4'>
-                <label class='form-label fw-bold'>Bio (Public-Facing)</label>
-                <div id='bio-editor' class='users-edit-bio-editor'>#bioContent#</div>
-                <input type='hidden' name='bioContent' id='bioContentHidden' value='#EncodeForHTMLAttribute(bioContent)#'>
-            </div>
-        ">
-    <cfelseif NOT showBio>
-        <cfset content &= "<p class='text-muted'>Bio is available when the <em>public-facing</em> flag is enabled.</p>">
-    <cfelse>
-        <cfset content &= "<p class='text-muted'>Bio is managed in the Faculty section above.</p>">
-    </cfif>
-</cfif>
-
-<!--- ── Student Data section (Current Students & Alumni) ── --->
-<cfif showCurrentStudent OR showAlumni>
-    <cfset content &= "
-            <hr>
-            <h6 class='fw-bold mb-3'>Student Data</h6>
-            <input type='hidden' name='processAcademicInfo' value='1'>
-            <input type='hidden' name='processStudentProfile' value='1'>
-            <div class='row mb-3'>
-                <div class='col-md-6'>
-                    <label class='form-label'>Current Grad Year</label>
-                    <input class='form-control' name='CurrentGradYear' id='currentGradYear' value='#currentGradYear#' placeholder='e.g. 2028'>
-                </div>
-                <div class='col-md-6'>
-                    <label class='form-label'>Original Grad Year</label>
-                    <input class='form-control' name='OriginalGradYear' id='originalGradYear' value='#originalGradYear#' placeholder='e.g. 2027' #(len(currentGradYear) ? '' : 'disabled')#>
-                    <div class='form-text'>Requires a Current Grad Year.</div>
-                </div>
-            </div>
-            <div class='row mb-3'>
-                <div class='col-md-3'>
-                    <label class='form-label'>Commencement Age</label>
-                    <input class='form-control' type='number' name='sp_commencement_age' min='0' max='120' value='#EncodeForHTMLAttribute(spCommAge)#'>
-                </div>
-                <div class='col-md-4'>
-                    <label class='form-label'>First Externship</label>
-                    <input class='form-control' name='sp_first_externship' value='#EncodeForHTMLAttribute(spFirstExt)#'>
-                </div>
-                <div class='col-md-4'>
-                    <label class='form-label'>Second Externship</label>
-                    <input class='form-control' name='sp_second_externship' value='#EncodeForHTMLAttribute(spSecondExt)#'>
-                </div>
-            </div>
-    ">
-</cfif>
+        </cfif>
+</cfsavecontent>
+<cfset content &= local.bioTabContent>
 
 <!--- ── Alumni Data section ── --->
 <cfif showAlumni>
@@ -2699,7 +2853,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 <!--- ── Degree Modal ── --->
 <div class="modal fade" id="degreeModal" tabindex="-1" aria-labelledby="degreeModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-sm">
+    <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="degreeModalLabel">Add Degree</h5>
@@ -2707,17 +2861,59 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
             <div class="modal-body">
                 <input type="hidden" id="degreeEditIdx" value="-1">
-                <div class="mb-3">
-                    <label class="form-label">Degree Name</label>
-                    <input class="form-control" id="degreeName">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Degree Name</label>
+                        <input class="form-control" id="degreeName">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">University</label>
+                        <input class="form-control" id="degreeUniversity">
+                    </div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">University</label>
-                    <input class="form-control" id="degreeUniversity">
+                <div class="row g-3 mt-1">
+                    <div class="col-md-4">
+                        <label class="form-label">Graduation Year</label>
+                        <input class="form-control" id="degreeYear" inputmode="numeric">
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label">Program</label>
+                        <select class="form-select" id="degreeProgram">
+                            <option value="">-- None --</option>
+                            <option value="OD">OD</option>
+                            <option value="MS">MS</option>
+                            <option value="PhD">PhD</option>
+                            <option value="Residency">Residency</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Year</label>
-                    <input class="form-control" id="degreeYear">
+
+                <hr>
+
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="degreeIsUHCO">
+                    <label class="form-check-label" for="degreeIsUHCO">UHCO Degree</label>
+                </div>
+
+                <div id="degreeUhcoFields" class="border rounded p-3 bg-light d-none">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="degreeIsEnrolled">
+                        <label class="form-check-label" for="degreeIsEnrolled">Currently Enrolled</label>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="degreeHasYearChange">
+                        <label class="form-check-label" for="degreeHasYearChange">Expected Grad Year Changed</label>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Expected Grad Year</label>
+                            <input class="form-control" id="degreeExpectedGradYear" inputmode="numeric">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Original Expected Grad Year</label>
+                            <input class="form-control" id="degreeOriginalExpectedGradYear" inputmode="numeric">
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -2768,6 +2964,45 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="modal-footer">
                 <button type="button" class="btn btn-ui-neutral" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-ui-success" id="saveAwardModalBtn">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!--- ── Residency Modal ── --->
+<div class="modal fade" id="residencyModal" tabindex="-1" aria-labelledby="residencyModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="residencyModalLabel">Add Residency</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="residencyEditIdx" value="-1">
+                <div class="mb-3">
+                    <label class="form-label">Location</label>
+                    <input class="form-control" id="residencyLocation" placeholder="University of Houston College of Optometry">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Specialty</label>
+                    <input class="form-control" id="residencySpecialty" placeholder="Pediatric Optometry">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Starting Year</label>
+                    <input class="form-control" id="residencyStartingYear" inputmode="numeric" placeholder="2026">
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="residencyIsUHCO">
+                    <label class="form-check-label" for="residencyIsUHCO">UHCO Residency</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="residencyIsCurrent">
+                    <label class="form-check-label" for="residencyIsCurrent">Current Residency</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ui-neutral" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-ui-success" id="saveResidencyModalBtn">Save</button>
             </div>
         </div>
     </div>

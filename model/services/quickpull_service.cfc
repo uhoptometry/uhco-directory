@@ -25,8 +25,8 @@ component output="false" singleton {
                 key = "gradclass",
                 label = "GradClass",
                 endpoint = "/api/v1/quickpulls/gradclass",
-                description = "Graduation class list filtered by year and program.",
-                baseFields = ["USERID", "FIRSTNAME", "MIDDLENAME", "LASTNAME", "CURRENTGRADYEAR", "PROGRAM", "FULLNAME", "INTERACTIVEUSERIMAGE", "KIOSKROSTERIMAGE", "KIOSKPROFILEIMAGE"]
+                description = "Graduation class list filtered by year and program with combined DEGREES and flattened AWARDNAME fields.",
+                baseFields = ["USERID", "FIRSTNAME", "MIDDLENAME", "LASTNAME", "FULLNAME", "PROGRAM", "KIOSKROSTERIMAGE", "KIOSKPROFILEIMAGE", "FIRSTEXTERNSHIP", "SECONDEXTERNSHIP", "HOMETOWNFULL", "DEGREES", "AWARDNAME1"]
             },
             {
                 key = "graduate",
@@ -67,8 +67,13 @@ component output="false" singleton {
 
     public struct function getQuickpullEditModel( required string quickpullType ) {
         var definition = getQuickpullDefinition(arguments.quickpullType);
+        var biographicalOptions = _getBiographicalOptions();
         if ( structIsEmpty(definition) ) {
             return {};
+        }
+
+        if ( lCase(arguments.quickpullType) EQ "gradclass" ) {
+            biographicalOptions = _withoutOptionValue(biographicalOptions, "CURRENTGRADYEAR");
         }
 
         return {
@@ -79,14 +84,14 @@ component output="false" singleton {
                 emailTypes = _getEmailTypeOptions(),
                 phoneTypes = _getPhoneTypeOptions(),
                 addressTypes = _getAddressTypeOptions(),
-                biographicalItems = _getBiographicalOptions(),
+                biographicalItems = biographicalOptions,
                 imageVariants = _getImageVariantOptions(),
                 externalSystems = _getExternalSystemOptions()
             }
         };
     }
 
-    public struct function normalizeQuickpullConfig( required struct submittedConfig ) {
+    public struct function normalizeQuickpullConfig( required struct submittedConfig, string quickpullType = "" ) {
         var normalized = _getDefaultQuickpullConfig();
         var allowedGeneral = _getAllowedValueSet( _getGeneralFieldOptions() );
         var allowedEmails = _getAllowedValueSet( _getEmailTypeOptions() );
@@ -106,6 +111,10 @@ component output="false" singleton {
         normalized.appendOrganizations = _toBoolean(arguments.submittedConfig.appendOrganizations ?: false);
         normalized.appendFlags = _toBoolean(arguments.submittedConfig.appendFlags ?: false);
 
+        if ( lCase(arguments.quickpullType) EQ "gradclass" ) {
+            normalized.biographicalItems = _removeSelection(normalized.biographicalItems, "CURRENTGRADYEAR");
+        }
+
         return normalized;
     }
 
@@ -117,7 +126,7 @@ component output="false" singleton {
 
         variables.appConfigService.setValue(
             _getQuickpullConfigKey(arguments.quickpullType),
-            serializeJSON( normalizeQuickpullConfig(arguments.submittedConfig) )
+            serializeJSON( normalizeQuickpullConfig(arguments.submittedConfig, arguments.quickpullType) )
         );
     }
 
@@ -144,10 +153,21 @@ component output="false" singleton {
 
     /**
      * Alumni graduation class quick pull.
-     * Flat list filtered by grad year: UserID, FirstName, MiddleName, LastName, CurrentGradYear.
+     * Flat list filtered by degree graduation year: UserID, FullName, Program and configured output fields.
      */
-    public array function getGradClass( required numeric gradYear, required string programName ) {
-        var users = variables.dao.getGradClassUsers( arguments.gradYear, arguments.programName );
+    public array function getGradClass(
+        required numeric gradYear,
+        required string programName,
+        string lastNameFilter = ""
+    ) {
+        var gradClassConfig = _getQuickpullConfig( "gradclass" );
+        var filterRange = _resolveGradClassLastNameFilterRange(arguments.lastNameFilter);
+        var users = variables.dao.getGradClassUsers(
+            arguments.gradYear,
+            arguments.programName,
+            filterRange.start,
+            filterRange.finish
+        );
         if ( arrayLen(users) == 0 ) return [];
 
         var ids = [];
@@ -155,19 +175,62 @@ component output="false" singleton {
             arrayAppend( ids, user.USERID );
         }
 
-        var interactiveMap = variables.dao.getImageMapByVariant( "interactive_roster", ids );
         var rosterMap      = variables.dao.getImageMapByVariant( "KIOSK_ROSTER", ids );
         var profileMap     = variables.dao.getImageMapByVariant( "KIOSK_PROFILE", ids );
+        var degreesByUser  = _buildUserDegreeMap( variables.dao.getDegreesForUsers( ids ) );
+        var awardsByUser   = _buildUserAwardNameMap( variables.dao.getAwardsForUsers( ids ) );
+        var rows = [];
+        var profileCache = {};
 
         for ( var i = 1; i <= arrayLen(users); i++ ) {
-            var key = toString( users[i].USERID );
-            users[i]["FULLNAME"] = buildFullName( users[i] );
-            users[i]["INTERACTIVEUSERIMAGE"] = structKeyExists( interactiveMap, key ) ? interactiveMap[ key ] : "";
-            users[i]["KIOSKROSTERIMAGE"] = structKeyExists( rosterMap, key ) ? rosterMap[ key ] : "";
-            users[i]["KIOSKPROFILEIMAGE"] = structKeyExists( profileMap, key ) ? profileMap[ key ] : "";
+            var userID = val( users[i].USERID ?: 0 );
+            var key = toString( userID );
+            var row = {
+                "USERID" = userID,
+                "FIRSTNAME" = users[i].FIRSTNAME ?: "",
+                "MIDDLENAME" = users[i].MIDDLENAME ?: "",
+                "LASTNAME" = users[i].LASTNAME ?: "",
+                "FULLNAME" = buildFullName( users[i] ),
+                "PROGRAM" = users[i].PROGRAM ?: "",
+                "KIOSKROSTERIMAGE" = structKeyExists( rosterMap, key ) ? rosterMap[ key ] : "",
+                "KIOSKPROFILEIMAGE" = structKeyExists( profileMap, key ) ? profileMap[ key ] : "",
+                "FIRSTEXTERNSHIP" = users[i].FIRSTEXTERNSHIP ?: "",
+                "SECONDEXTERNSHIP" = users[i].SECONDEXTERNSHIP ?: "",
+                "DISSERTATIONTHESIS" = users[i].DISSERTATIONTHESIS ?: "",
+                "HOMETOWNFULL" = _buildHometownFull( users[i].HOMETOWNCITY ?: "", users[i].HOMETOWNSTATE ?: "" ),
+                "DEGREES" = structKeyExists( degreesByUser, key ) ? degreesByUser[ key ] : ""
+            };
+
+            if ( structKeyExists( awardsByUser, key ) ) {
+                for ( var awardIndex = 1; awardIndex <= arrayLen(awardsByUser[ key ]); awardIndex++ ) {
+                    row["AWARDNAME" & awardIndex] = awardsByUser[ key ][ awardIndex ];
+                }
+            }
+
+            _applyConfiguredFieldsToRowWithConfig( row, userID, gradClassConfig, profileCache );
+            arrayAppend( rows, row );
         }
 
-        return _appendConfiguredFieldsToRows( users, "gradclass" );
+        return rows;
+    }
+
+    private struct function _resolveGradClassLastNameFilterRange( string lastNameFilter = "" ) {
+        var normalizedFilter = uCase(trim(arguments.lastNameFilter ?: ""));
+        var filterMap = {
+            "A-C" = { start = "A", finish = "C" },
+            "D-G" = { start = "D", finish = "G" },
+            "H-K" = { start = "H", finish = "K" },
+            "L-M" = { start = "L", finish = "M" },
+            "N-P" = { start = "N", finish = "P" },
+            "Q-S" = { start = "Q", finish = "S" },
+            "T-Z" = { start = "T", finish = "Z" }
+        };
+
+        if ( len(normalizedFilter) AND structKeyExists(filterMap, normalizedFilter) ) {
+            return filterMap[ normalizedFilter ];
+        }
+
+        return { start = "", finish = "" };
     }
 
     /**
@@ -271,7 +334,7 @@ component output="false" singleton {
         // Get CurrentGradYear if user is Alumni or Current-Student
         if (hasAlumniOrStudent) {
             var academic = profile.academic ?: {};
-            user.CURRENTGRADYEAR = academic.CURRENTGRADYEAR ?: "";
+            user.CURRENTGRADYEAR = academic.EFFECTIVEGRADYEAR ?: (academic.CURRENTGRADYEAR ?: "");
         } else {
             user.CURRENTGRADYEAR = "";
         }
@@ -289,6 +352,83 @@ component output="false" singleton {
         _applyConfiguredFieldsToRow(user, userID, "myuhco", {});
 
         return user;
+    }
+
+    /**
+     * MyUHCO roster metadata listing for generated class PDFs.
+     * Returns local roster file details plus last Dropbox publish status/path when available.
+     */
+    public array function getMyUHCORosterCatalog( boolean publishedOnly = false ) {
+        var rosterDirectory = expandPath("/_temp_rosters");
+        var publishMetaPath = rosterDirectory & "/.publish-status.json";
+        var publishMeta = {};
+        var fileQuery = queryNew("name,size,dateLastModified,type");
+        var pattern = "^class-of-([0-9]{4})-roster\.pdf$";
+
+        if ( fileExists(publishMetaPath) ) {
+            try {
+                var publishMetaRaw = trim(fileRead(publishMetaPath, "utf-8"));
+                if ( len(publishMetaRaw) AND isJSON(publishMetaRaw) ) {
+                    publishMeta = deserializeJSON(publishMetaRaw);
+                    if ( !isStruct(publishMeta) ) {
+                        publishMeta = {};
+                    }
+                }
+            } catch ( any ignored ) {
+                publishMeta = {};
+            }
+        }
+
+        if ( !directoryExists(rosterDirectory) ) {
+            return [];
+        }
+
+        directoryList(
+            rosterDirectory,
+            false,
+            "query",
+            "class-of-*-roster.pdf",
+            "dateLastModified DESC",
+            "fileQuery"
+        );
+
+        var result = [];
+        for ( var row in queryToArray(fileQuery) ) {
+            var fileName = trim(row.NAME ?: "");
+            var fileMatch = reFindNoCase(pattern, fileName, 1, true);
+            var gradYear = 0;
+            var metaKey = lCase(fileName);
+            var fileMeta = structKeyExists(publishMeta, metaKey) AND isStruct(publishMeta[metaKey]) ? publishMeta[metaKey] : {};
+            var publishStatus = lCase(trim(fileMeta.lastStatus ?: ""));
+
+            if ( arrayLen(fileMatch.pos) LT 2 OR fileMatch.pos[2] LTE 0 ) {
+                continue;
+            }
+
+            gradYear = val(mid(fileName, fileMatch.pos[2], fileMatch.len[2]));
+
+            if ( arguments.publishedOnly AND publishStatus NEQ "ok" ) {
+                continue;
+            }
+
+            arrayAppend(result, {
+                FILENAME = fileName,
+                GRADYEAR = gradYear,
+                SIZEKB = javacast("double", (val(row.SIZE ?: 0) / 1024)),
+                DATELASTMODIFIED = isDate(row.DATELASTMODIFIED ?: "")
+                    ? dateTimeFormat(row.DATELASTMODIFIED, "yyyy-mm-dd'T'HH:nn:ss")
+                    : "",
+                LOCALURL = "/_temp_rosters/" & fileName,
+                PUBLISHED = (publishStatus EQ "ok"),
+                LASTPUBLISHSTATUS = publishStatus,
+                LASTPUBLISHATTEMPTAT = trim(fileMeta.lastAttemptAt ?: ""),
+                LASTPUBLISHEDAT = trim(fileMeta.lastPublishedAt ?: ""),
+                LASTPUBLISHEDPATH = trim(fileMeta.lastPublishedPath ?: ""),
+                LASTERROR = trim(fileMeta.lastError ?: "")
+            });
+        }
+
+        return result;
     }
 
     private array function _appendConfiguredFieldsToRows( required array rows, required string quickpullType ) {
@@ -313,10 +453,25 @@ component output="false" singleton {
         required struct profileCache
     ) {
         var config = _getQuickpullConfig( arguments.quickpullType );
+
+        _applyConfiguredFieldsToRowWithConfig(
+            arguments.row,
+            arguments.userID,
+            config,
+            arguments.profileCache
+        );
+    }
+
+    private void function _applyConfiguredFieldsToRowWithConfig(
+        required struct row,
+        required numeric userID,
+        required struct config,
+        required struct profileCache
+    ) {
         var cacheKey = toString(arguments.userID);
         var profile = {};
 
-        if ( arguments.userID LTE 0 OR !_hasConfiguredItems(config) ) {
+        if ( arguments.userID LTE 0 OR !_hasConfiguredItems(arguments.config) ) {
             return;
         }
 
@@ -326,17 +481,17 @@ component output="false" singleton {
 
         profile = arguments.profileCache[cacheKey];
 
-        _appendGeneralFields(arguments.row, profile, config.generalFields);
-        _appendContactFields(arguments.row, profile, config);
-        _appendBiographicalFields(arguments.row, profile, config.biographicalItems);
-        _appendImageFields(arguments.row, profile, config.imageVariants);
-        _appendExternalIDFields(arguments.row, profile, config.externalSystems);
+        _appendGeneralFields(arguments.row, profile, arguments.config.generalFields);
+        _appendContactFields(arguments.row, profile, arguments.config);
+        _appendBiographicalFields(arguments.row, profile, arguments.config.biographicalItems);
+        _appendImageFields(arguments.row, profile, arguments.config.imageVariants);
+        _appendExternalIDFields(arguments.row, profile, arguments.config.externalSystems);
 
-        if ( config.appendOrganizations ) {
+        if ( arguments.config.appendOrganizations ) {
             arguments.row["ORGANIZATIONS"] = profile.organizations ?: [];
         }
 
-        if ( config.appendFlags ) {
+        if ( arguments.config.appendFlags ) {
             arguments.row["FLAGS"] = profile.flags ?: [];
         }
     }
@@ -363,7 +518,7 @@ component output="false" singleton {
             return _getDefaultQuickpullConfig();
         }
 
-        return normalizeQuickpullConfig(parsed);
+        return normalizeQuickpullConfig(parsed, arguments.quickpullType);
     }
 
     private string function _getQuickpullConfigKey( required string quickpullType ) {
@@ -400,8 +555,54 @@ component output="false" singleton {
         var userData = arguments.profile.user ?: {};
 
         for ( var fieldName in arguments.selectedFields ) {
-            arguments.row[fieldName] = structKeyExists(userData, fieldName) ? userData[fieldName] : "";
+            if ( compareNoCase(fieldName, "PREFERREDNAME") EQ 0 ) {
+                var preferredFirstName = _normalizeMeaningfulNamePart(userData.PREFERREDNAME ?: "");
+                var resolvedFirstName = _firstMeaningfulNamePart([
+                    preferredFirstName,
+                    userData.FIRSTNAME ?: "",
+                    arguments.row["FIRSTNAME"] ?: ""
+                ]);
+                var resolvedMiddleName = _firstMeaningfulNamePart([
+                    userData.MIDDLENAME ?: "",
+                    arguments.row["MIDDLENAME"] ?: ""
+                ]);
+                var resolvedLastName = _firstMeaningfulNamePart([
+                    userData.LASTNAME ?: "",
+                    arguments.row["LASTNAME"] ?: ""
+                ]);
+                arguments.row["FIRSTNAME"] = resolvedFirstName;
+                arguments.row["MIDDLENAME"] = resolvedMiddleName;
+                arguments.row["LASTNAME"] = resolvedLastName;
+            } else {
+                arguments.row[fieldName] = structKeyExists(userData, fieldName) ? userData[fieldName] : "";
+            }
         }
+    }
+
+    private string function _firstMeaningfulNamePart( required array candidates ) {
+        for ( var candidate in arguments.candidates ) {
+            var normalizedCandidate = _normalizeMeaningfulNamePart(candidate);
+            if ( len(normalizedCandidate) ) {
+                return normalizedCandidate;
+            }
+        }
+
+        return "";
+    }
+
+    private string function _normalizeMeaningfulNamePart( any rawValue = "" ) {
+        var normalized = trim(arguments.rawValue ?: "");
+
+        if ( !len(normalized) ) {
+            return "";
+        }
+
+        // Treat punctuation-only placeholders like "." or "-" as empty.
+        if ( reFind("[\\p{L}\\p{N}]", normalized) EQ 0 ) {
+            return "";
+        }
+
+        return normalized;
     }
 
     private void function _appendContactFields( required struct row, required struct profile, required struct config ) {
@@ -425,6 +626,7 @@ component output="false" singleton {
     private void function _appendBiographicalFields( required struct row, required struct profile, required array selectedItems ) {
         var academic = arguments.profile.academic ?: {};
         var studentProfile = arguments.profile.studentProfile ?: {};
+        var residencies = arguments.profile.residencies ?: [];
         var bio = arguments.profile.bio ?: {};
 
         for ( var itemKey in arguments.selectedItems ) {
@@ -436,7 +638,7 @@ component output="false" singleton {
                     arguments.row["STUDENTPROFILE"] = studentProfile;
                     break;
                 case "CURRENTGRADYEAR":
-                    arguments.row["CURRENTGRADYEAR"] = academic.CURRENTGRADYEAR ?: "";
+                    arguments.row["CURRENTGRADYEAR"] = academic.EFFECTIVEGRADYEAR ?: (academic.CURRENTGRADYEAR ?: "");
                     break;
                 case "ORIGINALGRADYEAR":
                     arguments.row["ORIGINALGRADYEAR"] = academic.ORIGINALGRADYEAR ?: "";
@@ -449,6 +651,9 @@ component output="false" singleton {
                     break;
                 case "COMMENCEMENTAGE":
                     arguments.row["COMMENCEMENTAGE"] = studentProfile.COMMENCEMENTAGE ?: "";
+                    break;
+                case "DISSERTATIONTHESIS":
+                    arguments.row["DISSERTATIONTHESIS"] = studentProfile.DISSERTATIONTHESIS ?: (arguments.row["DISSERTATIONTHESIS"] ?: "");
                     break;
                 case "BIO":
                     arguments.row["BIO"] = bio;
@@ -468,8 +673,17 @@ component output="false" singleton {
                 case "DEGREES":
                     arguments.row["DEGREES"] = arguments.profile.degrees ?: [];
                     break;
+                case "ALLDEGREES":
+                    arguments.row["ALLDEGREES"] = arguments.profile.degrees ?: [];
+                    break;
+                case "UHCODEGREES":
+                    arguments.row["UHCODEGREES"] = _filterUHCODegrees(arguments.profile.degrees ?: []);
+                    break;
                 case "AWARDS":
                     arguments.row["AWARDS"] = arguments.profile.awards ?: [];
+                    break;
+                case "RESIDENCIES":
+                    arguments.row["RESIDENCIES"] = residencies;
                     break;
             }
         }
@@ -569,13 +783,80 @@ component output="false" singleton {
             { value = "FIRSTEXTERNSHIP", label = "First Externship" },
             { value = "SECONDEXTERNSHIP", label = "Second Externship" },
             { value = "COMMENCEMENTAGE", label = "Commencement Age" },
+            { value = "DISSERTATIONTHESIS", label = "Dissertation / Thesis" },
             { value = "BIO", label = "All Bio Data" },
             { value = "HOMETOWNCITY", label = "Hometown City" },
             { value = "HOMETOWNSTATE", label = "Hometown State" },
             { value = "HOMETOWNFULL", label = "Hometown Full (City, State)" },
             { value = "DEGREES", label = "Degrees" },
-            { value = "AWARDS", label = "Awards" }
+            { value = "ALLDEGREES", label = "All Degrees (Full Data)" },
+            { value = "UHCODEGREES", label = "UHCO Degrees (Full Data)" },
+            { value = "AWARDS", label = "Awards" },
+            { value = "RESIDENCIES", label = "Residencies (Full Data)" }
         ];
+    }
+
+    private array function _withoutOptionValue( required array options, required string valueToRemove ) {
+        var filtered = [];
+
+        for ( var option in arguments.options ) {
+            if ( compareNoCase(trim(option.value ?: ""), trim(arguments.valueToRemove)) NEQ 0 ) {
+                arrayAppend(filtered, option);
+            }
+        }
+
+        return filtered;
+    }
+
+    private array function _removeSelection( required array selections, required string valueToRemove ) {
+        var filtered = [];
+
+        for ( var selection in arguments.selections ) {
+            if ( compareNoCase(trim(selection ?: ""), trim(arguments.valueToRemove)) NEQ 0 ) {
+                arrayAppend(filtered, selection);
+            }
+        }
+
+        return filtered;
+    }
+
+    private array function _filterUHCODegrees( required array degrees ) {
+        var result = [];
+
+        for ( var degree in arguments.degrees ) {
+            if ( _isUHCODegree(degree) ) {
+                arrayAppend(result, degree);
+            }
+        }
+
+        return result;
+    }
+
+    private boolean function _isUHCODegree( required struct degree ) {
+        var isUhcoRaw = degree.ISUHCO ?: "";
+        var university = uCase(trim(degree.UNIVERSITY ?: ""));
+        var program = uCase(trim(degree.PROGRAM ?: ""));
+
+        // Primary signal: explicit IsUHCO flag in UserDegrees.
+        if ( isBoolean(isUhcoRaw) ) {
+            return isUhcoRaw;
+        }
+        if ( val(isUhcoRaw) EQ 1 ) {
+            return true;
+        }
+
+        // Legacy fallback: infer UHCO when rows predate IsUHCO population.
+        if ( compareNoCase(university, "UHCO") EQ 0 ) {
+            return true;
+        }
+        if ( findNoCase("HOUSTON COLLEGE OF OPTOMETRY", university) ) {
+            return true;
+        }
+        if ( listFindNoCase("OD,OD PROGRAM,PHD,PHD PROGRAM,MS,MS PROGRAM,RESIDENCY", program) ) {
+            return true;
+        }
+
+        return false;
     }
 
     private string function _buildHometownFull( string hometownCity = "", string hometownState = "" ) {
@@ -722,6 +1003,57 @@ component output="false" singleton {
         }
 
         return arrayToList(selectedDegrees, ", ");
+    }
+
+    private struct function _buildUserDegreeMap( required array degreeRows ) {
+        var groupedDegrees = {};
+
+        for ( var degreeRow in arguments.degreeRows ) {
+            var userKey = toString( degreeRow.USERID ?: "" );
+            var degreeName = trim( degreeRow.DEGREENAME ?: "" );
+
+            if ( !len(userKey) OR !len(degreeName) ) {
+                continue;
+            }
+
+            if ( !structKeyExists(groupedDegrees, userKey) ) {
+                groupedDegrees[userKey] = [];
+            }
+
+            if ( !arrayFindNoCase(groupedDegrees[userKey], degreeName) ) {
+                arrayAppend(groupedDegrees[userKey], degreeName);
+            }
+        }
+
+        var degreeMap = {};
+        for ( var mapKey in groupedDegrees ) {
+            degreeMap[ mapKey ] = arrayToList(groupedDegrees[ mapKey ], ", ");
+        }
+
+        return degreeMap;
+    }
+
+    private struct function _buildUserAwardNameMap( required array awardRows ) {
+        var awardMap = {};
+
+        for ( var awardRow in arguments.awardRows ) {
+            var userKey = toString( awardRow.USERID ?: "" );
+            var awardName = trim( awardRow.AWARDNAME ?: "" );
+
+            if ( !len(userKey) OR !len(awardName) ) {
+                continue;
+            }
+
+            if ( !structKeyExists(awardMap, userKey) ) {
+                awardMap[userKey] = [];
+            }
+
+            if ( !arrayFindNoCase(awardMap[userKey], awardName) ) {
+                arrayAppend(awardMap[userKey], awardName);
+            }
+        }
+
+        return awardMap;
     }
 
     private string function buildFullName( required struct user ) {

@@ -16,22 +16,47 @@ component extends="dao.BaseDAO" output="false" singleton {
     public void function saveProfile( required numeric userID, required struct data ) {
         data.id = userID;
         var existing = getProfile( userID );
-        var firstExternship = structKeyExists(data, "FirstExternship") ? data.FirstExternship : "";
-        var secondExternship = structKeyExists(data, "SecondExternship") ? data.SecondExternship : "";
-        var commencementAge = structKeyExists(data, "CommencementAge") ? data.CommencementAge : { value="", cfsqltype="cf_sql_integer", null=true };
-        var hometownCity = structKeyExists(data, "HometownCity") ? data.HometownCity : { value="", cfsqltype="cf_sql_nvarchar", null=true };
-        var hometownState = structKeyExists(data, "HometownState") ? data.HometownState : { value="", cfsqltype="cf_sql_nvarchar", null=true };
+        var existingFirstExternship = structIsEmpty(existing) ? "" : trim(existing.FirstExternship ?: "");
+        var existingSecondExternship = structIsEmpty(existing) ? "" : trim(existing.SecondExternship ?: "");
+        var existingCommencementAgeRaw = structIsEmpty(existing) ? "" : trim(existing.CommencementAge ?: "");
+        var existingDissertation = structIsEmpty(existing) ? "" : trim(existing.DissertationThesis ?: "");
+        var existingHometownCity = structIsEmpty(existing) ? "" : trim(existing.HometownCity ?: "");
+        var existingHometownState = structIsEmpty(existing) ? "" : trim(existing.HometownState ?: "");
+
+        var firstExternship = structKeyExists(data, "FirstExternship") ? data.FirstExternship : existingFirstExternship;
+        var secondExternship = structKeyExists(data, "SecondExternship") ? data.SecondExternship : existingSecondExternship;
+        var commencementAge = structKeyExists(data, "CommencementAge") ? data.CommencementAge : {
+            value=(len(existingCommencementAgeRaw) AND isNumeric(existingCommencementAgeRaw) ? val(existingCommencementAgeRaw) : ""),
+            cfsqltype="cf_sql_integer",
+            null=(!len(existingCommencementAgeRaw) OR !isNumeric(existingCommencementAgeRaw))
+        };
+        var dissertationThesis = structKeyExists(data, "DissertationThesis") ? data.DissertationThesis : {
+            value=existingDissertation,
+            cfsqltype="cf_sql_nvarchar",
+            null=!len(existingDissertation)
+        };
+        var hometownCity = structKeyExists(data, "HometownCity") ? data.HometownCity : {
+            value=existingHometownCity,
+            cfsqltype="cf_sql_nvarchar",
+            null=!len(existingHometownCity)
+        };
+        var hometownState = structKeyExists(data, "HometownState") ? data.HometownState : {
+            value=existingHometownState,
+            cfsqltype="cf_sql_nvarchar",
+            null=!len(existingHometownState)
+        };
 
         data.FirstExternship = firstExternship;
         data.SecondExternship = secondExternship;
         data.CommencementAge = commencementAge;
+        data.DissertationThesis = dissertationThesis;
         data.HometownCity = hometownCity;
         data.HometownState = hometownState;
 
         if ( structIsEmpty(existing) ) {
             executeQueryWithRetry(
-                "INSERT INTO UserStudentProfile (UserID, FirstExternship, SecondExternship, CommencementAge, HometownCity, HometownState)
-                 VALUES (:id, :FirstExternship, :SecondExternship, :CommencementAge, :HometownCity, :HometownState)",
+                "INSERT INTO UserStudentProfile (UserID, FirstExternship, SecondExternship, CommencementAge, DissertationThesis, HometownCity, HometownState)
+                 VALUES (:id, :FirstExternship, :SecondExternship, :CommencementAge, :DissertationThesis, :HometownCity, :HometownState)",
                 data,
                 { datasource=variables.datasource, timeout=30 }
             );
@@ -40,6 +65,7 @@ component extends="dao.BaseDAO" output="false" singleton {
                 "UPDATE UserStudentProfile
                  SET FirstExternship=:FirstExternship, SecondExternship=:SecondExternship,
                      CommencementAge=:CommencementAge,
+                     DissertationThesis=:DissertationThesis,
                      HometownCity=:HometownCity,
                      HometownState=:HometownState,
                      UpdatedAt=GETDATE()
@@ -115,6 +141,18 @@ component extends="dao.BaseDAO" output="false" singleton {
         return queryToArray(qry);
     }
 
+    public array function getResidencies( required numeric userID ) {
+        var qry = executeQueryWithRetry(
+            "SELECT ResidencyID, UserID, Location, Specialty, StartingYear, IsUHCO, IsCurrent, SortOrder
+             FROM UserResidency
+             WHERE UserID = :id
+             ORDER BY ISNULL(IsCurrent, 0) DESC, ISNULL(SortOrder, 0), ResidencyID",
+            { id={ value=userID, cfsqltype="cf_sql_integer" } },
+            { datasource=variables.datasource, timeout=30, fetchSize=100 }
+        );
+        return queryToArray(qry);
+    }
+
     public void function replaceAwards( required numeric userID, required array awards ) {
         var idParam = { id={ value=userID, cfsqltype="cf_sql_integer" } };
         executeQueryWithRetry(
@@ -135,9 +173,50 @@ component extends="dao.BaseDAO" output="false" singleton {
         }
     }
 
+    public void function replaceResidencies( required numeric userID, required array residencies ) {
+        var idParam = { id={ value=userID, cfsqltype="cf_sql_integer" } };
+        executeQueryWithRetry(
+            "DELETE FROM UserResidency WHERE UserID = :id",
+            idParam,
+            { datasource=variables.datasource, timeout=30 }
+        );
+
+        var sortOrder = 0;
+        for ( var residency in arguments.residencies ) {
+            executeQueryWithRetry(
+                "INSERT INTO UserResidency (UserID, Location, Specialty, StartingYear, IsUHCO, IsCurrent, SortOrder)
+                 VALUES (:id, :Location, :Specialty, :StartingYear, :IsUHCO, :IsCurrent, :SortOrder)",
+                {
+                    id           = { value=userID, cfsqltype="cf_sql_integer" },
+                    Location     = { value=trim(residency.location ?: ""), cfsqltype="cf_sql_nvarchar", null=!len(trim(residency.location ?: "")) },
+                    Specialty    = { value=trim(residency.specialty ?: ""), cfsqltype="cf_sql_nvarchar", null=!len(trim(residency.specialty ?: "")) },
+                    StartingYear = { value=(isNumeric(trim(residency.startingYear ?: "")) ? val(residency.startingYear) : javaCast("null", "")), cfsqltype="cf_sql_integer", null=!isNumeric(trim(residency.startingYear ?: "")) },
+                    IsUHCO       = { value=(_toBitBoolean(residency.isUHCO ?: 0) ? 1 : 0), cfsqltype="cf_sql_bit" },
+                    IsCurrent    = { value=(_toBitBoolean(residency.isCurrent ?: 0) ? 1 : 0), cfsqltype="cf_sql_bit" },
+                    SortOrder    = { value=sortOrder, cfsqltype="cf_sql_integer" }
+                },
+                { datasource=variables.datasource, timeout=30 }
+            );
+            sortOrder++;
+        }
+    }
+
+    private boolean function _toBitBoolean( any rawValue ) {
+        if ( isBoolean(arguments.rawValue) ) {
+            return arguments.rawValue;
+        }
+
+        if ( isNumeric(arguments.rawValue ?: "") ) {
+            return val(arguments.rawValue) EQ 1;
+        }
+
+        return listFindNoCase("1,true,yes,on", trim(arguments.rawValue ?: "")) GT 0;
+    }
+
     public void function deleteAllForUser( required numeric userID ) {
         var idParam = { id={ value=userID, cfsqltype="cf_sql_integer" } };
         executeQueryWithRetry( "DELETE FROM UserAwards          WHERE UserID = :id", idParam, { datasource=variables.datasource, timeout=30 } );
+        executeQueryWithRetry( "DELETE FROM UserResidency       WHERE UserID = :id", idParam, { datasource=variables.datasource, timeout=30 } );
         executeQueryWithRetry( "DELETE FROM UserStudentProfile  WHERE UserID = :id", idParam, { datasource=variables.datasource, timeout=30 } );
     }
 

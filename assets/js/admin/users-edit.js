@@ -290,8 +290,10 @@ document.addEventListener('DOMContentLoaded', function () {
             if (tabId === 'bio-info-tab') {
                 replaceContainerFromFresh(currentPane, freshPane, 'degreesContainer');
                 replaceContainerFromFresh(currentPane, freshPane, 'awardsContainer');
+                replaceContainerFromFresh(currentPane, freshPane, 'residenciesContainer');
                 clearDirty('degrees');
                 clearDirty('awards');
+                clearDirty('residencies');
             }
             if (tabId === 'student-profile-tab') {
                 replaceContainerFromFresh(currentPane, freshPane, 'spAwardsContainer');
@@ -787,13 +789,74 @@ document.addEventListener('DOMContentLoaded', function () {
         var modalEl = document.getElementById('degreeModal');
         var modal = new bootstrap.Modal(modalEl);
 
+        var degreeIsUhcoEl = document.getElementById('degreeIsUHCO');
+        var degreeIsEnrolledEl = document.getElementById('degreeIsEnrolled');
+        var degreeHasYearChangeEl = document.getElementById('degreeHasYearChange');
+        var degreeUhcoFieldsEl = document.getElementById('degreeUhcoFields');
+        var degreeExpectedGradYearEl = document.getElementById('degreeExpectedGradYear');
+        var degreeOriginalExpectedGradYearEl = document.getElementById('degreeOriginalExpectedGradYear');
+
+        function syncDegreeModalState() {
+            if (!degreeIsUhcoEl || !degreeIsEnrolledEl || !degreeHasYearChangeEl) return;
+            var isUhco = !!degreeIsUhcoEl.checked;
+            var isEnrolled = !!degreeIsEnrolledEl.checked;
+            var hasYearChange = !!degreeHasYearChangeEl.checked;
+
+            if (degreeUhcoFieldsEl) {
+                degreeUhcoFieldsEl.classList.toggle('d-none', !isUhco);
+            }
+
+            var programEl = document.getElementById('degreeProgram');
+            if (programEl) {
+                programEl.disabled = !isUhco;
+                if (!isUhco) {
+                    programEl.value = '';
+                }
+            }
+
+            degreeIsEnrolledEl.disabled = !isUhco;
+            if (!isUhco) {
+                degreeIsEnrolledEl.checked = false;
+                degreeHasYearChangeEl.checked = false;
+            }
+
+            degreeHasYearChangeEl.disabled = !isUhco || !degreeIsEnrolledEl.checked;
+            if (degreeHasYearChangeEl.disabled) {
+                degreeHasYearChangeEl.checked = false;
+            }
+
+            if (degreeExpectedGradYearEl) {
+                degreeExpectedGradYearEl.disabled = !isUhco || !degreeIsEnrolledEl.checked;
+                if (degreeExpectedGradYearEl.disabled) {
+                    degreeExpectedGradYearEl.value = '';
+                }
+            }
+
+            if (degreeOriginalExpectedGradYearEl) {
+                degreeOriginalExpectedGradYearEl.disabled = !isUhco || !degreeHasYearChangeEl.checked;
+                if (degreeOriginalExpectedGradYearEl.disabled) {
+                    degreeOriginalExpectedGradYearEl.value = '';
+                }
+            }
+        }
+
         function getAllData() {
             var items = [];
             var hiddens = container.querySelectorAll('input[data-degree-field="name"]');
             hiddens.forEach(function (el) {
                 var idx = el.getAttribute('data-degree-idx');
                 var get = function(f) { return (container.querySelector('input[data-degree-field="'+f+'"][data-degree-idx="'+idx+'"]') || {}).value || ''; };
-                items.push({ name: el.value, university: get('university'), year: get('year') });
+                items.push({
+                    name: el.value,
+                    university: get('university'),
+                    year: get('year'),
+                    isuhco: get('isuhco') || '0',
+                    isenrolled: get('isenrolled') || '0',
+                    haschange: get('haschange') || '0',
+                    origexpgrad: get('origexpgrad') || '',
+                    expgrad: get('expgrad') || '',
+                    program: get('program') || ''
+                });
             });
             return items;
         }
@@ -807,13 +870,21 @@ document.addEventListener('DOMContentLoaded', function () {
                     "<strong>" + esc(d.name) + "</strong>" +
                     (d.university ? " <small class='text-muted'>— " + esc(d.university) + "</small>" : "") +
                     (d.year ? " <small class='text-muted'>(" + esc(d.year) + ")</small>" : "") +
+                    (d.isuhco === '1' ? " <span class='badge bg-primary ms-1'>UHCO</span>" : "") +
+                    (d.program ? " <span class='badge bg-info text-dark ms-1'>" + esc(d.program) + "</span>" : "") +
                     "</div><div>" +
                     "<button type='button' class='btn btn-sm btn-edit edit-degree-btn' data-idx='" + i + "'><i class='bi bi-pencil-square me-1'></i>Edit</button> " +
                     "<button type='button' class='btn btn-sm btn-remove remove-degree-btn' data-idx='" + i + "'><i class='bi bi-trash me-1'></i>Remove</button>" +
                     "</div></div></div></div>" +
                     "<input type='hidden' data-degree-field='name' data-degree-idx='" + i + "' value='" + esc(d.name) + "'>" +
                     "<input type='hidden' data-degree-field='university' data-degree-idx='" + i + "' value='" + esc(d.university) + "'>" +
-                    "<input type='hidden' data-degree-field='year' data-degree-idx='" + i + "' value='" + esc(d.year) + "'>"
+                    "<input type='hidden' data-degree-field='year' data-degree-idx='" + i + "' value='" + esc(d.year) + "'>" +
+                    "<input type='hidden' data-degree-field='isuhco' data-degree-idx='" + i + "' value='" + esc(d.isuhco || '0') + "'>" +
+                    "<input type='hidden' data-degree-field='isenrolled' data-degree-idx='" + i + "' value='" + esc(d.isenrolled || '0') + "'>" +
+                    "<input type='hidden' data-degree-field='haschange' data-degree-idx='" + i + "' value='" + esc(d.haschange || '0') + "'>" +
+                    "<input type='hidden' data-degree-field='origexpgrad' data-degree-idx='" + i + "' value='" + esc(d.origexpgrad || '') + "'>" +
+                    "<input type='hidden' data-degree-field='expgrad' data-degree-idx='" + i + "' value='" + esc(d.expgrad || '') + "'>" +
+                    "<input type='hidden' data-degree-field='program' data-degree-idx='" + i + "' value='" + esc(d.program || '') + "'>"
                 );
             });
         }
@@ -823,6 +894,13 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('degreeName').value = '';
             document.getElementById('degreeUniversity').value = '';
             document.getElementById('degreeYear').value = '';
+            document.getElementById('degreeProgram').value = '';
+            if (degreeIsUhcoEl) degreeIsUhcoEl.checked = false;
+            if (degreeIsEnrolledEl) degreeIsEnrolledEl.checked = false;
+            if (degreeHasYearChangeEl) degreeHasYearChangeEl.checked = false;
+            if (degreeExpectedGradYearEl) degreeExpectedGradYearEl.value = '';
+            if (degreeOriginalExpectedGradYearEl) degreeOriginalExpectedGradYearEl.value = '';
+            syncDegreeModalState();
             document.getElementById('degreeModalLabel').textContent = 'Add Degree';
         }
 
@@ -833,6 +911,13 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('degreeName').value = d.name;
             document.getElementById('degreeUniversity').value = d.university;
             document.getElementById('degreeYear').value = d.year;
+            document.getElementById('degreeProgram').value = d.program || '';
+            if (degreeIsUhcoEl) degreeIsUhcoEl.checked = (d.isuhco === '1');
+            if (degreeIsEnrolledEl) degreeIsEnrolledEl.checked = (d.isenrolled === '1');
+            if (degreeHasYearChangeEl) degreeHasYearChangeEl.checked = (d.haschange === '1');
+            if (degreeExpectedGradYearEl) degreeExpectedGradYearEl.value = d.expgrad || '';
+            if (degreeOriginalExpectedGradYearEl) degreeOriginalExpectedGradYearEl.value = d.origexpgrad || '';
+            syncDegreeModalState();
             document.getElementById('degreeModalLabel').textContent = 'Edit Degree';
         }
 
@@ -840,8 +925,24 @@ document.addEventListener('DOMContentLoaded', function () {
             return {
                 name: document.getElementById('degreeName').value.trim(),
                 university: document.getElementById('degreeUniversity').value.trim(),
-                year: document.getElementById('degreeYear').value.trim()
+                year: document.getElementById('degreeYear').value.trim(),
+                isuhco: degreeIsUhcoEl && degreeIsUhcoEl.checked ? '1' : '0',
+                isenrolled: degreeIsEnrolledEl && degreeIsEnrolledEl.checked ? '1' : '0',
+                haschange: degreeHasYearChangeEl && degreeHasYearChangeEl.checked ? '1' : '0',
+                origexpgrad: degreeOriginalExpectedGradYearEl ? degreeOriginalExpectedGradYearEl.value.trim() : '',
+                expgrad: degreeExpectedGradYearEl ? degreeExpectedGradYearEl.value.trim() : '',
+                program: document.getElementById('degreeProgram').value
             };
+        }
+
+        if (degreeIsUhcoEl) {
+            degreeIsUhcoEl.addEventListener('change', syncDegreeModalState);
+        }
+        if (degreeIsEnrolledEl) {
+            degreeIsEnrolledEl.addEventListener('change', syncDegreeModalState);
+        }
+        if (degreeHasYearChangeEl) {
+            degreeHasYearChangeEl.addEventListener('change', syncDegreeModalState);
         }
 
         var addDegreeBtn = document.getElementById('addDegreeBtn');
@@ -882,6 +983,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 body.append('name_' + i, d.name);
                 body.append('univ_' + i, d.university);
                 body.append('year_' + i, d.year);
+                body.append('isuhco_' + i, d.isuhco || '0');
+                body.append('isenrolled_' + i, d.isenrolled || '0');
+                body.append('haschange_' + i, d.haschange || '0');
+                body.append('origexpgrad_' + i, d.origexpgrad || '');
+                body.append('expgrad_' + i, d.expgrad || '');
+                body.append('program_' + i, d.program || '');
             });
             var status = getSaveStatusEl('saveDegreesBtn', 'degreesSaveStatus');
             if (!status) return Promise.resolve({ success: false, message: 'Save status unavailable' });
@@ -1022,6 +1129,141 @@ document.addEventListener('DOMContentLoaded', function () {
             var status = getSaveStatusEl('saveAwardsBtn', 'awardsSaveStatus');
             if (!status) return Promise.resolve({ success: false, message: 'Save status unavailable' });
             return ajaxSave('awards', body, status).then(function (data) {
+                if (data && data.success && options.hideModalOnSuccess) {
+                    modal.hide();
+                }
+                return data;
+            });
+        }
+
+    })();
+
+    /* ────────────────────────────────────────────────────────
+       RESIDENCY SECTION
+       ──────────────────────────────────────────────────────── */
+    (function () {
+        var container = document.getElementById('residenciesContainer');
+        if (!container) return;
+        var modalEl = document.getElementById('residencyModal');
+        var modal = new bootstrap.Modal(modalEl);
+
+        function getAllData() {
+            var items = [];
+            var hiddens = container.querySelectorAll('input[data-residency-field="location"]');
+            hiddens.forEach(function (el) {
+                var idx = el.getAttribute('data-residency-idx');
+                var get = function (f) { return (container.querySelector('input[data-residency-field="' + f + '"][data-residency-idx="' + idx + '"]') || {}).value || ''; };
+                items.push({
+                    location: el.value,
+                    specialty: get('specialty'),
+                    startingyear: get('startingyear'),
+                    isuhco: get('isuhco') || '0',
+                    iscurrent: get('iscurrent') || '0'
+                });
+            });
+            return items;
+        }
+
+        function rebuild(items) {
+            container.innerHTML = '';
+            items.forEach(function (d, i) {
+                container.insertAdjacentHTML('beforeend',
+                    "<div class='card mb-2'><div class='card-body py-2 px-3'>" +
+                    "<div class='d-flex justify-content-between align-items-center'><div>" +
+                    "<strong>" + esc(d.location) + "</strong>" +
+                    (d.specialty ? " <span class='text-muted'>- " + esc(d.specialty) + "</span>" : "") +
+                    (d.startingyear ? " <span class='badge bg-secondary text-dark ms-1'>" + esc(d.startingyear) + "</span>" : "") +
+                    (d.isuhco === '1' ? " <span class='badge bg-primary ms-1'>UHCO</span>" : "") +
+                    (d.iscurrent === '1' ? " <span class='badge bg-success ms-1'>Current</span>" : "") +
+                    "</div><div>" +
+                    "<button type='button' class='btn btn-sm btn-edit edit-residency-btn' data-idx='" + i + "'><i class='bi bi-pencil-square me-1'></i>Edit</button> " +
+                    "<button type='button' class='btn btn-sm btn-remove remove-residency-btn' data-idx='" + i + "'><i class='bi bi-trash me-1'></i>Remove</button>" +
+                    "</div></div></div></div>" +
+                    "<input type='hidden' data-residency-field='location' data-residency-idx='" + i + "' value='" + esc(d.location) + "'>" +
+                    "<input type='hidden' data-residency-field='specialty' data-residency-idx='" + i + "' value='" + esc(d.specialty) + "'>" +
+                    "<input type='hidden' data-residency-field='startingyear' data-residency-idx='" + i + "' value='" + esc(d.startingyear) + "'>" +
+                    "<input type='hidden' data-residency-field='isuhco' data-residency-idx='" + i + "' value='" + (d.isuhco || '0') + "'>" +
+                    "<input type='hidden' data-residency-field='iscurrent' data-residency-idx='" + i + "' value='" + (d.iscurrent || '0') + "'>"
+                );
+            });
+        }
+
+        function clearModal() {
+            document.getElementById('residencyEditIdx').value = '-1';
+            document.getElementById('residencyLocation').value = '';
+            document.getElementById('residencySpecialty').value = '';
+            document.getElementById('residencyStartingYear').value = '';
+            document.getElementById('residencyIsUHCO').checked = false;
+            document.getElementById('residencyIsCurrent').checked = false;
+            document.getElementById('residencyModalLabel').textContent = 'Add Residency';
+        }
+
+        function fillModal(idx) {
+            var items = getAllData();
+            var d = items[idx];
+            document.getElementById('residencyEditIdx').value = idx;
+            document.getElementById('residencyLocation').value = d.location;
+            document.getElementById('residencySpecialty').value = d.specialty;
+            document.getElementById('residencyStartingYear').value = d.startingyear;
+            document.getElementById('residencyIsUHCO').checked = d.isuhco === '1';
+            document.getElementById('residencyIsCurrent').checked = d.iscurrent === '1';
+            document.getElementById('residencyModalLabel').textContent = 'Edit Residency';
+        }
+
+        function readModal() {
+            return {
+                location: document.getElementById('residencyLocation').value.trim(),
+                specialty: document.getElementById('residencySpecialty').value.trim(),
+                startingyear: document.getElementById('residencyStartingYear').value.trim(),
+                isuhco: document.getElementById('residencyIsUHCO').checked ? '1' : '0',
+                iscurrent: document.getElementById('residencyIsCurrent').checked ? '1' : '0'
+            };
+        }
+
+        var addResidencyBtn = document.getElementById('addResidencyBtn');
+        if (addResidencyBtn) {
+            addResidencyBtn.addEventListener('click', function () { clearModal(); modal.show(); });
+        }
+
+        document.getElementById('saveResidencyModalBtn').addEventListener('click', function () {
+            var d = readModal();
+            if (!d.location) { alert('Residency location is required.'); return; }
+            var items = getAllData();
+            var editIdx = parseInt(document.getElementById('residencyEditIdx').value, 10);
+            if (editIdx >= 0) { items[editIdx] = d; } else { items.push(d); }
+            rebuild(items);
+            saveResidenciesToDatabase({ hideModalOnSuccess: true });
+        });
+
+        container.addEventListener('click', function (e) {
+            var btn = e.target.closest('.edit-residency-btn');
+            if (btn) { fillModal(parseInt(btn.dataset.idx, 10)); modal.show(); return; }
+            btn = e.target.closest('.remove-residency-btn');
+            if (btn) {
+                var items = getAllData();
+                items.splice(parseInt(btn.dataset.idx, 10), 1);
+                rebuild(items);
+                saveResidenciesToDatabase();
+            }
+        });
+
+        function saveResidenciesToDatabase(options) {
+            options = options || {};
+            var items = getAllData();
+            var body = new URLSearchParams();
+            body.append('userID', document.getElementById('pageUserID').value);
+            body.append('section', 'residencies');
+            body.append('count', items.length);
+            items.forEach(function (d, i) {
+                body.append('location_' + i, d.location);
+                body.append('specialty_' + i, d.specialty);
+                body.append('startingyear_' + i, d.startingyear);
+                body.append('isuhco_' + i, d.isuhco || '0');
+                body.append('iscurrent_' + i, d.iscurrent || '0');
+            });
+            var status = getSaveStatusEl('saveResidenciesBtn', 'residenciesSaveStatus');
+            if (!status) return Promise.resolve({ success: false, message: 'Save status unavailable' });
+            return ajaxSave('residencies', body, status).then(function (data) {
                 if (data && data.success && options.hideModalOnSuccess) {
                     modal.hide();
                 }
@@ -1245,6 +1487,7 @@ document.addEventListener('DOMContentLoaded', function () {
     wireRepeaterDirty('addresses', document.getElementById('addressesContainer'));
     wireRepeaterDirty('degrees', document.getElementById('degreesContainer'));
     wireRepeaterDirty('awards', document.getElementById('awardsContainer'));
+    wireRepeaterDirty('residencies', document.getElementById('residenciesContainer'));
 
     window.addEventListener('users-edit-tab-selected', function (event) {
         var tabId = event && event.detail ? (event.detail.tabId || '') : '';
@@ -1998,7 +2241,7 @@ document.addEventListener('DOMContentLoaded', function () {
             body.append('DOB', dobEl ? dobEl.value : '');
             body.append('Gender', genEl ? genEl.value : '');
 
-            ['CurrentGradYear','OriginalGradYear','sp_first_externship','sp_second_externship','sp_commencement_age'].forEach(function (f) {
+            ['CurrentGradYear','OriginalGradYear','sp_first_externship','sp_second_externship','sp_commencement_age','sp_dissertation_thesis'].forEach(function (f) {
                 var el = pane.querySelector('[name="' + f + '"]');
                 body.append(f, el ? el.value : '');
             });
@@ -2021,7 +2264,7 @@ document.addEventListener('DOMContentLoaded', function () {
             var body = new URLSearchParams();
             body.append('userID', pageUserID);
             body.append('section', 'studentprofile');
-            ['CurrentGradYear','OriginalGradYear','sp_first_externship','sp_second_externship','sp_commencement_age'].forEach(function (f) {
+            ['CurrentGradYear','OriginalGradYear','sp_first_externship','sp_second_externship','sp_commencement_age','sp_dissertation_thesis'].forEach(function (f) {
                 var el = pane.querySelector('[name="' + f + '"]');
                 body.append(f, el ? el.value : '');
             });
@@ -2033,9 +2276,21 @@ document.addEventListener('DOMContentLoaded', function () {
                 var n = pane.querySelector('[name="sp_deg_name_' + i + '"]');
                 var u = pane.querySelector('[name="sp_deg_univ_' + i + '"]');
                 var y = pane.querySelector('[name="sp_deg_year_' + i + '"]');
+                var isuhco  = pane.querySelector('[name="sp_deg_isuhco_' + i + '"]');
+                var enrolled = pane.querySelector('[name="sp_deg_enrolled_' + i + '"]');
+                var haschange = pane.querySelector('[name="sp_deg_haschange_' + i + '"]');
+                var origexpgrad = pane.querySelector('[name="sp_deg_origexpgrad_' + i + '"]');
+                var expgrad = pane.querySelector('[name="sp_deg_expgrad_' + i + '"]');
+                var program = pane.querySelector('[name="sp_deg_program_' + i + '"]');
                 body.append('sp_deg_name_' + i, n ? n.value : '');
                 body.append('sp_deg_univ_' + i, u ? u.value : '');
                 body.append('sp_deg_year_' + i, y ? y.value : '');
+                body.append('sp_deg_isuhco_' + i, (isuhco && isuhco.checked) ? '1' : '0');
+                body.append('sp_deg_enrolled_' + i, (enrolled && enrolled.checked) ? '1' : '0');
+                body.append('sp_deg_haschange_' + i, (haschange && haschange.checked) ? '1' : '0');
+                body.append('sp_deg_origexpgrad_' + i, origexpgrad ? origexpgrad.value : '');
+                body.append('sp_deg_expgrad_' + i, expgrad ? expgrad.value : '');
+                body.append('sp_deg_program_' + i, program ? program.value : '');
             }
             saveSectionAjax('studentprofile', body, document.getElementById('save-studentprofile-status'));
         });
@@ -2057,9 +2312,21 @@ document.addEventListener('DOMContentLoaded', function () {
                 var n = document.querySelector('[name="' + prefix + '_deg_name_' + i + '"]');
                 var u = document.querySelector('[name="' + prefix + '_deg_univ_' + i + '"]');
                 var y = document.querySelector('[name="' + prefix + '_deg_year_' + i + '"]');
+                var isuhco    = document.querySelector('[name="' + prefix + '_deg_isuhco_' + i + '"]');
+                var enrolled  = document.querySelector('[name="' + prefix + '_deg_enrolled_' + i + '"]');
+                var haschange = document.querySelector('[name="' + prefix + '_deg_haschange_' + i + '"]');
+                var origexpgrad = document.querySelector('[name="' + prefix + '_deg_origexpgrad_' + i + '"]');
+                var expgrad   = document.querySelector('[name="' + prefix + '_deg_expgrad_' + i + '"]');
+                var program   = document.querySelector('[name="' + prefix + '_deg_program_' + i + '"]');
                 body.append(prefix + '_deg_name_' + i, n ? n.value : '');
                 body.append(prefix + '_deg_univ_' + i, u ? u.value : '');
                 body.append(prefix + '_deg_year_' + i, y ? y.value : '');
+                body.append(prefix + '_deg_isuhco_' + i, (isuhco && isuhco.checked) ? '1' : '0');
+                body.append(prefix + '_deg_enrolled_' + i, (enrolled && enrolled.checked) ? '1' : '0');
+                body.append(prefix + '_deg_haschange_' + i, (haschange && haschange.checked) ? '1' : '0');
+                body.append(prefix + '_deg_origexpgrad_' + i, origexpgrad ? origexpgrad.value : '');
+                body.append(prefix + '_deg_expgrad_' + i, expgrad ? expgrad.value : '');
+                body.append(prefix + '_deg_program_' + i, program ? program.value : '');
             }
             saveSectionAjax('tabdegrees', body, document.getElementById(statusId));
         });
@@ -2067,6 +2334,43 @@ document.addEventListener('DOMContentLoaded', function () {
     setupDegreeTabSave('save-facultydeg-btn', 'save-facultydeg-status', 'fac');
     setupDegreeTabSave('save-emeritusdeg-btn', 'save-emeritusdeg-status', 'emer');
     setupDegreeTabSave('save-residentdeg-btn', 'save-residentdeg-status', 'res');
+
+    /* ── UHCO degree field toggles (inline degree rows in all tab panels) ── */
+    document.addEventListener('change', function (e) {
+        var row = e.target.closest('.degree-row');
+        if (!row) return;
+
+        // UHCO checkbox toggles the whole uhco-fields block
+        if (e.target.classList.contains('deg-isuhco')) {
+            var uhcoBlock = row.querySelector('.uhco-fields');
+            if (uhcoBlock) {
+                uhcoBlock.classList.toggle('d-none', !e.target.checked);
+                row.querySelectorAll('.deg-isenrolled, .deg-haschange, .deg-expgrad, .deg-origexpgrad, .deg-program')
+                   .forEach(function(el){ el.disabled = !e.target.checked; });
+            }
+        }
+
+        // Enrolled checkbox toggles ExpectedGradYear and HasYearChange
+        if (e.target.classList.contains('deg-isenrolled')) {
+            var enrolled = e.target.checked;
+            var expgradEl = row.querySelector('.deg-expgrad');
+            var hasChangeEl = row.querySelector('.deg-haschange');
+            if (expgradEl) expgradEl.disabled = !enrolled;
+            if (hasChangeEl) {
+                hasChangeEl.disabled = !enrolled;
+                if (!enrolled) { hasChangeEl.checked = false; }
+            }
+            // Also propagate hasChange state
+            var origEl = row.querySelector('.deg-origexpgrad');
+            if (origEl) origEl.disabled = !enrolled || !(hasChangeEl && hasChangeEl.checked);
+        }
+
+        // HasYearChange checkbox toggles OriginalExpectedGradYear
+        if (e.target.classList.contains('deg-haschange')) {
+            var origExpEl = row.querySelector('.deg-origexpgrad');
+            if (origExpEl) origExpEl.disabled = !e.target.checked;
+        }
+    });
 
     /* ── Bio tab ── */
     var saveBioBtn = document.getElementById('save-bio-btn');

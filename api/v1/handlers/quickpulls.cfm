@@ -5,10 +5,12 @@
     filtered by flag, without the overhead of full profiles.
 
     Types:
-        attending  — Clinical-Attending users (token only)
-        gradclass  — Alumni by grad year   (token + secret, ?year= required)
-        graduate   — Single Alumni by UserID   (token + secret, ?id= required)
-        deans      — Deans with kiosk image (token only)
+        attending       — Clinical-Attending users (token only)
+        gradclass       — Alumni by grad year   (token + secret, ?year= required)
+        graduate        — Single Alumni by UserID   (token + secret, ?id= required)
+        deans           — Deans with kiosk image (token only)
+        myuhco          — MyUHCO profile by external ID (token + optional secret)
+        myuhco-rosters  — MyUHCO roster PDF metadata catalog (token + secret)
 --->
 <cfset auth.requireAuth("read")>
 
@@ -26,7 +28,8 @@
 
     <!--- ── Grad Class ────────────────────────────────────────────── --->
     <cfcase value="gradclass">
-        <cfset allowedPrograms = ["OD Program", "PhD Program", "MS Program"]>
+        <cfset allowedPrograms = ["OD Program", "PhD Program", "MS Program", "All"]>
+        <cfset allowedLastNameFilters = ["A-C", "D-G", "H-K", "L-M", "N-P", "Q-S", "T-Z"]>
 
         <!--- Require secret that unlocks Alumni --->
         <cfset unlockedFlags = auth.checkSecret()>
@@ -46,10 +49,19 @@
             <cfset auth.sendError(400, "Missing required parameter: program")>
         </cfif>
         <cfif NOT arrayFindNoCase(allowedPrograms, programName)>
-            <cfset auth.sendError(400, "Invalid program. Allowed values: OD Program, PhD Program, MS Program")>
+            <cfset auth.sendError(400, "Invalid program. Allowed values: OD Program, PhD Program, MS Program, All")>
+        </cfif>
+        <cfif compareNoCase(programName, "all") EQ 0>
+            <cfset programName = "All">
         </cfif>
 
-        <cfset data = qpService.getGradClass(gradYear, programName)>
+        <!--- Optional ?filter= parameter for last name initial range --->
+        <cfset lastNameFilter = uCase(trim(url.filter ?: ""))>
+        <cfif len(lastNameFilter) AND NOT arrayFindNoCase(allowedLastNameFilters, lastNameFilter)>
+            <cfset auth.sendError(400, "Invalid filter. Allowed values: A-C, D-G, H-K, L-M, N-P, Q-S, T-Z")>
+        </cfif>
+
+        <cfset data = qpService.getGradClass(gradYear, programName, lastNameFilter)>
         <cfset auth.sendResponse({ total: arrayLen(data), data: data })>
         <cfabort>
     </cfcase>
@@ -101,6 +113,27 @@
         </cfif>
 
         <cfset auth.sendResponse(data)>
+        <cfabort>
+    </cfcase>
+
+    <!--- ── MyUHCO Roster Catalog ─────────────────────────────────── --->
+    <cfcase value="myuhco-rosters,myuhcorosters">
+        <cfset unlockedFlags = auth.checkSecret()>
+        <cfset hasAlumniAccess = arrayFindNoCase(unlockedFlags, "Alumni") GT 0>
+        <cfset hasStudentAccess = arrayFindNoCase(unlockedFlags, "Current-Student") GT 0>
+
+        <cfif NOT (hasAlumniAccess OR hasStudentAccess)>
+            <cfset auth.sendError(401, "A valid secret with Alumni or Current-Student access is required")>
+        </cfif>
+
+        <cfset publishedOnly = listFindNoCase("1,true,yes,on", trim(url.publishedOnly ?: "")) GT 0>
+        <cfset data = qpService.getMyUHCORosterCatalog(publishedOnly)>
+
+        <cfset auth.sendResponse({
+            total: arrayLen(data),
+            publishedOnly: publishedOnly,
+            data: data
+        })>
         <cfabort>
     </cfcase>
 

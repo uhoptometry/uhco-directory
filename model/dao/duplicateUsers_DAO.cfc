@@ -535,12 +535,12 @@ component extends="dao.BaseDAO" output="false" singleton {
                     CASE WHEN d1.UserID < d2.UserID THEN d1.UserID ELSE d2.UserID END AS UserID_A,
                     CASE WHEN d1.UserID < d2.UserID THEN d2.UserID ELSE d1.UserID END AS UserID_B,
                     'degrees_shared' AS SignalType,
-                    LOWER(LTRIM(RTRIM(ISNULL(d1.DegreeName, '')))) + '|' + LOWER(LTRIM(RTRIM(ISNULL(d1.DegreeYear, '')))) AS SignalValue
+                    LOWER(LTRIM(RTRIM(ISNULL(d1.DegreeName, '')))) + '|' + LOWER(LTRIM(RTRIM(ISNULL(d1.GraduationYear, '')))) AS SignalValue
                 FROM UserDegrees d1
                 INNER JOIN UserDegrees d2
                     ON d1.UserID < d2.UserID
                    AND LOWER(LTRIM(RTRIM(ISNULL(d1.DegreeName, '')))) = LOWER(LTRIM(RTRIM(ISNULL(d2.DegreeName, ''))))
-                   AND LOWER(LTRIM(RTRIM(ISNULL(d1.DegreeYear, '')))) = LOWER(LTRIM(RTRIM(ISNULL(d2.DegreeYear, ''))))
+                   AND LOWER(LTRIM(RTRIM(ISNULL(d1.GraduationYear, '')))) = LOWER(LTRIM(RTRIM(ISNULL(d2.GraduationYear, ''))))
                 WHERE NULLIF(LTRIM(RTRIM(ISNULL(d1.DegreeName, ''))), '') IS NOT NULL
 
                 UNION ALL
@@ -1109,7 +1109,7 @@ component extends="dao.BaseDAO" output="false" singleton {
                       WHERE pd.UserID = @primaryUserID
                         AND LOWER(LTRIM(RTRIM(ISNULL(pd.DegreeName, '')))) = LOWER(LTRIM(RTRIM(ISNULL(sd.DegreeName, ''))))
                         AND LOWER(LTRIM(RTRIM(ISNULL(pd.University, '')))) = LOWER(LTRIM(RTRIM(ISNULL(sd.University, ''))))
-                        AND LOWER(LTRIM(RTRIM(ISNULL(pd.DegreeYear, '')))) = LOWER(LTRIM(RTRIM(ISNULL(sd.DegreeYear, ''))))
+                        AND LOWER(LTRIM(RTRIM(ISNULL(pd.GraduationYear, '')))) = LOWER(LTRIM(RTRIM(ISNULL(sd.GraduationYear, ''))))
                   );
                 SET @degreesDeduped = @degreesDeduped + @@ROWCOUNT;
 

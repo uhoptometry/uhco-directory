@@ -99,6 +99,7 @@
                 "settings.import.manage",
                 "settings.bulk_exclusions.manage",
                 "settings.migrations.manage",
+                "settings.rosters.manage",
                 "settings.uh_sync.view",
                 "settings.query_builder.use",
                 "settings.scheduled_tasks.manage",
